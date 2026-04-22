@@ -46,6 +46,7 @@ export default function GraphExplorer({
   replayRunId,
   toolbarRightActions,
   showOriginLegend = true,
+  hideSelectionToolbar = false,
   className = '',
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
@@ -546,7 +547,7 @@ export default function GraphExplorer({
           </button>
         </div>
       )}
-      {cytoscape.selectedNodeIds.size > 0 && (
+      {!hideSelectionToolbar && cytoscape.selectedNodeIds.size > 0 && (
         <div className="absolute bottom-16 right-4 z-50 flex items-center gap-2 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 shadow-lg">
           <span className="text-slate-300 text-xs">{cytoscape.selectedNodeIds.size} selected</span>
           <div className="w-px h-4 bg-slate-600" />
