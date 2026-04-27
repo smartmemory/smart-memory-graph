@@ -17,6 +17,9 @@ export { default as NodeTooltip } from './components/NodeTooltip';
 export { default as WikipediaOverlay } from './components/WikipediaOverlay';
 export { default as ReplayButton } from './components/ReplayButton';
 export { default as TimeTravelSlider } from './components/TimeTravelSlider';
+export { default as PipelineDag, buildElements as buildPipelineDagElements } from './components/PipelineDag';
+export { default as ReplayScrubBar, fmtSeconds as formatReplayTime } from './components/ReplayScrubBar';
+export { default as RunLogPanel } from './components/RunLogPanel';
 
 // --- Hooks ---
 export { useGraphData } from './hooks/useGraphData';
@@ -27,6 +30,9 @@ export { useDripFeed } from './hooks/useDripFeed';
 export { useUrlState } from './hooks/useUrlState';
 export { useConnectionStatus } from './hooks/useConnectionStatus';
 export { useEntityCorrections } from './hooks/useEntityCorrections';
+export { usePipelineDag } from './hooks/usePipelineDag';
+export { useReplayClock } from './hooks/useReplayClock';
+export { ReplayClock, eventTimestamp } from './core/replayClock';
 
 // --- Adapters ---
 export { createFetchAdapter } from './adapters/fetchAdapter';
@@ -54,7 +60,17 @@ export { ENTITY_TYPES, LAYOUT_OPTIONS, RECIPROCAL_PAIRS } from './core/constants
 export { normalizeAPIResponse, normalizeExtractionResults } from './core/normalize';
 export { coalesceGraphData } from './core/coalesce';
 export { classifyEvent } from './core/classifyEvent';
-export { eventToGraphNode, eventToGraphEdge } from './core/eventTransform';
+export {
+  eventToGraphNode,
+  eventToGraphEdge,
+  extractionEntityToData,
+  extractionRelationToData,
+} from './core/eventTransform';
+export {
+  deriveStageStatus,
+  fillNeverEntered,
+  UI_STATES as PIPELINE_DAG_UI_STATES,
+} from './core/pipelineDagState';
 export { searchWikipedia } from './core/wikipedia';
 export { exportPNG, exportSVG } from './core/export';
 export { saveRecording, getLastRecording, getAllRecordings, clearRecordings } from './core/eventStore';

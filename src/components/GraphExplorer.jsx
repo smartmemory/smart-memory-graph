@@ -32,6 +32,10 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
  * @param {string} [props.sseBaseUrl] - SmartMemory API base URL for SSE progress stream
  * @param {string} [props.sseToken] - Bearer JWT for SSE auth
  * @param {string} [props.replayRunId] - When set, replays a specific run (passes runId+fromSeq:0)
+ * @param {Object} [props.clock] - Optional shared replay clock from useReplayClock().
+ *   When provided, GraphExplorer consumes events released by the clock instead
+ *   of opening its own SSE subscription. Used by Run Inspector to lockstep the
+ *   graph view with <PipelineDag> on a single playhead. (VIS-PIPELINE-DAG-1 Phase 4)
  * @param {import('react').ReactNode} [props.toolbarRightActions] - Extra controls rendered at toolbar right side
  * @param {string} [props.className] - Additional CSS classes
  */
@@ -44,6 +48,7 @@ export default function GraphExplorer({
   sseBaseUrl,
   sseToken,
   replayRunId,
+  clock = null,
   toolbarRightActions,
   showOriginLegend = true,
   hideSelectionToolbar = false,
@@ -155,17 +160,37 @@ export default function GraphExplorer({
   // Replay not available state: set when 404 + no IDB recording found
   const [replayNotAvailable, setReplayNotAvailable] = useState(false);
 
-  // Streaming — SSE transport (sseBaseUrl/sseToken) preferred; wsUrl/wsToken kept for backward compat
+  // Streaming — SSE transport (sseBaseUrl/sseToken) preferred; wsUrl/wsToken kept for backward compat.
+  // VIS-PIPELINE-DAG-1 Phase 4: when a `clock` prop is provided, the clock owns SSE
+  // and we consume events released through it — but useGraphStream still needs `enabled`
+  // to be true so the clock-driven path actually runs.
   const effectiveSseBase = sseBaseUrl || '';
   const effectiveSseToken = sseToken || wsToken;
-  const sseEnabled = !!(sseBaseUrl || sseToken || replayRunId);
+  const sseEnabled = !!(sseBaseUrl || sseToken || replayRunId || clock);
 
   const stream = useGraphStream({
     sseBaseUrl: effectiveSseBase,
     token: effectiveSseToken,
     enabled: sseEnabled,
     runId: replayRunId,
-    onElementAdded: (el) => dripFeedRef.current?.enqueue(el),
+    clock,
+    // VIS-PIPELINE-DAG-1 Phase 4 (Codex Round 1 MUST FIX 3):
+    // In clock-driven mode, bypass the drip-feed and apply elements directly
+    // to Cytoscape. The clock is already pacing events at original_ts; the
+    // drip-feed adds a second pacing layer with its own setTimeout queue
+    // that does NOT pause when the clock pauses, breaking lockstep pause.
+    onElementAdded: (el) => {
+      if (clock) {
+        const cy = cytoscape.cy?.current;
+        if (!cy) return;
+        try {
+          const cyEl = 'source' in el ? graphEdgeToCyElement(el) : graphNodeToCyElement(el);
+          cy.add(cyEl);
+        } catch (_) { /* element exists or transient */ }
+        return;
+      }
+      dripFeedRef.current?.enqueue(el);
+    },
     onSearchHighlight: (ids) => cytoscape.highlightElements(ids),
     onGroundingFlash: (nodeId) => {
       const cy = cytoscape.cy?.current;
@@ -180,6 +205,17 @@ export default function GraphExplorer({
     onGraphCleared: () => {
       dripFeedRef.current?.resetDrip();
       streamRef.current?.clearOperations();
+      // VIS-PIPELINE-DAG-1 Phase 4 (Codex Round 1 MUST FIX 2):
+      // In clock-driven replay mode, do NOT refetch the live graph — that
+      // would replace the playhead's slice with current global state and
+      // leave future nodes visible after seek-backward. Wipe the canvas
+      // and let the clock re-emit events from the new playhead position.
+      if (clock) {
+        try {
+          cytoscape.cy?.current?.elements()?.remove();
+        } catch (_) { /* no canvas yet */ }
+        return;
+      }
       refresh();
     },
     onReconnect: () => refresh(),

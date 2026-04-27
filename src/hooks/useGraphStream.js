@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { classifyEvent } from '../core/classifyEvent';
-import { eventToGraphNode, eventToGraphEdge } from '../core/eventTransform';
+import {
+  eventToGraphNode,
+  eventToGraphEdge,
+  extractionEntityToData,
+  extractionRelationToData,
+} from '../core/eventTransform';
 import { coalesceGraphData } from '../core/coalesce';
 import { saveRecording, shouldSaveToIDB } from '../core/eventStore';
 import { subscribeProgress } from '@smartmemory/sdk-js/progress';
@@ -24,6 +29,14 @@ import { subscribeProgress } from '@smartmemory/sdk-js/progress';
  * @param {Function} [options.onGraphCleared] - Callback when graph is cleared
  * @param {Function} [options.onReconnect] - Callback on SSE reconnection
  * @param {Function} [options.onGroundingFlash] - Callback with nodeId when entity is grounded
+ * @param {Object} [options.clock] - Optional shared replay clock from
+ *   useReplayClock(). When provided, this hook does NOT subscribe to SSE
+ *   directly — it consumes events released by the clock at recorded
+ *   `payload.original_ts` pacing, with the same classify→batch→callback
+ *   pipeline. Use this when a single playhead drives multiple views
+ *   (Run Inspector: <PipelineDag clock={c}> + <GraphExplorer clock={c}>).
+ *   On clock reset (e.g. seek-backward, runId change), pending state is
+ *   cleared and `onGraphCleared` fires so the graph view re-builds.
  */
 export function useGraphStream(options = {}) {
   const {
@@ -39,6 +52,7 @@ export function useGraphStream(options = {}) {
     onReconnect,
     onGroundingFlash,
     onReplayNotFound,
+    clock = null,
   } = options;
 
   const [status, setStatus] = useState('disconnected');
@@ -98,10 +112,10 @@ export function useGraphStream(options = {}) {
       if (op.category === 'graph_cleared') {
         graphCleared = true;
       } else if (op.category === 'node_added') {
-        const el = eventToGraphNode(op.meta?.data);
+        const el = eventToGraphNode(op.meta?.data, op.meta?.payload);
         if (el) rawElements.push(el);
       } else if (op.category === 'edge_added') {
-        const el = eventToGraphEdge(op.meta?.data);
+        const el = eventToGraphEdge(op.meta?.data, op.meta?.payload);
         if (el) rawElements.push(el);
       } else if (op.category === 'search_highlight' && op.matchIds?.length) {
         searchIds.push(...op.matchIds);
@@ -190,8 +204,8 @@ export function useGraphStream(options = {}) {
         continue;
       }
 
-      const el = op.category === 'node_added' ? eventToGraphNode(op.meta?.data)
-        : op.category === 'edge_added' ? eventToGraphEdge(op.meta?.data)
+      const el = op.category === 'node_added' ? eventToGraphNode(op.meta?.data, op.meta?.payload)
+        : op.category === 'edge_added' ? eventToGraphEdge(op.meta?.data, op.meta?.payload)
         : null;
       if (!el) continue;
 
@@ -235,13 +249,81 @@ export function useGraphStream(options = {}) {
     }
   }, [bufferSize]);
 
-  // SSE connection via subscribeProgress
+  // VIS-PIPELINE-DAG-1 Phase 4: clock-driven path. When a shared clock is
+  // provided, consume events from it instead of opening a direct SSE
+  // subscription — the clock owns SSE for all consumers in the Run Inspector.
+  // Stable identities (subscribe / subscribeReset) are pulled out so the
+  // effect doesn't re-fire on every snapshot update.
+  const clockSubscribe = clock?.subscribe;
+  const clockSubscribeReset = clock?.subscribeReset;
+  useEffect(() => {
+    if (!enabled || !clockSubscribe) return undefined;
+
+    unmountedRef.current = false;
+    setStatus('connected');
+
+    const handleEvent = (progressEvent) => {
+      if (unmountedRef.current || isPausedRef.current) return;
+      const classified = classifyProgressEvent(progressEvent);
+      if (!classified) return;
+      batchRef.current.push(classified);
+      // No 200ms batch timer in clock-driven mode — flush synchronously per
+      // released batch so the playhead and graph stay perceptually in sync
+      // with the DAG view also driven by the same clock.
+      flushBatch();
+    };
+
+    const unsubEvents = clockSubscribe(handleEvent);
+    // Codex Round 1 MUST FIX 1 + Round 3 SHOULD ADJUST: shared reset body
+    // used by both the seek-backward reset signal AND clock-prop teardown
+    // (e.g. parent swaps the clock instance). Without the teardown call,
+    // `batchRef`/`canonicalMapRef`/recording timers would leak across clock
+    // changes and corrupt the rebuilt graph in the next clock-driven run.
+    const resetStreamState = ({ notifyGraphCleared }) => {
+      batchRef.current = [];
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+        batchTimerRef.current = null;
+      }
+      pendingElementsRef.current = [];
+      canonicalMapRef.current = {};
+      opsTimestampsRef.current = [];
+      const buf = recordingBufferRef.current;
+      for (const key of Object.keys(buf)) {
+        if (buf[key]?.timer) clearTimeout(buf[key].timer);
+      }
+      recordingBufferRef.current = {};
+      if (notifyGraphCleared) {
+        callbacksRef.current.onGraphCleared?.();
+      }
+    };
+
+    const unsubReset = clockSubscribeReset
+      ? clockSubscribeReset(() => resetStreamState({ notifyGraphCleared: true }))
+      : () => {};
+
+    return () => {
+      unmountedRef.current = true;
+      try { unsubEvents(); } catch (_) { /* tearing down */ }
+      try { unsubReset(); } catch (_) { /* tearing down */ }
+      // Wipe stream state on teardown so a subsequent clock-prop swap or
+      // SSE-path fallback starts clean. Don't fire onGraphCleared during
+      // unmount — consumer is also tearing down.
+      resetStreamState({ notifyGraphCleared: false });
+    };
+  }, [enabled, clockSubscribe, clockSubscribeReset, flushBatch]);
+
+  // SSE connection via subscribeProgress (skipped when a clock is provided)
   useEffect(() => {
     unmountedRef.current = false;
 
     if (!enabled) {
       setStatus('disconnected');
       return;
+    }
+    if (clockSubscribe) {
+      // Clock owns the subscription — see effect above.
+      return undefined;
     }
 
     let unmounted = false;
@@ -326,7 +408,7 @@ export function useGraphStream(options = {}) {
         subscription.close();
       }
     };
-  }, [sseBaseUrl, token, enabled, runId, flushBatch]);
+  }, [sseBaseUrl, token, enabled, runId, flushBatch, clockSubscribe]);
 
   const pause = useCallback(() => {
     isPausedRef.current = true;
@@ -371,10 +453,10 @@ export function useGraphStream(options = {}) {
     const edges = [];
     for (const op of relevant) {
       if (op.category === 'node_added') {
-        const el = eventToGraphNode(op.meta?.data);
+        const el = eventToGraphNode(op.meta?.data, op.meta?.payload);
         if (el) nodes.push(el);
       } else if (op.category === 'edge_added') {
-        const el = eventToGraphEdge(op.meta?.data);
+        const el = eventToGraphEdge(op.meta?.data, op.meta?.payload);
         if (el) edges.push(el);
       }
     }
@@ -402,7 +484,7 @@ export function useGraphStream(options = {}) {
  *
  * @param {Object} progressEvent - ProgressEvent per progress-event-contract.json
  */
-function classifyProgressEvent(progressEvent) {
+export function classifyProgressEvent(progressEvent) {
   if (!progressEvent) return null;
 
   const { kind, stage, status, payload, run_id, seq, ts } = progressEvent;
@@ -450,8 +532,61 @@ function classifyProgressEvent(progressEvent) {
     };
   }
 
+  // Pipeline DAG topology declaration (VIS-PIPELINE-DAG-1)
+  if (kind === 'pipeline.dag') {
+    const pipeline = payload?.pipeline || 'pipeline';
+    const nodeCount = payload?.nodes?.length || 0;
+    return {
+      ...base,
+      category: 'pipeline_dag',
+      label: `Pipeline DAG: ${pipeline} (${nodeCount} stages)`,
+      nodeId: null,
+      meta: { ...progressEvent, operation: 'pipeline_dag' },
+    };
+  }
+
   // Pipeline stage events
   if (kind === 'pipeline.stage') {
+    // VIS-PIPELINE-DAG-1 Phase 2: post-extraction batched drip
+    // (IDEA-85 fold-in). pipeline.stage events from llm_extract carrying
+    // payload.entity / payload.relation are projected as graph elements
+    // so the viewer drip-feeds them during the rest of the pipeline.
+    if (stage === 'llm_extract' && payload?.entity) {
+      const data = extractionEntityToData(payload.entity);
+      if (data) {
+        return {
+          ...base,
+          category: 'node_added',
+          label: `Extracted entity "${payload.entity.name}"`,
+          nodeId: data.id,
+          meta: { ...progressEvent, data, operation: 'add_node' },
+        };
+      }
+      // Drip event was present but unprojectable — surface per
+      // no-silent-degradation.md instead of falling through silently.
+      console.warn(
+        '[useGraphStream] llm_extract drip entity payload unprojectable; skipping graph element',
+        payload.entity,
+      );
+    }
+    if (stage === 'llm_extract' && payload?.relation) {
+      const data = extractionRelationToData(payload.relation);
+      if (data) {
+        return {
+          ...base,
+          category: 'edge_added',
+          label: `Extracted relation "${data.edge_type}"`,
+          nodeId: data.source_id,
+          edgeId: data.id,
+          meta: { ...progressEvent, data, operation: 'add_edge' },
+        };
+      }
+      console.warn(
+        '[useGraphStream] llm_extract drip relation payload unprojectable; skipping graph element',
+        payload.relation,
+      );
+    }
+
     const stageName = stage || 'unknown';
     const durationMs = payload?.duration_ms;
     const durationStr = durationMs != null ? ` (${Math.round(durationMs)}ms)` : '';
