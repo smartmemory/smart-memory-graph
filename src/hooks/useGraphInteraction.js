@@ -28,6 +28,7 @@ export function useGraphInteraction({
   refresh,
   getShareableUrl,
   saveToUrl,
+  onNodeOpen,
 }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [connectedEdges, setConnectedEdges] = useState([]);
@@ -39,7 +40,7 @@ export function useGraphInteraction({
   const [timeTravelOpen, setTimeTravelOpen] = useState(!!urlState?.asOfTime);
   const [asOfTime, setAsOfTime] = useState(urlState?.asOfTime || null);
   const [timeTravelLoading, setTimeTravelLoading] = useState(false);
-  const [layout, setLayout] = useState(urlState?.layout || 'cose-bilkent');
+  const [layout, setLayout] = useState('cose-bilkent');
 
   // Single click: select node + highlight neighbors + open detail panel
   const handleNodeClick = useCallback((nodeData) => {
@@ -68,13 +69,17 @@ export function useGraphInteraction({
     }
   }, [pathMode, cytoscape, adapter]);
 
-  // Double-click: open detail panel
+  // Double-click: host hook (e.g. open in vault), fall back to detail panel.
   const handleNodeDblClick = useCallback((nodeData) => {
+    if (typeof onNodeOpen === 'function') {
+      onNodeOpen(nodeData);
+      return;
+    }
     setSelectedNode(nodeData);
     setDetailPanelOpen(true);
     cytoscape.selectNode(nodeData.id);
     setConnectedEdges(cytoscape.getConnectedEdges(nodeData.id));
-  }, [cytoscape]);
+  }, [cytoscape, onNodeOpen]);
 
   // Update node data in Cytoscape + React state
   const handleNodeUpdate = useCallback((nodeId, updates) => {

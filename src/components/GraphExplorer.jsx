@@ -53,6 +53,7 @@ export default function GraphExplorer({
   showOriginLegend = true,
   hideSelectionToolbar = false,
   className = '',
+  onNodeOpen,
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
   // Hybrid mode: adapter powers refresh/reconnect, external data merges as overlay.
@@ -242,6 +243,7 @@ export default function GraphExplorer({
     refresh,
     getShareableUrl,
     saveToUrl,
+    onNodeOpen,
   });
 
   // Wire node click/dblclick handlers to Cytoscape events
