@@ -1,5 +1,7 @@
 # @smartmemory/graph
 
+**Version:** 0.2.3
+
 Shared graph visualization package for SmartMemory. Provides Cytoscape.js-powered graph components, hooks, and adapters that can be consumed by any React app.
 
 ## Usage
@@ -65,3 +67,7 @@ src/
 - **smart-memory-viewer** — Standalone graph viewer (uses `fetchAdapter`)
 - **smart-memory-web** — Main web app (planned, will use `sdkAdapter`)
 - **smart-memory-studio** — Pipeline lab (planned)
+
+## Documentation
+
+Full SmartMemory documentation: https://docs.smartmemory.ai
