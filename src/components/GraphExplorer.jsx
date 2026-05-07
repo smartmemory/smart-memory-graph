@@ -38,6 +38,24 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
  *   graph view with <PipelineDag> on a single playhead. (VIS-PIPELINE-DAG-1 Phase 4)
  * @param {import('react').ReactNode} [props.toolbarRightActions] - Extra controls rendered at toolbar right side
  * @param {string} [props.className] - Additional CSS classes
+ * @param {Object} [props.theme] - Optional consumer-scoped canvas theme.
+ *   When omitted, the default dark semantic palette is used (web/studio/insights).
+ *   Applies to nodes/edges only — surrounding chrome stays under consumer CSS.
+ *   Annotation overlays (search match, contradictions) keep their signal colors
+ *   regardless of theme.
+ * @param {'dark'|'light'} [props.theme.mode] - Mode-default label/outline/selection
+ *   colors when no explicit palette override is provided.
+ * @param {Object} [props.theme.palette] - Direct color overrides. Each field
+ *   accepts any CSS color (hex, rgb(), named). Use this to mirror a host
+ *   application's theme variables (e.g. Obsidian `--graph-node`, `--graph-line`,
+ *   `--graph-text`) — the canvas updates live via the workspace `css-change`
+ *   event when the consumer re-renders with new values.
+ * @param {string} [props.theme.palette.node] - Single fill replacing the
+ *   per-type memory/entity/grounding palette (size differentiation preserved).
+ * @param {string} [props.theme.palette.edge] - Edge line + edge label color.
+ * @param {string} [props.theme.palette.label] - Node label text color.
+ * @param {string} [props.theme.palette.labelOutline] - Node label outline color.
+ * @param {string} [props.theme.palette.selectionBorder] - Selected-element border.
  */
 export default function GraphExplorer({
   adapter,
@@ -54,6 +72,7 @@ export default function GraphExplorer({
   hideSelectionToolbar = false,
   className = '',
   onNodeOpen,
+  theme = null,
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
   // Hybrid mode: adapter powers refresh/reconnect, external data merges as overlay.
@@ -123,7 +142,7 @@ export default function GraphExplorer({
   const filters = useGraphFilters(nodes, edges);
   const containerRef = useRef(null);
   const rootRef = useRef(null);
-  const cytoscape = useCytoscape(containerRef);
+  const cytoscape = useCytoscape(containerRef, { theme });
   const { urlState, saveToUrl, getShareableUrl } = useUrlState();
 
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);

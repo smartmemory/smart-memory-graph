@@ -51,7 +51,8 @@ export function getFitPadding(cy) {
   return Math.round(Math.max(12, Math.min(48, Math.min(cy.width(), cy.height()) * 0.03)));
 }
 
-export function useCytoscape(containerRef) {
+export function useCytoscape(containerRef, options = {}) {
+  const { theme = null } = options;
   const cyRef = useRef(null);
   const [containerReady, setContainerReady] = useState(false);
   const [cyReady, setCyReady] = useState(false);
@@ -94,7 +95,7 @@ export function useCytoscape(containerRef) {
 
     const cy = cytoscape({
       container,
-      style: getCytoscapeStyles(),
+      style: getCytoscapeStyles(theme),
       elements: [],
       layout: { name: 'preset' },
       minZoom: 0.1,
@@ -807,6 +808,17 @@ export function useCytoscape(containerRef) {
     });
     setSelectedNodeIds(new Set());
   }, []);
+
+  // Re-apply cytoscape styles when the consumer-supplied theme changes.
+  // The init effect only runs once (cyRef guard), so without this hook
+  // a runtime theme switch (e.g. Obsidian light/dark toggle) would not
+  // propagate to the canvas.
+  const themeKey = JSON.stringify(theme || null);
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !cyReady) return;
+    cy.style().fromJson(getCytoscapeStyles(theme)).update();
+  }, [themeKey, cyReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Memoize the return object so that only reactive state changes (ready, autoFit,
   // selectedNodeIds, selectionMode, isolated, moveMode) produce a new identity.

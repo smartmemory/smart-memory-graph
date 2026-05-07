@@ -6,7 +6,41 @@ function entityNodeSize(ele) {
   return Math.min(24, Math.max(12, 12 + deg * 1.5));
 }
 
-export function getCytoscapeStyles() {
+/**
+ * Build cytoscape style array.
+ *
+ * @param {Object} [theme] - Optional consumer-supplied theme.
+ * @param {'dark'|'light'} [theme.mode='dark'] - Light/dark mode for label,
+ *   outline, and selection-border defaults. Ignored if `palette.*` overrides
+ *   are provided. Default 'dark' preserves web/studio/insights output.
+ * @param {Object} [theme.palette] - Explicit color overrides. Any field set
+ *   here wins over the mode default and over the per-type semantic palette.
+ *   Use this to adopt a host application's theme variables verbatim
+ *   (e.g. Obsidian's --graph-node, --graph-line, --graph-text). Memory and
+ *   entity node *sizes* are unaffected — only fills and chrome colors are.
+ * @param {string} [theme.palette.node] - Single fill for ALL memory/entity/
+ *   grounding nodes (collapses the type palette to one color).
+ * @param {string} [theme.palette.edge] - Edge line + edge label color.
+ * @param {string} [theme.palette.label] - Node label text color.
+ * @param {string} [theme.palette.labelOutline] - Node label outline color.
+ * @param {string} [theme.palette.selectionBorder] - Selected-element border.
+ */
+export function getCytoscapeStyles(theme = null) {
+  const mode = theme?.mode === 'light' ? 'light' : 'dark';
+  const palette = theme?.palette || {};
+
+  // Mode-aware fallbacks (used only when palette.* is not provided).
+  const labelColor = palette.label || (mode === 'light' ? '#1e293b' : '#cbd5e1');
+  const labelOutline = palette.labelOutline || (mode === 'light' ? '#f8fafc' : '#0f172a');
+  const selectionBorder = palette.selectionBorder || (mode === 'light' ? '#0f172a' : '#f8fafc');
+  const edgeBaseColor = palette.edge || (mode === 'light' ? '#94a3b8' : '#475569');
+  const edgeLabelHover = palette.edge || (mode === 'light' ? '#334155' : '#64748b');
+  const defaultNodeFill = palette.node || '#94a3b8';
+
+  // When a flat node color is provided, it replaces the per-type semantic
+  // palette. `nodeFillFor()` is the single resolution point.
+  const nodeFillFor = (typeColor) => palette.node || typeColor;
+
   const styles = [
     // Base node style
     {
@@ -16,10 +50,10 @@ export function getCytoscapeStyles() {
         'text-valign': 'bottom',
         'text-halign': 'center',
         'font-size': '10px',
-        color: '#cbd5e1', // slate-300
+        color: labelColor,
         'text-outline-width': 2,
-        'text-outline-color': '#0f172a', // slate-900
-        'background-color': '#94a3b8', // default
+        'text-outline-color': labelOutline,
+        'background-color': defaultNodeFill,
         width: 16,
         height: 16,
         'border-width': (ele) => {
@@ -47,7 +81,7 @@ export function getCytoscapeStyles() {
       selector: 'node:selected',
       style: {
         'border-width': 3,
-        'border-color': '#f8fafc', // slate-50
+        'border-color': selectionBorder,
         'border-opacity': 1,
         width: 24,
         height: 24,
@@ -118,9 +152,9 @@ export function getCytoscapeStyles() {
           const w = ele.data('weight') || ele.data('strength') || 1;
           return Math.min(4, Math.max(0.5, w * 1.5));
         },
-        'line-color': '#475569', // slate-600
+        'line-color': edgeBaseColor,
         'target-arrow-shape': 'triangle',
-        'target-arrow-color': '#475569', // slate-600 — matches line-color
+        'target-arrow-color': edgeBaseColor,
         'target-arrow-width': 0.8,
         'curve-style': 'bezier',
         opacity: 0.6,
@@ -129,9 +163,9 @@ export function getCytoscapeStyles() {
           return t === 'RELATED_ENTITY' ? '' : t;
         },
         'font-size': '8px',
-        color: '#475569', // matches line-color (slate-600)
+        color: edgeBaseColor,
         'text-outline-width': 1,
-        'text-outline-color': '#0f172a',
+        'text-outline-color': labelOutline,
         'text-rotation': 'autorotate',
       },
     },
@@ -140,9 +174,9 @@ export function getCytoscapeStyles() {
       selector: 'edge:selected',
       style: {
         width: 2,
-        'line-color': '#f8fafc',
+        'line-color': selectionBorder,
         opacity: 1,
-        color: '#64748b', // reveal label on selection
+        color: edgeLabelHover,
       },
     },
     // Highlighted edge (path)
@@ -166,7 +200,7 @@ export function getCytoscapeStyles() {
     {
       selector: 'edge.hover-edge-visible',
       style: {
-        color: '#64748b', // slate-500
+        color: edgeLabelHover,
       },
     },
   ];
@@ -175,7 +209,7 @@ export function getCytoscapeStyles() {
   for (const [type, color] of Object.entries(MEMORY_COLORS)) {
     styles.push({
       selector: `node[type="${type}"]`,
-      style: { 'background-color': color, width: 28, height: 28 },
+      style: { 'background-color': nodeFillFor(color), width: 28, height: 28 },
     });
   }
 
@@ -184,7 +218,7 @@ export function getCytoscapeStyles() {
     styles.push({
       selector: `node[type="${type}"]`,
       style: {
-        'background-color': color,
+        'background-color': nodeFillFor(color),
         width: entityNodeSize,
         height: entityNodeSize,
       },
@@ -194,7 +228,7 @@ export function getCytoscapeStyles() {
   // Grounding nodes (fixed 16px)
   styles.push({
     selector: 'node[category="grounding"]',
-    style: { 'background-color': SPECIAL_COLORS.grounding, width: 16, height: 16 },
+    style: { 'background-color': nodeFillFor(SPECIAL_COLORS.grounding), width: 16, height: 16 },
   });
 
   // Grounded nodes — thin border indicates Wikipedia/Wikidata provenance
@@ -273,8 +307,11 @@ export function getCytoscapeStyles() {
       selector: `node[age_bucket="${bucket}"]`,
       style: {
         'background-color': (ele) => {
-          const color = getNodeColor(ele.data('type'), ele.data('category'));
-          return desaturateColor(color, ratio);
+          // Decay only desaturates hex colors; for non-hex CSS values
+          // (rgb()/named/CSS vars) desaturateColor returns the input
+          // unchanged, so flat-palette themes simply skip decay tinting.
+          const base = palette.node || getNodeColor(ele.data('type'), ele.data('category'));
+          return desaturateColor(base, ratio);
         },
       },
     });
@@ -289,6 +326,10 @@ export function getCytoscapeStyles() {
     if (kind === 'search_match') continue;
     for (const [value, color] of Object.entries(values)) {
       if (typeof color !== 'string') continue;
+      // Annotations are SIGNALS (search match, contradiction, support).
+      // Keep their semantic colors at full saturation even when the base
+      // palette is flattened to a host theme — losing them defeats the
+      // purpose of overlay channels.
       styles.push({
         selector: `node.anno-fill-${kind}-${value}`,
         style: { 'background-color': color },
