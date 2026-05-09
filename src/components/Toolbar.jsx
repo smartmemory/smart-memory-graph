@@ -24,6 +24,8 @@ export default function Toolbar({
   isFullscreen,
   onToggleFullscreen,
   rightActions,
+  contradictionOverlay = false,
+  onToggleContradictionOverlay,
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -185,6 +187,20 @@ export default function Toolbar({
         </svg>
         Time
       </button>
+
+      {/* Decision contradiction overlay */}
+      {onToggleContradictionOverlay && (
+        <button
+          onClick={() => onToggleContradictionOverlay(!contradictionOverlay)}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            contradictionOverlay ? 'bg-red-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          }`}
+          title="Highlight conflicting decisions on the canvas"
+          data-testid="toolbar-contradiction-overlay"
+        >
+          Conflicts
+        </button>
+      )}
 
       {/* Copy Link */}
       <button

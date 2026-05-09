@@ -43,5 +43,17 @@
     "hook":         "#9ca3af",
     "import":       "#3b82f6",
     "unknown":      "#ef4444"
+  },
+  "decisionStatus": {
+    "active":     "#10b981",
+    "superseded": "#f59e0b",
+    "retracted":  "#ef4444",
+    "pending":    "#94a3b8",
+    "unknown":    "#ef4444"
+  },
+  "decisionEdges": {
+    "SUPERSEDES":     "#f59e0b",
+    "CONFLICTS_WITH": "#ef4444",
+    "CHAIN_HIGHLIGHT": "#fbbf24"
   }
 }

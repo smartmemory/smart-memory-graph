@@ -3,6 +3,7 @@
  * This is the ONE place where format conversion happens — enforced by the internal/ convention.
  */
 import { getOriginPrefix } from '../core/graphColors';
+import { resolveDecisionStatus, isDecisionNode, DECISION_STATUS_CLASS_PREFIX } from '../core/decisionStyles';
 
 const ONE_DAY_MS = 86_400_000;
 
@@ -18,6 +19,17 @@ function computeAgeBucket(createdAt) {
 
 // GraphNode → Cytoscape node element
 export function graphNodeToCyElement(node) {
+  const isDecision = isDecisionNode(node);
+  const decisionStatus = isDecision
+    ? resolveDecisionStatus(node.status ?? node.metadata?.status)
+    : null;
+
+  const classList = [];
+  if (node.grounded) classList.push('grounded');
+  if (isDecision) {
+    classList.push(`${DECISION_STATUS_CLASS_PREFIX}${decisionStatus._resolvedKey}`);
+  }
+
   return {
     group: 'nodes',
     data: {
@@ -34,8 +46,17 @@ export function graphNodeToCyElement(node) {
       parentId: node.parentId || null,
       metadata: node.metadata,
       grounded: node.grounded ? true : undefined,
+      // Decision fields — undefined for non-decision nodes so cytoscape data
+      // selectors don't accidentally match (cytoscape's [attr] selectors
+      // treat undefined as absent).
+      decision_status: isDecision ? decisionStatus._resolvedKey : undefined,
+      decision_type: isDecision ? (node.decision_type ?? node.metadata?.decision_type) : undefined,
+      supersedes: isDecision ? (node.supersedes ?? node.metadata?.supersedes) : undefined,
+      superseded_by: isDecision ? (node.superseded_by ?? node.metadata?.superseded_by) : undefined,
+      contradiction_count: isDecision ? (node.contradiction_count ?? node.metadata?.contradiction_count ?? 0) : undefined,
+      reinforcement_count: isDecision ? (node.reinforcement_count ?? node.metadata?.reinforcement_count ?? 0) : undefined,
     },
-    classes: node.grounded ? 'grounded' : undefined,
+    classes: classList.length ? classList.join(' ') : undefined,
   };
 }
 
@@ -69,6 +90,13 @@ export function cyElementToGraphNode(el) {
     created_at: d.created_at,
     origin: d.origin,
     metadata: d.metadata,
+    // Decision fields — undefined for non-decision nodes.
+    status: d.decision_status,
+    decision_type: d.decision_type,
+    supersedes: d.supersedes,
+    superseded_by: d.superseded_by,
+    contradiction_count: d.contradiction_count,
+    reinforcement_count: d.reinforcement_count,
   };
 }
 

@@ -1,4 +1,15 @@
 import { MEMORY_COLORS, ENTITY_COLORS, SPECIAL_COLORS, ORIGIN_BORDER_COLORS, ANNOTATION_COLORS, ANNOTATION_BORDERS, getNodeColor, desaturateColor } from '../core/graphColors';
+import {
+  DECISION_STATUSES,
+  DECISION_EDGE_STYLES,
+  DECISION_NODE_SHAPE,
+  DECISION_NODE_SIZE,
+  DECISION_OVERLAY,
+  DECISION_CONTRADICTION_CLASS,
+  DECISION_CHAIN_HIGHLIGHT_CLASS,
+  DECISION_SUPERSEDES_EDGE_TYPE,
+  DECISION_CONFLICT_EDGE_TYPE,
+} from '../core/decisionStyles';
 
 /** Compute degree-based size for entity nodes (12–24px). Memory nodes stay fixed at 28px. */
 function entityNodeSize(ele) {
@@ -224,6 +235,97 @@ export function getCytoscapeStyles(theme = null) {
       },
     });
   }
+
+  // ── Decision memory: hexagon + status border ───────────────────────────
+  // Distinct shape so decisions are recognisable in the graph hub even
+  // before color is parsed. Per contracts/decisions.json + .claude rules
+  // (no-silent-degradation): missing status falls through to "unknown"
+  // class (logged WARN once at resolve time, not in the style emitter).
+  styles.push({
+    selector: 'node[type="decision"]',
+    style: {
+      shape: DECISION_NODE_SHAPE,
+      'background-color': nodeFillFor(MEMORY_COLORS.decision),
+      width: DECISION_NODE_SIZE,
+      height: DECISION_NODE_SIZE,
+      'font-weight': 'bold',
+    },
+  });
+  for (const [statusKey, statusDef] of Object.entries(DECISION_STATUSES)) {
+    styles.push({
+      selector: `node[type="decision"].decision-status-${statusKey}`,
+      style: {
+        'border-color': statusDef.color,
+        'border-style': statusDef.border_style,
+        'border-width': statusDef.border_width,
+        'border-opacity': 1,
+      },
+    });
+  }
+  // Retracted decisions are visually struck through via reduced opacity.
+  styles.push({
+    selector: 'node[type="decision"].decision-status-retracted',
+    style: { opacity: 0.55 },
+  });
+  // Contradiction overlay — pulsing red ring (toggled by Toolbar).
+  styles.push({
+    selector: `node.${DECISION_CONTRADICTION_CLASS}`,
+    style: {
+      'overlay-color': DECISION_OVERLAY.contradiction_pulse_color,
+      'overlay-padding': DECISION_OVERLAY.contradiction_pulse_padding,
+      'overlay-opacity': DECISION_OVERLAY.contradiction_pulse_opacity,
+      'border-color': DECISION_OVERLAY.contradiction_pulse_color,
+      'border-width': 3,
+      'border-opacity': 1,
+      'z-index': 1500,
+    },
+  });
+  // Chain highlight — applied to every node in a supersession lineage when
+  // a decision is selected and the chain block expands.
+  styles.push({
+    selector: `node.${DECISION_CHAIN_HIGHLIGHT_CLASS}`,
+    style: {
+      'border-color': DECISION_EDGE_STYLES.CHAIN_HIGHLIGHT_COLOR,
+      'border-width': 4,
+      'border-opacity': 1,
+      'z-index': 1200,
+    },
+  });
+  // SUPERSEDES edges — bold amber, directional.
+  styles.push({
+    selector: `edge[type="${DECISION_SUPERSEDES_EDGE_TYPE}"]`,
+    style: {
+      'line-color': DECISION_EDGE_STYLES.SUPERSEDES.color,
+      'target-arrow-color': DECISION_EDGE_STYLES.SUPERSEDES.color,
+      'target-arrow-shape': DECISION_EDGE_STYLES.SUPERSEDES.arrow,
+      width: DECISION_EDGE_STYLES.SUPERSEDES.width,
+      'line-style': DECISION_EDGE_STYLES.SUPERSEDES.line_style,
+      opacity: 0.95,
+      'z-index': 50,
+    },
+  });
+  styles.push({
+    selector: `edge[type="${DECISION_SUPERSEDES_EDGE_TYPE}"].${DECISION_CHAIN_HIGHLIGHT_CLASS}`,
+    style: {
+      'line-color': DECISION_EDGE_STYLES.CHAIN_HIGHLIGHT_COLOR,
+      'target-arrow-color': DECISION_EDGE_STYLES.CHAIN_HIGHLIGHT_COLOR,
+      width: DECISION_EDGE_STYLES.SUPERSEDES.width + 1.5,
+      'z-index': 1300,
+    },
+  });
+  // CONFLICTS_WITH edges — dashed red.
+  styles.push({
+    selector: `edge[type="${DECISION_CONFLICT_EDGE_TYPE}"]`,
+    style: {
+      'line-color': DECISION_EDGE_STYLES.CONFLICTS_WITH.color,
+      'target-arrow-color': DECISION_EDGE_STYLES.CONFLICTS_WITH.color,
+      'target-arrow-shape': 'triangle',
+      width: DECISION_EDGE_STYLES.CONFLICTS_WITH.width,
+      'line-style': DECISION_EDGE_STYLES.CONFLICTS_WITH.line_style,
+      opacity: 0.9,
+      'z-index': 60,
+    },
+  });
 
   // Grounding nodes (fixed 16px)
   styles.push({

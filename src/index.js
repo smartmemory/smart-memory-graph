@@ -20,6 +20,7 @@ export { default as TimeTravelSlider } from './components/TimeTravelSlider';
 export { default as PipelineDag, buildElements as buildPipelineDagElements } from './components/PipelineDag';
 export { default as ReplayScrubBar, fmtSeconds as formatReplayTime } from './components/ReplayScrubBar';
 export { default as RunLogPanel } from './components/RunLogPanel';
+export { default as DecisionDetailBlock } from './components/DecisionDetailBlock';
 
 // --- Hooks ---
 export { useGraphData } from './hooks/useGraphData';
@@ -55,6 +56,22 @@ export {
 } from './core/graphColors';
 
 export { getOriginTier, getTierLabel } from './core/originTiers';
+
+export {
+  DECISION_STATUSES,
+  DECISION_EDGE_STYLES,
+  DECISION_NODE_SHAPE,
+  DECISION_NODE_SIZE,
+  DECISION_TYPES,
+  DECISION_OVERLAY,
+  DECISION_ROUTES,
+  DECISION_CONTRADICTION_CLASS,
+  DECISION_CHAIN_HIGHLIGHT_CLASS,
+  DECISION_SUPERSEDES_EDGE_TYPE,
+  DECISION_CONFLICT_EDGE_TYPE,
+  resolveDecisionStatus,
+  isDecisionNode,
+} from './core/decisionStyles';
 
 export { ENTITY_TYPES, LAYOUT_OPTIONS, RECIPROCAL_PAIRS } from './core/constants';
 export { normalizeAPIResponse, normalizeExtractionResults } from './core/normalize';

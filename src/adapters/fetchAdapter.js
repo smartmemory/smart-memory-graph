@@ -47,6 +47,21 @@ export function createFetchAdapter({ apiUrl, getToken, getTeamId }) {
     listMemories: (limit = 2000, offset = 0) => request('GET', `/memory/list?limit=${limit}&offset=${offset}`),
     deleteNode: (id) => request('DELETE', `/memory/${encodeURIComponent(id)}`),
     deleteEntityNode: (id) => request('DELETE', `/memory/graph/nodes/${encodeURIComponent(id)}`),
+    // Decision endpoints — see contracts/decisions.json
+    listActiveDecisions: ({ domain, decisionType, minConfidence, limit } = {}) => {
+      const qs = new URLSearchParams();
+      if (domain) qs.set('domain', domain);
+      if (decisionType) qs.set('decision_type', decisionType);
+      if (minConfidence != null) qs.set('min_confidence', String(minConfidence));
+      if (limit != null) qs.set('limit', String(limit));
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      return request('GET', `/memory/decisions${suffix}`);
+    },
+    getDecision: (id) => request('GET', `/memory/decisions/${encodeURIComponent(id)}`),
+    getDecisionProvenance: (id) => request('GET', `/memory/decisions/${encodeURIComponent(id)}/provenance`),
+    getDecisionCausalChain: (id, { direction = 'both', maxDepth = 3 } = {}) =>
+      request('GET', `/memory/decisions/${encodeURIComponent(id)}/causal-chain?direction=${encodeURIComponent(direction)}&max_depth=${maxDepth}`),
+    findDecisionConflicts: (id) => request('POST', `/memory/decisions/${encodeURIComponent(id)}/conflicts`),
     getAuthToken: () => getToken(),
   };
 }

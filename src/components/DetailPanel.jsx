@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { getNodeColor, getOriginBorderColor } from '../core/graphColors';
 import { getOriginTier, getTierLabel } from '../core/originTiers';
 import { ENTITY_TYPES } from '../core/constants';
+import { isDecisionNode } from '../core/decisionStyles';
 import { useEntityCorrections } from '../hooks/useEntityCorrections';
 import WikipediaOverlay from './WikipediaOverlay';
+import DecisionDetailBlock from './DecisionDetailBlock';
 
 const EDGES_PAGE_SIZE = 10;
 
@@ -20,7 +22,7 @@ const EDGES_PAGE_SIZE = 10;
  * @param {function} props.onNodeUpdate - Callback to update node data (nodeId, updates)
  * @param {GraphAPIAdapter} props.adapter - API adapter for entity corrections
  */
-export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, adapter }) {
+export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, adapter, onDecisionChainHighlight, onSelectId }) {
   const [edgesShown, setEdgesShown] = useState(EDGES_PAGE_SIZE);
 
   const isEntity = node?.category === 'entity';
@@ -252,6 +254,16 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
               {node.content}
             </p>
           </section>
+        )}
+
+        {/* Decision-specific block */}
+        {isDecisionNode(node) && (
+          <DecisionDetailBlock
+            node={node}
+            adapter={adapter}
+            onChainHighlight={onDecisionChainHighlight}
+            onSelectId={onSelectId}
+          />
         )}
 
         {/* Connected Edges */}

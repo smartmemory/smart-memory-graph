@@ -1,0 +1,40 @@
+{
+  "_source": "smart-memory-graph/contracts/decisions.json",
+  "_description": "Decision memory-type visual + lifecycle contract. Mirrors REST surface in smart-memory-service/memory_service/api/routes/decisions.py and MCP decision_* tools. Source of truth for the @smartmemory/graph package.",
+  "_routes": {
+    "list_active": "GET /memory/decisions",
+    "search": "GET /memory/decisions/search",
+    "pending": "GET /memory/decisions/pending",
+    "get": "GET /memory/decisions/{decision_id}",
+    "supersede": "POST /memory/decisions/{decision_id}/supersede",
+    "retract": "POST /memory/decisions/{decision_id}/retract",
+    "reinforce": "POST /memory/decisions/{decision_id}/reinforce",
+    "contradict": "POST /memory/decisions/{decision_id}/contradict",
+    "provenance": "GET /memory/decisions/{decision_id}/provenance",
+    "causal_chain": "GET /memory/decisions/{decision_id}/causal-chain",
+    "conflicts": "POST /memory/decisions/{decision_id}/conflicts"
+  },
+  "decisionTypes": ["inference", "preference", "classification", "choice", "belief", "policy"],
+  "statuses": {
+    "active":     { "color": "#10b981", "label": "Active",     "border_style": "solid",  "border_width": 2 },
+    "superseded": { "color": "#f59e0b", "label": "Superseded", "border_style": "dashed", "border_width": 2 },
+    "retracted":  { "color": "#ef4444", "label": "Retracted",  "border_style": "dotted", "border_width": 2.5 },
+    "pending":    { "color": "#94a3b8", "label": "Pending",    "border_style": "dashed", "border_width": 1.5 },
+    "unknown":    { "color": "#ef4444", "label": "Unknown status (untagged)", "border_style": "dashed", "border_width": 2.5 }
+  },
+  "edges": {
+    "SUPERSEDES":     { "color": "#f59e0b", "width": 2.5, "line_style": "solid", "arrow": "triangle", "label": "supersedes" },
+    "CONFLICTS_WITH": { "color": "#ef4444", "width": 2.5, "line_style": "dashed", "arrow": "triangle-cross", "label": "conflicts" },
+    "CHAIN_HIGHLIGHT_COLOR": "#fbbf24"
+  },
+  "node": {
+    "shape": "hexagon",
+    "size":  32,
+    "label_position": "bottom"
+  },
+  "overlay": {
+    "contradiction_pulse_color": "#ef4444",
+    "contradiction_pulse_padding": 8,
+    "contradiction_pulse_opacity": 0.35
+  }
+}

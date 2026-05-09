@@ -10,6 +10,17 @@
 
 ### Added
 
+- **VIS-DECISION-1 (Wave-2, Stream F): Decision memory as a first-class graph citizen.**
+  - New `contracts/decisions.json` — single-source-of-truth for decision visual + lifecycle: shape (`hexagon`), per-status colors/border styles (active=solid emerald, superseded=dashed amber, retracted=dotted red, pending=dashed slate, unknown=dashed red), `SUPERSEDES`/`CONFLICTS_WITH` edge styling, contradiction overlay tokens, and a frozen `_routes` map mirroring `smart-memory-service/memory_service/api/routes/decisions.py`.
+  - New `src/core/decisionStyles.js` exporting `DECISION_STATUSES`, `DECISION_EDGE_STYLES`, `DECISION_OVERLAY`, `DECISION_TYPES`, `resolveDecisionStatus()`, `isDecisionNode()`, plus class-name constants. Resolver logs `WARN` once when a decision arrives without a recognized status (per `rules/no-silent-degradation.md`) and renders the distinct "unknown" border.
+  - New `src/components/DecisionDetailBlock.jsx` — DetailPanel sub-block for decisions: status badge with contract color, decision-type, reinforcement/contradiction counts, supersession chain block (prev/next links + "Highlight chain" button), conflicts panel (lazy-loaded via `adapter.findDecisionConflicts`), provenance block (lazy-loaded via `adapter.getDecisionProvenance`).
+  - `internal/cytoscapeStyles.js` extended: hexagon decision node with status-driven border (amber dashed when superseded, dotted red when retracted), `decision-contradiction` overlay class (pulsing red ring), `decision-chain-highlight` class for canvas chain emphasis, `SUPERSEDES`/`CONFLICTS_WITH` edge styling.
+  - `internal/cytoscapeConvert.js` extended: pass-through for `status`, `decision_type`, `supersedes`, `superseded_by`, `reinforcement_count`, `contradiction_count`; auto-applies `decision-status-{key}` class.
+  - `adapters/fetchAdapter.js` + `adapters/sdkAdapter.js`: new `listActiveDecisions`, `getDecision`, `getDecisionProvenance`, `getDecisionCausalChain`, `findDecisionConflicts` methods (SDK falls back to underlying http when `client.decisions.*` is missing).
+  - `components/Toolbar.jsx`: optional `Conflicts` button (visible when `onToggleContradictionOverlay` is provided).
+  - `contracts/graph-colors.json` extended with `decisionStatus` and `decisionEdges` blocks (mirrored to legacy `/contracts/graph-colors.json`).
+  - 22 new tests in `tests/decisionStyles.test.js` (15) + `tests/decisionAdapter.test.js` (7). All 277 vitest tests pass; perf-sanity logs `[perf] decision-styled 200-node init: <8 ms` (well under the 4s ceiling). The 2.2k-node SCALE-SMOKE-1 baseline (`styleEnabled:false`) is unaffected because decision styles are skipped when styling is disabled.
+
 - **SCALE-SMOKE-1 (Wave-1, Stream D): multi-hop BFS cap + perf smoke.**
   - New `src/core/multiHopBfs.js` exporting `bfsExpand({ startId, adjacency, maxHops, maxNodesPerHop })` and `buildAdjacency(edges)`. Default cap is **100 nodes per hop**. Cap firing logs `WARNING` with `{ hop, requested, kept, dropped, maxNodesPerHop, startId }` and surfaces `truncated: true` on the per-hop result so the UI can render a "+N more" affordance without re-querying. Pure / dependency-free.
   - New `tests/fixtures/codebase-200k.json` — 2,202 nodes / 6,580 edges generated from the SmartMemory monorepo by `tests/fixtures/build-codebase-fixture.mjs`. Real-codebase fixture for layout + BFS perf work.

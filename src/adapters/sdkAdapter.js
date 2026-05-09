@@ -56,6 +56,30 @@ export function createSDKAdapter(client) {
     deleteEntityNode: (id) =>
       client.graph.deleteEntityNode(id),
 
+    // Decision endpoints — see contracts/decisions.json. The SDK may not expose
+    // these yet; the adapter falls back to the underlying HTTP client when a
+    // dedicated `client.decisions.*` method is missing.
+    listActiveDecisions: (params = {}) =>
+      client.decisions?.list
+        ? client.decisions.list(params)
+        : (client.http || client._http || client).get?.('/memory/decisions', { params }),
+    getDecision: (id) =>
+      client.decisions?.get
+        ? client.decisions.get(id)
+        : (client.http || client._http || client).get?.(`/memory/decisions/${encodeURIComponent(id)}`),
+    getDecisionProvenance: (id) =>
+      client.decisions?.getProvenance
+        ? client.decisions.getProvenance(id)
+        : (client.http || client._http || client).get?.(`/memory/decisions/${encodeURIComponent(id)}/provenance`),
+    getDecisionCausalChain: (id, opts = {}) =>
+      client.decisions?.getCausalChain
+        ? client.decisions.getCausalChain(id, opts)
+        : (client.http || client._http || client).get?.(`/memory/decisions/${encodeURIComponent(id)}/causal-chain`, { params: opts }),
+    findDecisionConflicts: (id) =>
+      client.decisions?.findConflicts
+        ? client.decisions.findConflicts(id)
+        : (client.http || client._http || client).post?.(`/memory/decisions/${encodeURIComponent(id)}/conflicts`),
+
     getAuthToken: () =>
       client.auth.tokenManager.getAccessToken(),
   };
