@@ -72,6 +72,11 @@ export {
   UI_STATES as PIPELINE_DAG_UI_STATES,
 } from './core/pipelineDagState';
 export { searchWikipedia } from './core/wikipedia';
+export {
+  bfsExpand,
+  buildAdjacency,
+  DEFAULT_MAX_NODES_PER_HOP,
+} from './core/multiHopBfs';
 export { exportPNG, exportSVG } from './core/export';
 export { saveRecording, getLastRecording, getAllRecordings, clearRecordings } from './core/eventStore';
 
