@@ -22,7 +22,7 @@ const EDGES_PAGE_SIZE = 10;
  * @param {function} props.onNodeUpdate - Callback to update node data (nodeId, updates)
  * @param {GraphAPIAdapter} props.adapter - API adapter for entity corrections
  */
-export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, adapter, onDecisionChainHighlight, onSelectId }) {
+export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState }) {
   const [edgesShown, setEdgesShown] = useState(EDGES_PAGE_SIZE);
 
   const isEntity = node?.category === 'entity';
@@ -226,6 +226,29 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                 </svg>
                 Expand Neighbors
+              </>
+            )}
+          </button>
+        )}
+
+        {/* Multi-hop replay button */}
+        {onHopReplay && (
+          <button
+            onClick={() => onHopReplay(node.id)}
+            disabled={hopReplayState === 'playing'}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-cyan-600/20 text-cyan-400 border border-cyan-600/30 rounded-lg hover:bg-cyan-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {hopReplayState === 'playing' ? (
+              <>
+                <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                Replaying hops...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Explore Hops
               </>
             )}
           </button>

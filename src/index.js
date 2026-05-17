@@ -29,6 +29,7 @@ export { useGraphStream } from './hooks/useGraphStream';
 export { useGraphInteraction } from './hooks/useGraphInteraction';
 export { useDripFeed } from './hooks/useDripFeed';
 export { useUrlState } from './hooks/useUrlState';
+export { useMultiHopReplay } from './hooks/useMultiHopReplay';
 export { useConnectionStatus } from './hooks/useConnectionStatus';
 export { useEntityCorrections } from './hooks/useEntityCorrections';
 export { usePipelineDag } from './hooks/usePipelineDag';

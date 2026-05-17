@@ -14,6 +14,7 @@ import { useGraphFilters } from '../hooks/useGraphFilters';
 import { useGraphStream } from '../hooks/useGraphStream';
 import { useDripFeed } from '../hooks/useDripFeed';
 import { useGraphInteraction } from '../hooks/useGraphInteraction';
+import { useMultiHopReplay } from '../hooks/useMultiHopReplay';
 import { useUrlState } from '../hooks/useUrlState';
 import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscapeConvert';
 
@@ -263,6 +264,11 @@ export default function GraphExplorer({
     getShareableUrl,
     saveToUrl,
     onNodeOpen,
+  });
+
+  const multiHop = useMultiHopReplay({
+    cytoscape,
+    graphData: { nodes, edges },
   });
 
   // Wire node click/dblclick handlers to Cytoscape events
@@ -544,6 +550,8 @@ export default function GraphExplorer({
               onClose={interaction.closeDetailPanel}
               onExpand={interaction.handleExpand}
               expanding={interaction.expanding}
+              onHopReplay={(nodeId) => multiHop.replayState === 'playing' ? multiHop.stopReplay() : multiHop.startReplay(nodeId)}
+              hopReplayState={multiHop.replayState}
               onNodeUpdate={interaction.handleNodeUpdate}
               adapter={adapter}
             />
@@ -561,6 +569,40 @@ export default function GraphExplorer({
             }
           }}
         />
+      )}
+
+      {/* Multi-hop replay indicator */}
+      {multiHop.replayState !== 'idle' && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-900/90 border border-cyan-600 text-cyan-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-3">
+          {multiHop.replayState === 'playing' && (
+            <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          )}
+          <div className="flex items-center gap-2">
+            {multiHop.HOP_COLORS.slice(0, (multiHop.hopStats?.length || 0) + 1).map((color, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-1"
+                style={{ opacity: i <= multiHop.activeHop ? 1 : 0.3 }}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full"
+                  style={{ backgroundColor: color }}
+                />
+                <span className="text-xs">
+                  {i === 0 ? 'start' : `hop ${i}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          {multiHop.replayState === 'done' && (
+            <button
+              onClick={multiHop.stopReplay}
+              className="ml-2 text-xs text-cyan-400 hover:text-white underline"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       )}
 
       {interaction.timeTravelLoading && (
