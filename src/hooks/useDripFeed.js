@@ -102,23 +102,12 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
   // Entity nodes buffered until their connecting edge arrives — so node+edge appear together.
   const pendingNodesRef = useRef(new Map());
 
-  // Run the streaming cola sim WITHOUT reshuffling the established graph.
-  // Previously every burst re-simulated all elements, so existing nodes
-  // drifted and the whole canvas lurched on each new command. Now only
-  // nodes flagged `_fresh` (added in this burst, not yet settled) are free
-  // to move; everything already placed is locked, so the graph grows
-  // calmly instead of flashing. Lock is released when the sim settles.
-  const runStreamLayout = useCallback((cy) => {
-    const fresh = cy.nodes('._fresh');
-    const established = cy.nodes().difference(fresh);
-    established.lock();
-    const layout = cy.layout({ ...STREAMING_LAYOUT, eles: cy.elements().not('[_isPulse]') });
-    layout.one('layoutstop', () => {
-      established.unlock();
-      fresh.removeClass('_fresh');
-    });
-    layout.run();
-  }, []);
+  // NOTE: there is intentionally NO per-burst layout. Nodes appear by
+  // accretion (positionStreamedNode seeds them at their parent); the graph
+  // is arranged by a SINGLE gentle cola settle when the command's stream
+  // goes quiet (see scheduleQuietLayout). Per-burst cola re-sim lurched the
+  // canvas; per-burst lock-established strung the graph out as it grew.
+  // One settle per command is both calm and produces a clean layout.
 
   // Position a node during streaming: entity nodes born at parent position,
   // cola physics drifts them to their settled location (unfurling effect).
@@ -193,7 +182,6 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
     filters.registerStreamedElements([el]);
     try {
       const added = cy.add(cyEl);
-      added.addClass('_fresh'); // free to move in runStreamLayout; established graph stays locked
       positionStreamedNode(cy, cyEl);
       incrementStats([el], 0);
       const targetW = added.style('width');
@@ -213,27 +201,35 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
     } catch { /* ignore */ }
   }, [filters, incrementStats, positionStreamedNode]);
 
-  // Fit viewport after streaming goes quiet — no layout reshuffle, cola physics
-  // has already settled positions. Fires at 800ms so it catches the gap between
-  // passages without reshuffling the graph when the next passage starts.
-  // Also flushes any entity nodes that arrived without a matching edge.
+  // When a command's stream goes quiet (800ms after the last element), do
+  // the ONE gentle full settle + a single calm fit. This is the only
+  // layout/fit per command — no per-burst work — so the graph grows by
+  // accretion during the burst then elegantly arranges once. Flushes any
+  // entity nodes whose edge never arrived first so they're included.
   const scheduleQuietLayout = useCallback(() => {
     if (relayoutTimerRef.current) clearTimeout(relayoutTimerRef.current);
     relayoutTimerRef.current = setTimeout(() => {
       relayoutTimerRef.current = null;
       const cy = cytoscape.cy.current;
-      if (!cy) return;
-      // Flush any nodes still buffered (their edge never arrived)
+      if (!cy || cy.nodes().length === 0) return;
       if (pendingNodesRef.current.size > 0) {
         for (const { el, cyEl } of pendingNodesRef.current.values()) {
           addNodeAnimated(cy, el, cyEl);
         }
         pendingNodesRef.current.clear();
-        runStreamLayout(cy);
       }
-      if (!userInteractedRef.current) {
-        cy.animate({ fit: { eles: getFitElements(cy), padding: getFitPadding(cy) } }, { duration: 400, easing: 'ease-in-out-sine' });
-      }
+      // Gentle full settle, then frame it once it's stable (fit AFTER the
+      // settle, not racing it — avoids a mid-settle viewport jump).
+      const layout = cy.layout({ ...STREAMING_LAYOUT, eles: cy.elements().not('[_isPulse]') });
+      layout.one('layoutstop', () => {
+        if (!userInteractedRef.current) {
+          cy.animate(
+            { fit: { eles: getFitElements(cy), padding: getFitPadding(cy) } },
+            { duration: 400, easing: 'ease-in-out-sine' },
+          );
+        }
+      });
+      layout.run();
     }, 800);
   }, [cytoscape, addNodeAnimated]);
 
@@ -275,7 +271,6 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
       if (isNode) {
         // Memory / root node — appear immediately
         const added = cy.add(cyEl);
-        added.addClass('_fresh'); // free to move in runStreamLayout; established graph stays locked
         positionStreamedNode(cy, cyEl);
         incrementStats([el], 0);
         const targetW = added.style('width');
@@ -289,7 +284,6 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
             complete: () => {
               added.addClass('streaming-new');
               pulseStreamingNode(added);
-              runStreamLayout(cy);
             },
           }
         );
@@ -313,7 +307,6 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
             easing: 'ease-out-sine',
             complete: () => {
               animateEdgePulse(added);
-              runStreamLayout(cy);
             },
           }
         );
@@ -507,14 +500,12 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
                 easing: 'ease-out-sine',
                 complete: () => {
                   animateEdgePulse(added);
-                  runStreamLayout(cy);
                 },
               }
             );
           } else {
             // Memory node — appear immediately
             const added = cy.add(cyEl);
-            added.addClass('_fresh'); // free to move in runStreamLayout; established graph stays locked
             positionStreamedNode(cy, cyEl);
             incrementStats([el], 0);
             const targetW = added.style('width');
@@ -528,7 +519,6 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
                 complete: () => {
                   added.addClass('streaming-new');
                   pulseStreamingNode(added);
-                  runStreamLayout(cy);
                 },
               }
             );
