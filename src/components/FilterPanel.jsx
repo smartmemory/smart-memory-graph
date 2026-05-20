@@ -4,6 +4,8 @@ export default function FilterPanel({
   filters,
   onClose,
   searchBar,
+  originLegendVisible,
+  onToggleOriginLegend,
 }) {
   const {
     activeMemoryTypes,
@@ -48,7 +50,7 @@ export default function FilterPanel({
         {availableTypes.memoryTypes.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Memory Types</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Memory Types <span className="text-slate-500 normal-case font-normal">({availableTypes.memoryTypes.length})</span></h3>
               <div className="flex gap-1">
                 <button onClick={selectAllMemoryTypes} className="text-[10px] text-slate-500 hover:text-slate-300">All</button>
                 <span className="text-slate-600">|</span>
@@ -73,7 +75,7 @@ export default function FilterPanel({
         {availableTypes.entityTypes.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Entity Types</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Entity Types <span className="text-slate-500 normal-case font-normal">({availableTypes.entityTypes.length})</span></h3>
               <div className="flex gap-1">
                 <button onClick={selectAllEntityTypes} className="text-[10px] text-slate-500 hover:text-slate-300">All</button>
                 <span className="text-slate-600">|</span>
@@ -98,7 +100,7 @@ export default function FilterPanel({
         {availableTypes.relationTypes.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Relation Types</h3>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Relations <span className="text-slate-500 normal-case font-normal">({availableTypes.relationTypes.length})</span></h3>
               <div className="flex gap-1">
                 <button onClick={selectAllRelationTypes} className="text-[10px] text-slate-500 hover:text-slate-300">All</button>
                 <span className="text-slate-600">|</span>
@@ -139,6 +141,31 @@ export default function FilterPanel({
           </section>
         )}
       </div>
+
+      {onToggleOriginLegend && (
+        <div className="border-t border-slate-700 px-3 py-2">
+          <label className="flex items-center gap-2 py-0.5 px-1 rounded hover:bg-slate-700/50 cursor-pointer transition-colors">
+            <input
+              type="checkbox"
+              checked={!!originLegendVisible}
+              onChange={onToggleOriginLegend}
+              className="sr-only"
+            />
+            <div
+              className={`w-3 h-3 rounded-sm border flex items-center justify-center transition-colors ${
+                originLegendVisible ? 'border-transparent bg-blue-500' : 'border-slate-500 bg-transparent'
+              }`}
+            >
+              {originLegendVisible && (
+                <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </div>
+            <span className="text-xs text-slate-300">Origin legend</span>
+          </label>
+        </div>
+      )}
 
       <div className="border-t border-slate-700 p-2 bg-slate-800/95">
         <p className="text-[11px] text-slate-500 text-center select-none">

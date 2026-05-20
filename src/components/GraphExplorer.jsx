@@ -69,7 +69,7 @@ export default function GraphExplorer({
   replayRunId,
   clock = null,
   toolbarRightActions,
-  showOriginLegend = true,
+  showOriginLegend = false,
   hideSelectionToolbar = false,
   className = '',
   onNodeOpen,
@@ -147,6 +147,7 @@ export default function GraphExplorer({
   const { urlState, saveToUrl, getShareableUrl } = useUrlState();
 
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
+  const [originLegendOpen, setOriginLegendOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Sync isFullscreen state when user exits via Esc or browser chrome
@@ -525,6 +526,8 @@ export default function GraphExplorer({
           <FilterPanel
             filters={filters}
             onClose={() => setFilterPanelOpen(false)}
+            originLegendVisible={showOriginLegend !== false && originLegendOpen}
+            onToggleOriginLegend={showOriginLegend !== false ? () => setOriginLegendOpen(p => !p) : undefined}
             searchBar={(
               <SearchBar
                 nodes={nodes}
@@ -538,7 +541,7 @@ export default function GraphExplorer({
         <CytoscapeCanvas
           setContainerRef={cytoscape.setContainerRef}
         >
-          <OriginLegend visible={showOriginLegend} />
+          <OriginLegend visible={showOriginLegend !== false && originLegendOpen} />
         </CytoscapeCanvas>
 
         {/* Detail panel — absolute overlay */}
