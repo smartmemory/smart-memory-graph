@@ -69,7 +69,7 @@ export default function GraphExplorer({
   replayRunId,
   clock = null,
   toolbarRightActions,
-  showOriginLegend = false,
+  showOriginLegend = true,
   hideSelectionToolbar = false,
   className = '',
   onNodeOpen,
