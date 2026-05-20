@@ -26,6 +26,8 @@ export default function Toolbar({
   rightActions,
   contradictionOverlay = false,
   onToggleContradictionOverlay,
+  originLegendVisible = false,
+  onToggleOriginLegend,
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -199,6 +201,19 @@ export default function Toolbar({
           data-testid="toolbar-contradiction-overlay"
         >
           Conflicts
+        </button>
+      )}
+
+      {/* Origin Legend */}
+      {onToggleOriginLegend && (
+        <button
+          onClick={onToggleOriginLegend}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            originLegendVisible ? 'bg-slate-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          }`}
+          title="Toggle origin provenance legend"
+        >
+          Origin
         </button>
       )}
 

@@ -141,6 +141,20 @@ export default function GraphExplorer({
   ]);
 
   const filters = useGraphFilters(nodes, edges);
+
+  const typeCounts = useMemo(() => {
+    const counts = {};
+    for (const node of (nodes || [])) {
+      const t = node.type;
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    }
+    for (const edge of (edges || [])) {
+      const t = edge.type;
+      if (t) counts[t] = (counts[t] || 0) + 1;
+    }
+    return counts;
+  }, [nodes, edges]);
+
   const containerRef = useRef(null);
   const rootRef = useRef(null);
   const cytoscape = useCytoscape(containerRef, { theme });
@@ -519,6 +533,8 @@ export default function GraphExplorer({
         isFullscreen={isFullscreen}
         onToggleFullscreen={handleToggleFullscreen}
         rightActions={toolbarRightActions}
+        originLegendVisible={showOriginLegend !== false && originLegendOpen}
+        onToggleOriginLegend={showOriginLegend !== false ? () => setOriginLegendOpen(p => !p) : undefined}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -526,8 +542,7 @@ export default function GraphExplorer({
           <FilterPanel
             filters={filters}
             onClose={() => setFilterPanelOpen(false)}
-            originLegendVisible={showOriginLegend !== false && originLegendOpen}
-            onToggleOriginLegend={showOriginLegend !== false ? () => setOriginLegendOpen(p => !p) : undefined}
+            typeCounts={typeCounts}
             searchBar={(
               <SearchBar
                 nodes={nodes}
