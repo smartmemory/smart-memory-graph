@@ -204,18 +204,6 @@ export default function Toolbar({
         </button>
       )}
 
-      {/* Origin Legend */}
-      {onToggleOriginLegend && (
-        <button
-          onClick={onToggleOriginLegend}
-          className={`px-3 py-1.5 text-sm rounded transition-colors ${
-            originLegendVisible ? 'bg-slate-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-          }`}
-          title="Toggle origin provenance legend"
-        >
-          Origin
-        </button>
-      )}
 
       {/* Copy Link */}
       <button
@@ -246,6 +234,19 @@ export default function Toolbar({
         <span>{stats.nodes} nodes</span>
         <span>{stats.edges} edges</span>
       </div>
+
+      {/* Legend toggle */}
+      {onToggleOriginLegend && (
+        <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Show origin provenance legend">
+          <input
+            type="checkbox"
+            checked={originLegendVisible}
+            onChange={onToggleOriginLegend}
+            className="accent-blue-500 w-3 h-3"
+          />
+          <span className="text-xs text-slate-400">Legend</span>
+        </label>
+      )}
 
       {/* Refresh */}
       <button
