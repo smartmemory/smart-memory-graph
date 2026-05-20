@@ -368,10 +368,9 @@ export default function GraphExplorer({
     }
   }, [annotations, cytoscape.ready, nodes, edges]);
 
-  // Delete selected nodes — calls backend for all node categories, removes all from graph
-  const handleDeleteSelected = useCallback(async () => {
-    const ids = [...cytoscape.selectedNodeIds];
-    if (ids.length === 0) return;
+  // Delete nodes by id — calls backend for all node categories, removes from graph
+  const deleteNodes = useCallback(async (ids) => {
+    if (!ids || ids.length === 0) return;
     const cy = cytoscape.cy.current;
     await Promise.allSettled(
       ids.map(async (id) => {
@@ -389,6 +388,17 @@ export default function GraphExplorer({
     );
     cytoscape.removeNodes(ids);
   }, [adapter, cytoscape]);
+
+  const handleDeleteSelected = useCallback(
+    () => deleteNodes([...cytoscape.selectedNodeIds]),
+    [deleteNodes, cytoscape.selectedNodeIds]
+  );
+
+  // Single-node delete from DetailPanel — closes panel after deletion
+  const handleDeleteNode = useCallback(async (id) => {
+    await deleteNodes([id]);
+    interaction.closeDetailPanel?.();
+  }, [deleteNodes, interaction]);
 
   // Keyboard shortcuts: Delete/Backspace removes selection, Cmd/Ctrl+A selects all
   useEffect(() => {
@@ -571,6 +581,7 @@ export default function GraphExplorer({
               onHopReplay={(nodeId) => multiHop.replayState === 'playing' ? multiHop.stopReplay() : multiHop.startReplay(nodeId)}
               hopReplayState={multiHop.replayState}
               onNodeUpdate={interaction.handleNodeUpdate}
+              onDelete={handleDeleteNode}
               adapter={adapter}
             />
           </div>

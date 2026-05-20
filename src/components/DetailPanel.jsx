@@ -22,8 +22,16 @@ const EDGES_PAGE_SIZE = 10;
  * @param {function} props.onNodeUpdate - Callback to update node data (nodeId, updates)
  * @param {GraphAPIAdapter} props.adapter - API adapter for entity corrections
  */
-export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState }) {
+export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState }) {
   const [edgesShown, setEdgesShown] = useState(EDGES_PAGE_SIZE);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Reset delete-confirm state when node changes
+  useEffect(() => {
+    setConfirmDelete(false);
+    setDeleting(false);
+  }, [node?.id]);
 
   const isEntity = node?.category === 'entity';
 
@@ -399,6 +407,45 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           </section>
         )}
       </div>
+
+      {/* Footer — destructive actions */}
+      {onDelete && (
+        <div className="border-t border-slate-700 p-3 bg-slate-800 shrink-0">
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-300 flex-1">Delete this node?</span>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true);
+                  try { await onDelete(node.id); } finally { setDeleting(false); setConfirmDelete(false); }
+                }}
+                className="px-2 py-1 text-xs font-medium bg-red-600 hover:bg-red-500 text-white rounded transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Confirm'}
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmDelete(false)}
+                className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="w-full px-3 py-1.5 text-xs font-medium text-red-400 hover:text-white hover:bg-red-600/80 border border-red-600/40 hover:border-red-500 rounded transition-colors"
+              title="Delete this node from the graph"
+            >
+              Delete Node
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

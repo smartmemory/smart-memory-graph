@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.4
+
+### Changed
+
+- **Toolbar:** Removed the "Select" selection-mode toggle from the menubar. Per-node click + Delete-key shortcut still work; `selectionMode`/`onSelectionModeChange` props remain on the component for any external controller.
+
+### Added
+
+- **DetailPanel:** New optional `onDelete(nodeId)` prop renders a sticky-footer "Delete Node" button with inline Confirm/Cancel. Footer is hidden when the prop is omitted, so embeds can opt out (same pattern as `hideSelectionToolbar`). `GraphExplorer` wires this to a single-node deletion that reuses the same backend routing as multi-select delete (`adapter.deleteNode` for `category === 'memory'`, `adapter.deleteEntityNode` otherwise), then closes the panel.
+
 ## 0.2.3
 
 ### Added
