@@ -701,24 +701,26 @@ export default function GraphExplorer({
           </button>
         </div>
       )}
-      <OperationsBar
-        status={stream.status}
-        operations={stream.operations}
-        opsPerSecond={stream.opsPerSecond}
-        isPaused={stream.isPaused}
-        onPause={stream.pause}
-        onResume={stream.resume}
-        dripInterval={dripFeed.dripInterval}
-        onDripIntervalChange={dripFeed.setDripInterval}
-        onOperationClick={handleOperationClick}
-        replayControl={(
-          <ReplayButton
-            onReplay={dripFeed.replayRecording}
-            disabled={dripFeed.isReplaying}
-            floating={false}
-          />
-        )}
-      />
+      {sseEnabled && stream.status === 'connected' && (
+        <OperationsBar
+          status={stream.status}
+          operations={stream.operations}
+          opsPerSecond={stream.opsPerSecond}
+          isPaused={stream.isPaused}
+          onPause={stream.pause}
+          onResume={stream.resume}
+          dripInterval={dripFeed.dripInterval}
+          onDripIntervalChange={dripFeed.setDripInterval}
+          onOperationClick={handleOperationClick}
+          replayControl={(
+            <ReplayButton
+              onReplay={dripFeed.replayRecording}
+              disabled={dripFeed.isReplaying}
+              floating={false}
+            />
+          )}
+        />
+      )}
 
       {interaction.pathMode && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-900/90 border border-amber-600 text-amber-200 px-4 py-2 rounded-lg text-sm z-50">
