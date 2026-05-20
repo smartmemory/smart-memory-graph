@@ -360,8 +360,10 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           </section>
         )}
 
-        {/* Origin provenance */}
-        {node.origin && (
+        {/* Origin provenance — only meaningful for MemoryItems. Entity nodes don't
+            carry an `origin` field in core; rendering "unknown" for them was misleading
+            (the field is absent, not unset). Hide the section for entities entirely. */}
+        {node.origin && !isEntity && (
           <section>
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Origin</h3>
             <div className="flex items-center gap-2">

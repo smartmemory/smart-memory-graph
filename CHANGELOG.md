@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.5
+
+### Fixed
+
+- **DetailPanel:** Hide the Origin section for entity nodes (`category === 'entity'`). Entities don't carry an `origin` field in core; the panel was rendering "unknown" / dashed-red chip for them, which conflated "field absent" (correct, by schema) with "untagged write path" (a real producer bug). Memory items still show the chip and the "Untagged write path" hint when their origin is genuinely `unknown`.
+
 ## 0.2.4
 
 ### Changed
