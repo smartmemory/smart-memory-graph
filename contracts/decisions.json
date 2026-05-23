@@ -3,6 +3,13 @@
   "_description": "Decision memory-type visual + lifecycle contract. Mirrors REST surface in smart-memory-service/memory_service/api/routes/decisions.py and MCP decision_* tools. Source of truth for the @smartmemory/graph package.",
   "_routes": {
     "list_active": "GET /memory/decisions",
+    "_list_active_params": {
+      "domain": "optional string",
+      "decision_type": "optional string",
+      "min_confidence": "optional float 0..1",
+      "limit": "optional int 1..200, default 50",
+      "provenance_memory_id": "optional string (CORE-DECISION-PROVENANCE-LOOKUP-1) - inverse-provenance filter. Returns only decisions whose provenance subgraph contains this memory id. Filters compose in-query; never silently truncates below `limit`. Unknown/out-of-scope ids return []."
+    },
     "search": "GET /memory/decisions/search",
     "pending": "GET /memory/decisions/pending",
     "get": "GET /memory/decisions/{decision_id}",

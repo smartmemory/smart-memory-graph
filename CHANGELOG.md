@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.6
+
+### Changed (CORE-DECISION-PROVENANCE-LOOKUP-1, 2026-05-23)
+
+- **`contracts/decisions.json`** (source-of-truth) extended with `_list_active_params` block documenting the new optional `provenance_memory_id` query parameter on `GET /memory/decisions`. No `Decision` schema changes; visual + lifecycle surface unchanged. Mirror at `contracts/decisions.json` (monorepo root) updated in sync. Thin feature-folder extension contract at `smart-memory-docs/docs/features/CORE-DECISION-PROVENANCE-LOOKUP-1/decision-provenance-contract.json` documents the consumer wiring (REST, MCP, Python SDK, JS SDK).
+
 ## 0.2.5
 
 ### Fixed
