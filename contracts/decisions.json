@@ -27,6 +27,9 @@
     "superseded": { "color": "#f59e0b", "label": "Superseded", "border_style": "dashed", "border_width": 2 },
     "retracted":  { "color": "#ef4444", "label": "Retracted",  "border_style": "dotted", "border_width": 2.5 },
     "pending":    { "color": "#94a3b8", "label": "Pending",    "border_style": "dashed", "border_width": 1.5 },
+    "completed":  { "color": "#3b82f6", "label": "Completed",  "border_style": "solid",  "border_width": 2 },
+    "failed":     { "color": "#dc2626", "label": "Failed",     "border_style": "solid",  "border_width": 2 },
+    "abandoned":  { "color": "#6b7280", "label": "Abandoned",  "border_style": "dotted", "border_width": 1.5 },
     "unknown":    { "color": "#ef4444", "label": "Unknown status (untagged)", "border_style": "dashed", "border_width": 2.5 }
   },
   "edges": {
