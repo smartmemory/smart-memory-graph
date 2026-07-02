@@ -63,46 +63,51 @@ export function coalesceGraphData(nodes, edges, canonicalMap = {}) {
     rawEdges.push({ ...edge, source: src, target: tgt });
   }
 
-  // Second pass: merge reciprocal CONTAINS_ENTITY + MENTIONED_IN into RELATED_ENTITY
-  const reciprocalPairKeys = new Set();
-  const reciprocalEdges = [];
+  // Second pass: merge reciprocal CONTAINS_ENTITY + MENTIONED_IN into RELATED_ENTITY.
+  // Group by unordered node pair so both directions of a true reciprocal pair land
+  // in the same group; only merge when a group actually contains both edge types
+  // (a lone CONTAINS_ENTITY/MENTIONED_IN with no counterpart is NOT reciprocal and
+  // must pass through as its original type, not be blanked into RELATED_ENTITY).
+  const reciprocalGroups = new Map(); // pairKey -> edges[]
   const nonReciprocalEdges = [];
 
   for (const edge of rawEdges) {
     if (RECIPROCAL_PAIRS.has(edge.type)) {
       const pairKey = [edge.source, edge.target].sort().join('||');
-      reciprocalEdges.push({ edge, pairKey });
-      reciprocalPairKeys.add(pairKey);
+      if (!reciprocalGroups.has(pairKey)) reciprocalGroups.set(pairKey, []);
+      reciprocalGroups.get(pairKey).push(edge);
     } else {
       nonReciprocalEdges.push(edge);
     }
   }
 
-  // Emit one RELATED_ENTITY edge per pair, drop duplicates
   const seenEdges = new Set();
   const remappedEdges = [];
 
-  for (const pairKey of reciprocalPairKeys) {
-    const [a, b] = pairKey.split('||');
-    const edgeKey = `${a}->${b}:RELATED_ENTITY`;
-    if (seenEdges.has(edgeKey)) continue;
-    seenEdges.add(edgeKey);
-    remappedEdges.push({
-      id: edgeKey,
-      source: a,
-      target: b,
-      label: '',
-      type: 'CONTAINS_ENTITY',
-    });
-  }
-
-  // Unpaired reciprocal edges pass through as-is
-  for (const { edge, pairKey } of reciprocalEdges) {
-    if (reciprocalPairKeys.has(pairKey)) continue; // already merged
-    const edgeKey = `${edge.source}->${edge.target}:${edge.type}`;
-    if (seenEdges.has(edgeKey)) continue;
-    seenEdges.add(edgeKey);
-    remappedEdges.push({ ...edge, id: edgeKey });
+  for (const [pairKey, group] of reciprocalGroups) {
+    const isPaired = new Set(group.map((e) => e.type)).size > 1;
+    if (isPaired) {
+      // Emit one RELATED_ENTITY edge per pair, drop duplicates
+      const [a, b] = pairKey.split('||');
+      const edgeKey = `${a}->${b}:RELATED_ENTITY`;
+      if (seenEdges.has(edgeKey)) continue;
+      seenEdges.add(edgeKey);
+      remappedEdges.push({
+        id: edgeKey,
+        source: a,
+        target: b,
+        label: '',
+        type: 'RELATED_ENTITY',
+      });
+    } else {
+      // Unpaired reciprocal-type edges pass through as-is
+      for (const edge of group) {
+        const edgeKey = `${edge.source}->${edge.target}:${edge.type}`;
+        if (seenEdges.has(edgeKey)) continue;
+        seenEdges.add(edgeKey);
+        remappedEdges.push({ ...edge, id: edgeKey });
+      }
+    }
   }
 
   // Non-reciprocal edges pass through with dedup
