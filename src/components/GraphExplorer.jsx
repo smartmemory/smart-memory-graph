@@ -221,11 +221,35 @@ export default function GraphExplorer({
         if (!cy) return;
         try {
           const cyEl = 'source' in el ? graphEdgeToCyElement(el) : graphNodeToCyElement(el);
-          cy.add(cyEl);
+          const existing = cy.getElementById(cyEl.data.id);
+          if (existing.length) existing.data(cyEl.data);
+          else cy.add(cyEl);
         } catch (_) { /* element exists or transient */ }
         return;
       }
       dripFeedRef.current?.enqueue(el);
+    },
+    onElementRemoved: ({ nodeIds = [], edgeIds = [], edges = [] }) => {
+      const cy = cytoscape.cy?.current;
+      if (!cy) return;
+      if (nodeIds.length) {
+        cytoscape.removeNodes(nodeIds);
+      }
+      if (!edgeIds.length && !edges.length) return;
+      cy.batch(() => {
+        edgeIds.forEach((id) => {
+          const edge = cy.getElementById(id);
+          if (edge.length) edge.remove();
+        });
+        edges.forEach(({ sourceId, targetId, edgeType }) => {
+          cy.edges().filter((edge) => {
+            if (sourceId && edge.source().id() !== sourceId) return false;
+            if (targetId && edge.target().id() !== targetId) return false;
+            if (edgeType && edge.data('type') !== edgeType && edge.data('edge_type') !== edgeType) return false;
+            return true;
+          }).remove();
+        });
+      });
     },
     onSearchHighlight: (ids) => cytoscape.highlightElements(ids),
     onGroundingFlash: (nodeId) => {

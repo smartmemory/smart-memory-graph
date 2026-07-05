@@ -140,6 +140,67 @@ describe('clock-driven graph event flow (composition)', () => {
     ]);
   });
 
+  it('classifies graph node deletions as node_removed', () => {
+    const classified = classifyProgressEvent({
+      run_id: 'run-1',
+      scope: 'workspace:test',
+      seq: 10,
+      ts: 1000,
+      kind: 'graph.node',
+      status: 'ok',
+      payload: {
+        action: 'deleted',
+        data: { node_id: 'entity:asyncio', label: 'asyncio' },
+      },
+    });
+
+    expect(classified.category).toBe('node_removed');
+    expect(classified.nodeId).toBe('entity:asyncio');
+    expect(classified.meta.operation).toBe('delete_node');
+  });
+
+  it('classifies graph edge deletions before grounding flashes', () => {
+    const classified = classifyProgressEvent({
+      run_id: 'run-1',
+      scope: 'workspace:test',
+      seq: 11,
+      ts: 1000,
+      kind: 'graph.edge',
+      status: 'ok',
+      payload: {
+        action: 'deleted',
+        data: {
+          source_id: 'entity:asyncio',
+          edge_type: 'GROUNDED_IN',
+        },
+      },
+    });
+
+    expect(classified.category).toBe('edge_removed');
+    expect(classified.nodeId).toBe('entity:asyncio');
+    expect(classified.meta.operation).toBe('delete_edge');
+  });
+
+  it('classifies graph node updates as node_added upserts', () => {
+    const classified = classifyProgressEvent({
+      run_id: 'run-1',
+      scope: 'workspace:test',
+      seq: 12,
+      ts: 1000,
+      kind: 'graph.node',
+      status: 'ok',
+      payload: {
+        action: 'updated',
+        data: { item_id: 'mem-1', content: 'renamed memory' },
+      },
+    });
+
+    expect(classified.category).toBe('node_added');
+    expect(classified.nodeId).toBe('mem-1');
+    expect(classified.label).toContain('updated');
+    expect(classified.meta.operation).toBe('update_node');
+  });
+
   it('seek-backward releases earlier events for the graph to re-build', () => {
     const c = new ReplayClock();
     c.addEvent(dagEvent({ pipeline: 'ingest', nodes: [], edges: [] }));

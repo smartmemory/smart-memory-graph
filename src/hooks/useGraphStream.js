@@ -24,6 +24,7 @@ import { subscribeProgress } from '@smartmemory/sdk-js/progress';
  * @param {number} [options.bufferSize=100] - Ring buffer capacity
  * @param {string} [options.runId] - When set, subscribes in replay mode (run_id + from_seq=0)
  * @param {Function} [options.onElementAdded] - Callback with GraphNode | GraphEdge
+ * @param {Function} [options.onElementRemoved] - Callback with { nodeIds, edgeIds, edges }
  * @param {Function} [options.onSearchHighlight] - Callback with array of matching node IDs
  * @param {Function} [options.onPipelineProgress] - Callback with { nodeId, stage, durationMs }
  * @param {Function} [options.onGraphCleared] - Callback when graph is cleared
@@ -46,6 +47,7 @@ export function useGraphStream(options = {}) {
     bufferSize = 100,
     runId,
     onElementAdded,
+    onElementRemoved,
     onSearchHighlight,
     onPipelineProgress,
     onGraphCleared,
@@ -66,8 +68,8 @@ export function useGraphStream(options = {}) {
   const isPausedRef = useRef(false);
   const [isPaused, setIsPaused] = useState(false);
 
-  const callbacksRef = useRef({ onElementAdded, onSearchHighlight, onPipelineProgress, onGraphCleared, onReconnect, onGroundingFlash, onReplayNotFound });
-  callbacksRef.current = { onElementAdded, onSearchHighlight, onPipelineProgress, onGraphCleared, onReconnect, onGroundingFlash, onReplayNotFound };
+  const callbacksRef = useRef({ onElementAdded, onElementRemoved, onSearchHighlight, onPipelineProgress, onGraphCleared, onReconnect, onGroundingFlash, onReplayNotFound });
+  callbacksRef.current = { onElementAdded, onElementRemoved, onSearchHighlight, onPipelineProgress, onGraphCleared, onReconnect, onGroundingFlash, onReplayNotFound };
 
   const batchRef = useRef([]);
   const batchTimerRef = useRef(null);
@@ -104,6 +106,9 @@ export function useGraphStream(options = {}) {
 
     const cbs = callbacksRef.current;
     const searchIds = [];
+    const removedNodeIds = [];
+    const removedEdgeIds = [];
+    const removedEdges = [];
 
     // Build GraphNode/GraphEdge list preserving backend order
     const rawElements = [];
@@ -117,6 +122,16 @@ export function useGraphStream(options = {}) {
       } else if (op.category === 'edge_added') {
         const el = eventToGraphEdge(op.meta?.data, op.meta?.payload);
         if (el) rawElements.push(el);
+      } else if (op.category === 'node_removed' && op.nodeId) {
+        removedNodeIds.push(op.nodeId);
+      } else if (op.category === 'edge_removed') {
+        if (op.edgeId) removedEdgeIds.push(op.edgeId);
+        removedEdges.push({
+          edgeId: op.edgeId || null,
+          sourceId: op.meta?.data?.source_id || op.meta?.data?.source || null,
+          targetId: op.meta?.data?.target_id || op.meta?.data?.target || null,
+          edgeType: op.meta?.data?.edge_type || op.meta?.data?.link_type || null,
+        });
       } else if (op.category === 'search_highlight' && op.matchIds?.length) {
         searchIds.push(...op.matchIds);
       } else if (op.category === 'pipeline_stage' && cbs.onPipelineProgress) {
@@ -131,6 +146,14 @@ export function useGraphStream(options = {}) {
       canonicalMapRef.current = {};
       cbs.onGraphCleared();
       return;
+    }
+
+    if ((removedNodeIds.length > 0 || removedEdgeIds.length > 0 || removedEdges.length > 0) && cbs.onElementRemoved) {
+      cbs.onElementRemoved({
+        nodeIds: [...new Set(removedNodeIds)],
+        edgeIds: [...new Set(removedEdgeIds)],
+        edges: removedEdges,
+      });
     }
 
     // Coalesce — now operates on GraphNode/GraphEdge
@@ -492,18 +515,31 @@ export function classifyProgressEvent(progressEvent) {
   const timestamp = ts ? new Date(ts * 1000).toISOString() : new Date().toISOString();
   const traceId = run_id;
   const base = { id, timestamp, traceId, meta: progressEvent };
+  const deletionActions = new Set(['delete', 'deleted', 'remove', 'removed']);
+  const updateActions = new Set(['update', 'updated', 'replace', 'replaced']);
+  const actionFor = (data) => String(payload?.action || payload?.operation || data?.action || data?.operation || '').toLowerCase();
 
   // Graph node events
   if (kind === 'graph.node' && payload?.data) {
     const data = payload.data;
     const nodeId = data.memory_id || data.item_id || data.node_id || data.id || null;
     if (nodeId && nodeId.startsWith('wikipedia:')) return null;
+    const action = actionFor(data);
+    if (deletionActions.has(action)) {
+      return {
+        ...base,
+        category: 'node_removed',
+        label: `Node "${data.label || nodeId || 'unknown'}" removed`,
+        nodeId,
+        meta: { ...progressEvent, data, operation: 'delete_node' },
+      };
+    }
     return {
       ...base,
       category: 'node_added',
-      label: `Node "${data.label || nodeId || 'unknown'}" added`,
+      label: `Node "${data.label || nodeId || 'unknown'}" ${updateActions.has(action) ? 'updated' : 'added'}`,
       nodeId,
-      meta: { ...progressEvent, data, operation: 'add_node' },
+      meta: { ...progressEvent, data, operation: updateActions.has(action) ? 'update_node' : 'add_node' },
     };
   }
 
@@ -513,6 +549,19 @@ export function classifyProgressEvent(progressEvent) {
     const src = data.source_id || data.source || '';
     const tgt = data.target_id || data.target || '';
     const edgeType = data.edge_type || data.link_type || 'RELATES_TO';
+    const action = actionFor(data);
+    const edgeId = data.edge_id || (src && tgt ? `${src}->${tgt}` : null);
+
+    if (deletionActions.has(action)) {
+      return {
+        ...base,
+        category: 'edge_removed',
+        label: `Edge "${edgeType}" removed`,
+        nodeId: src || null,
+        edgeId,
+        meta: { ...progressEvent, data, operation: 'delete_edge' },
+      };
+    }
 
     if (edgeType === 'GROUNDED_IN' || src.startsWith('wikipedia:') || tgt.startsWith('wikipedia:')) {
       const groundedNodeId = src.startsWith('wikipedia:') ? tgt : src;
@@ -521,7 +570,6 @@ export function classifyProgressEvent(progressEvent) {
       return { ...base, category: 'grounding_flash', label: `Grounded "${wikiName}"`, nodeId: groundedNodeId };
     }
 
-    const edgeId = data.edge_id || (src && tgt ? `${src}->${tgt}` : null);
     return {
       ...base,
       category: 'edge_added',
