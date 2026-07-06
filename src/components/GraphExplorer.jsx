@@ -231,6 +231,7 @@ export default function GraphExplorer({
     },
     onElementRemoved: ({ nodeIds = [], edgeIds = [], edges = [] }) => {
       const cy = cytoscape.cy?.current;
+      dripFeedRef.current?.removeElements?.({ nodeIds, edgeIds, edges });
       if (!cy) return;
       if (nodeIds.length) {
         cytoscape.removeNodes(nodeIds);
@@ -241,7 +242,13 @@ export default function GraphExplorer({
           const edge = cy.getElementById(id);
           if (edge.length) edge.remove();
         });
-        edges.forEach(({ sourceId, targetId, edgeType }) => {
+        edges.forEach(({ edgeId, sourceId, targetId, edgeType }) => {
+          if (edgeId) {
+            const edge = cy.getElementById(edgeId);
+            if (edge.length) edge.remove();
+            return;
+          }
+          if (!sourceId && !targetId && !edgeType) return;
           cy.edges().filter((edge) => {
             if (sourceId && edge.source().id() !== sourceId) return false;
             if (targetId && edge.target().id() !== targetId) return false;

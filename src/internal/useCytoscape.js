@@ -6,6 +6,15 @@ import dagre from 'cytoscape-dagre';
 import { getCytoscapeStyles } from './cytoscapeStyles';
 import { ANNOTATION_PRECEDENCE, CHANNEL_LOCKED_KINDS } from '../core/graphColors';
 
+export function removeIdsFromSelection(selectedIds, removedIds) {
+  const removed = new Set(removedIds);
+  const next = new Set();
+  selectedIds.forEach((id) => {
+    if (!removed.has(id)) next.add(id);
+  });
+  return next;
+}
+
 // Register layout extensions once
 let registered = false;
 if (!registered) {
@@ -806,7 +815,13 @@ export function useCytoscape(containerRef, options = {}) {
         if (el.length) cy.remove(el.closedNeighborhood().filter((e) => e.isEdge()).union(el));
       });
     });
-    setSelectedNodeIds(new Set());
+    setSelectedNodeIds((current) => {
+      const next = removeIdsFromSelection(current, ids);
+      // Bail out (return the same reference) when none of the removed ids
+      // were actually selected, so unrelated streamed removals don't churn
+      // consumer re-renders.
+      return next.size === current.size ? current : next;
+    });
   }, []);
 
   // Re-apply cytoscape styles when the consumer-supplied theme changes.

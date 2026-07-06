@@ -112,25 +112,52 @@ export function useGraphStream(options = {}) {
 
     // Build GraphNode/GraphEdge list preserving backend order
     const rawElements = [];
+    const rawElementIndex = new Map();
     let graphCleared = false;
     for (const op of batch) {
       if (op.category === 'graph_cleared') {
         graphCleared = true;
       } else if (op.category === 'node_added') {
         const el = eventToGraphNode(op.meta?.data, op.meta?.payload);
-        if (el) rawElements.push(el);
+        if (el) {
+          const previousIndex = rawElementIndex.get(el.id);
+          if (previousIndex != null) rawElements[previousIndex] = null;
+          rawElementIndex.set(el.id, rawElements.length);
+          rawElements.push(el);
+        }
       } else if (op.category === 'edge_added') {
         const el = eventToGraphEdge(op.meta?.data, op.meta?.payload);
-        if (el) rawElements.push(el);
+        if (el) {
+          const previousIndex = rawElementIndex.get(el.id);
+          if (previousIndex != null) rawElements[previousIndex] = null;
+          rawElementIndex.set(el.id, rawElements.length);
+          rawElements.push(el);
+        }
       } else if (op.category === 'node_removed' && op.nodeId) {
+        const pendingIndex = rawElementIndex.get(op.nodeId);
+        if (pendingIndex != null) rawElements[pendingIndex] = null;
         removedNodeIds.push(op.nodeId);
       } else if (op.category === 'edge_removed') {
         if (op.edgeId) removedEdgeIds.push(op.edgeId);
+        const pendingIndex = op.edgeId ? rawElementIndex.get(op.edgeId) : null;
+        if (pendingIndex != null) rawElements[pendingIndex] = null;
+        const sourceId = op.meta?.data?.source_id || op.meta?.data?.source || null;
+        const targetId = op.meta?.data?.target_id || op.meta?.data?.target || null;
+        const edgeType = op.meta?.data?.edge_type || op.meta?.data?.link_type || null;
+        if (sourceId || targetId || edgeType) {
+          rawElements.forEach((el, idx) => {
+            if (!el || !('source' in el)) return;
+            if (sourceId && el.source !== sourceId) return;
+            if (targetId && el.target !== targetId) return;
+            if (edgeType && el.type !== edgeType && el.edge_type !== edgeType) return;
+            rawElements[idx] = null;
+          });
+        }
         removedEdges.push({
           edgeId: op.edgeId || null,
-          sourceId: op.meta?.data?.source_id || op.meta?.data?.source || null,
-          targetId: op.meta?.data?.target_id || op.meta?.data?.target || null,
-          edgeType: op.meta?.data?.edge_type || op.meta?.data?.link_type || null,
+          sourceId,
+          targetId,
+          edgeType,
         });
       } else if (op.category === 'search_highlight' && op.matchIds?.length) {
         searchIds.push(...op.matchIds);
@@ -157,8 +184,9 @@ export function useGraphStream(options = {}) {
     }
 
     // Coalesce — now operates on GraphNode/GraphEdge
-    const rawNodes = rawElements.filter(el => !('source' in el));
-    const rawEdges = rawElements.filter(el => 'source' in el);
+    const orderedElements = rawElements.filter(Boolean);
+    const rawNodes = orderedElements.filter(el => !('source' in el));
+    const rawEdges = orderedElements.filter(el => 'source' in el);
     const { nodes: coalescedNodes, edges: coalescedEdges, idRemap } = coalesceGraphData(
       rawNodes, rawEdges, canonicalMapRef.current
     );
@@ -169,7 +197,7 @@ export function useGraphStream(options = {}) {
     const emittedIds = new Set();
     const interleavedElements = [];
 
-    for (const raw of rawElements) {
+    for (const raw of orderedElements) {
       if (!('source' in raw)) {
         // Node
         if (idRemap[raw.id]) continue;

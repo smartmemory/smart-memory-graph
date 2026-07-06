@@ -246,14 +246,15 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
 
     // Convert GraphNode/GraphEdge to Cytoscape element
     const cyEl = ('source' in el) ? graphEdgeToCyElement(el) : graphNodeToCyElement(el);
+    const isNode = !('source' in el);
 
     if (cy.getElementById(cyEl.data.id).length > 0) {
+      const existing = cy.getElementById(cyEl.data.id);
+      existing.data({ ...existing.data(), ...cyEl.data });
       const timer = setTimeout(processNextDrip, 50);
       dripTimersRef.current.push(timer);
       return;
     }
-
-    const isNode = !('source' in el);
 
     // Non-memory nodes (entity, grounding): buffer until their edge arrives so
     // node and edge appear together. Memory nodes (no parentId) appear immediately.
@@ -342,6 +343,32 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
       dripTimersRef.current.push(timer);
     }
   }, [processNextDrip]);
+
+  const removeElements = useCallback(({ nodeIds = [], edgeIds = [], edges = [] } = {}) => {
+    const nodeIdSet = new Set(nodeIds);
+    const edgeIdSet = new Set(edgeIds);
+    const edgeMatches = (el, edge) => {
+      if (!edge || !('source' in el)) return false;
+      if (edge.edgeId && el.id !== edge.edgeId) return false;
+      if (edge.sourceId && el.source !== edge.sourceId) return false;
+      if (edge.targetId && el.target !== edge.targetId) return false;
+      if (edge.edgeType && el.type !== edge.edgeType && el.edge_type !== edge.edgeType) return false;
+      return Boolean(edge.edgeId || edge.sourceId || edge.targetId || edge.edgeType);
+    };
+
+    dripQueueRef.current = dripQueueRef.current.filter((el) => {
+      if (!('source' in el)) {
+        return !nodeIdSet.has(el.id);
+      }
+      if (edgeIdSet.has(el.id)) return false;
+      if (nodeIdSet.has(el.source) || nodeIdSet.has(el.target)) return false;
+      return !edges.some((edge) => edgeMatches(el, edge));
+    });
+
+    for (const nodeId of nodeIdSet) {
+      pendingNodesRef.current.delete(nodeId);
+    }
+  }, []);
 
   // Replay a recording through the same drip-feed pipeline
   const replayRecording = useCallback(async (recording) => {
@@ -595,6 +622,7 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
     setIsReplaying,
     dripInterval,
     setDripInterval,
+    removeElements,
     resetDrip,
     userInteractedRef,
     dripTimersRef,
