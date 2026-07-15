@@ -28,6 +28,20 @@ const TERMINAL_UI_STATES = new Set([
 // Cap per-stage event logs so long runs can't grow memory unboundedly.
 export const MAX_EVENTS_PER_STAGE = 50;
 
+// High-volume drip kinds that GraphExplorer visualizes directly — thousands
+// per run. Excluded from the text log so each one doesn't enqueue a React
+// state update (the cap bounds memory, not update load).
+export const LOG_EXCLUDED_KINDS = new Set(['graph.node', 'graph.edge']);
+
+/**
+ * Should this event be kept in the per-stage text log?
+ * True for any staged event whose kind isn't a high-volume drip kind.
+ */
+export function shouldLogEvent(progressEvent) {
+  if (!progressEvent?.stage) return false;
+  return !LOG_EXCLUDED_KINDS.has(progressEvent.kind);
+}
+
 /**
  * Append a staged progress event to the per-stage log map (immutable update,
  * capped at MAX_EVENTS_PER_STAGE per stage).

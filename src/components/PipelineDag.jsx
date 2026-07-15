@@ -199,6 +199,9 @@ export default function PipelineDag({
     token,
     enabled,
     clock,
+    // This instance renders DAG nodes only and discards eventsByStage — never
+    // pay a re-render per log event (the log panel runs its own instance).
+    collectEvents: false,
   });
 
   // Ref-backed callbacks so parent inline callbacks don't reset Cytoscape

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.10
+
+### Fixed (2026-07-15, adversarial-review finding on 0.2.9)
+
+- **Per-event re-render amplification**: the 0.2.9 kind-agnostic log enqueued a React state
+  update for every staged event in every `usePipelineDag` instance — including `PipelineDag`'s
+  internal instance, which discards `eventsByStage`, and including `graph.node`/`graph.edge`
+  drip events that arrive in the thousands. New `collectEvents: false` option (used by
+  `PipelineDag`) skips accumulation entirely, and `shouldLogEvent` excludes the drip kinds
+  (`LOG_EXCLUDED_KINDS`) from the log — the 50-row cap bounds memory, these bound update load.
+
 ## 0.2.9
 
 ### Changed (2026-07-15)

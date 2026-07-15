@@ -25,7 +25,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeProgress } from '@smartmemory/sdk-js/progress';
-import { appendStagedEvent, deriveStageStatus, fillNeverEntered } from '../core/pipelineDagState';
+import {
+  appendStagedEvent,
+  deriveStageStatus,
+  fillNeverEntered,
+  shouldLogEvent,
+} from '../core/pipelineDagState';
 
 /**
  * @param {Object} opts
@@ -33,6 +38,9 @@ import { appendStagedEvent, deriveStageStatus, fillNeverEntered } from '../core/
  * @param {string} [opts.baseUrl]           - SSE base URL.
  * @param {string} [opts.token]             - Bearer token for authenticated SSE.
  * @param {boolean} [opts.enabled=true]     - Set to false to disconnect.
+ * @param {boolean} [opts.collectEvents=true] - Set to false to skip eventsByStage
+ *   accumulation entirely (no per-event re-renders). Use for instances that only
+ *   consume topology/statusByStage (e.g. PipelineDag's internal hook).
  * @param {Object} [opts.clock]             - Optional shared replay clock from
  *   useReplayClock(). When provided, this hook does NOT subscribe to SSE
  *   directly — it consumes events released by the clock at recorded
@@ -41,7 +49,14 @@ import { appendStagedEvent, deriveStageStatus, fillNeverEntered } from '../core/
  *   same run. When omitted, falls back to the original direct-subscription
  *   behavior used in Phase 1b.
  */
-export function usePipelineDag({ runId, baseUrl, token, enabled = true, clock = null }) {
+export function usePipelineDag({
+  runId,
+  baseUrl,
+  token,
+  enabled = true,
+  clock = null,
+  collectEvents = true,
+}) {
   const [topology, setTopology] = useState(null);
   const [statusByStage, setStatusByStage] = useState({});
   // Phase 5: per-stage event log + error capture for tooltip / log-panel.
@@ -97,7 +112,14 @@ export function usePipelineDag({ runId, baseUrl, token, enabled = true, clock = 
     // Log panel is kind-agnostic: every staged event (pipeline.stage,
     // studio.job, evolver.result, …) is kept, latest 50 per stage, so
     // wrapper-job events like Studio's relink are visible in the run log.
-    setEventsByStage((prev) => appendStagedEvent(prev, progressEvent));
+    // Guards: collectEvents=false skips accumulation entirely (consumers that
+    // discard eventsByStage, e.g. PipelineDag's internal instance, must not
+    // re-render per event), and high-volume drip kinds (graph.node/graph.edge,
+    // thousands per run, visualized by GraphExplorer) never enter the log —
+    // the 50-cap bounds memory, not update load.
+    if (collectEvents && shouldLogEvent(progressEvent)) {
+      setEventsByStage((prev) => appendStagedEvent(prev, progressEvent));
+    }
   };
 
   // --- Clock-driven path (Phase 3): consume events from the shared clock ---

@@ -17,6 +17,7 @@ import {
   UI_STATES,
   MAX_EVENTS_PER_STAGE,
   appendStagedEvent,
+  shouldLogEvent,
 } from '../src/core/pipelineDagState.js';
 
 const TOPOLOGY = {
@@ -196,5 +197,23 @@ describe('appendStagedEvent — kind-agnostic log accumulation', () => {
     const next = appendStagedEvent(before, ev(2, 'store'));
     expect(next.classify).toBe(before.classify);
     expect(Object.keys(next).sort()).toEqual(['classify', 'store']);
+  });
+});
+
+describe('shouldLogEvent — log admission predicate', () => {
+  it('admits staged pipeline.stage and studio.job events', () => {
+    expect(shouldLogEvent(ev(1, 'classify'))).toBe(true);
+    expect(shouldLogEvent({ seq: 2, stage: 'relinking', kind: 'studio.job' })).toBe(true);
+    expect(shouldLogEvent({ seq: 3, stage: 'evolve', kind: 'evolver.result' })).toBe(true);
+  });
+
+  it('rejects high-volume drip kinds (graph.node/graph.edge)', () => {
+    expect(shouldLogEvent({ seq: 4, stage: 'store', kind: 'graph.node' })).toBe(false);
+    expect(shouldLogEvent({ seq: 5, stage: 'link', kind: 'graph.edge' })).toBe(false);
+  });
+
+  it('rejects stage-less events and null', () => {
+    expect(shouldLogEvent({ seq: 6, kind: 'pipeline.dag' })).toBe(false);
+    expect(shouldLogEvent(null)).toBe(false);
   });
 });
