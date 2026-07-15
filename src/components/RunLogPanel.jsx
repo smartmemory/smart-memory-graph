@@ -100,6 +100,12 @@ const STATUS_COLOR = {
 
 function RunLogRow({ stage, ev }) {
   const color = STATUS_COLOR[ev.status] || '#9ca3af';
+  // Non-pipeline.stage kinds (studio.job, evolver.result, …) get a tag so
+  // interleaved wrapper-job rows are distinguishable from core stage rows.
+  const kindTag = ev.kind && ev.kind !== 'pipeline.stage' ? ` [${ev.kind}]` : '';
+  const message = typeof ev.payload?.message === 'string' && ev.payload.message
+    ? ` — ${ev.payload.message}`
+    : '';
   const reason = ev.payload?.reason ? ` reason=${ev.payload.reason}` : '';
   const dur = typeof ev.payload?.duration_ms === 'number'
     ? ` ${Math.round(ev.payload.duration_ms)}ms`
@@ -115,7 +121,8 @@ function RunLogRow({ stage, ev }) {
       <span style={{ color: '#64748b' }}>#{ev.seq}</span>{' '}
       <span style={{ color }}>{ev.status}</span>{' '}
       <span style={{ color: '#cbd5e1' }}>{stage}</span>
-      <span style={{ color: '#94a3b8' }}>{reason}{dur}{drip}</span>
+      <span style={{ color: '#64748b' }}>{kindTag}</span>
+      <span style={{ color: '#94a3b8' }}>{reason}{dur}{drip}{message}</span>
     </div>
   );
 }

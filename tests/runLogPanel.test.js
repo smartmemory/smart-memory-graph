@@ -13,7 +13,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildElements } from '../src/components/PipelineDag.jsx';
-import { UI_STATES } from '../src/core/pipelineDagState.js';
+import {
+  UI_STATES,
+  MAX_EVENTS_PER_STAGE,
+  appendStagedEvent,
+} from '../src/core/pipelineDagState.js';
 
 const TOPOLOGY = {
   pipeline: 'ingest',
@@ -137,5 +141,60 @@ describe('RunLogPanel sort + filter contract', () => {
   it('stage with no events under filter yields no rows', () => {
     const map = { other: [ev(1, 'other')] };
     expect(expectedRows(map, 'classify')).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// appendStagedEvent — the kind-agnostic per-stage log accumulator that feeds
+// RunLogPanel via usePipelineDag's eventsByStage.
+// ---------------------------------------------------------------------------
+
+describe('appendStagedEvent — kind-agnostic log accumulation', () => {
+  it('appends pipeline.stage events under their stage', () => {
+    const next = appendStagedEvent({}, ev(1, 'classify', 'started'));
+    expect(next.classify).toHaveLength(1);
+    expect(next.classify[0].seq).toBe(1);
+  });
+
+  it('appends non-pipeline.stage kinds (studio.job relink) under their stage', () => {
+    const relink = {
+      run_id: 'r', seq: 7, stage: 'relinking', kind: 'studio.job',
+      status: 'progress', payload: { progress: 50, message: 'Re-running linking…' },
+    };
+    const next = appendStagedEvent({}, relink);
+    expect(next.relinking).toHaveLength(1);
+    expect(next.relinking[0].kind).toBe('studio.job');
+  });
+
+  it('interleaves kinds within the same stage bucket', () => {
+    let map = appendStagedEvent({}, ev(1, 'extraction', 'started'));
+    map = appendStagedEvent(map, {
+      run_id: 'r', seq: 2, stage: 'extraction', kind: 'studio.job',
+      status: 'ok', payload: {},
+    });
+    expect(map.extraction.map((e) => e.kind)).toEqual(['pipeline.stage', 'studio.job']);
+  });
+
+  it('ignores events without a stage, returning the same map object', () => {
+    const map = { classify: [ev(1, 'classify')] };
+    expect(appendStagedEvent(map, { run_id: 'r', seq: 2, kind: 'pipeline.dag' })).toBe(map);
+    expect(appendStagedEvent(map, null)).toBe(map);
+  });
+
+  it('caps each stage at MAX_EVENTS_PER_STAGE, dropping oldest', () => {
+    let map = {};
+    for (let i = 1; i <= MAX_EVENTS_PER_STAGE + 5; i += 1) {
+      map = appendStagedEvent(map, ev(i, 'store'));
+    }
+    expect(map.store).toHaveLength(MAX_EVENTS_PER_STAGE);
+    expect(map.store[0].seq).toBe(6); // oldest 5 dropped
+    expect(map.store[map.store.length - 1].seq).toBe(MAX_EVENTS_PER_STAGE + 5);
+  });
+
+  it('does not mutate other stages (immutable update)', () => {
+    const before = { classify: [ev(1, 'classify')] };
+    const next = appendStagedEvent(before, ev(2, 'store'));
+    expect(next.classify).toBe(before.classify);
+    expect(Object.keys(next).sort()).toEqual(['classify', 'store']);
   });
 });

@@ -25,6 +25,32 @@ const TERMINAL_UI_STATES = new Set([
   UI_STATES.ERRORED,
 ]);
 
+// Cap per-stage event logs so long runs can't grow memory unboundedly.
+export const MAX_EVENTS_PER_STAGE = 50;
+
+/**
+ * Append a staged progress event to the per-stage log map (immutable update,
+ * capped at MAX_EVENTS_PER_STAGE per stage).
+ *
+ * Kind-agnostic on purpose: the log panel shows every event that names a
+ * stage (`pipeline.stage`, `studio.job`, `evolver.result`, …) so wrapper-job
+ * events like Studio's relink are visible, while the DAG state machine stays
+ * `pipeline.stage`-only (deriveStageStatus).
+ *
+ * @param {Object<string, Object[]>} eventsByStage - Previous log map.
+ * @param {Object} progressEvent - ProgressEvent; ignored if it has no stage.
+ * @returns {Object<string, Object[]>} Next log map (same object if no stage).
+ */
+export function appendStagedEvent(eventsByStage, progressEvent) {
+  const stage = progressEvent?.stage;
+  if (!stage) return eventsByStage;
+  const list = eventsByStage[stage] || [];
+  const next = list.length >= MAX_EVENTS_PER_STAGE
+    ? [...list.slice(-(MAX_EVENTS_PER_STAGE - 1)), progressEvent]
+    : [...list, progressEvent];
+  return { ...eventsByStage, [stage]: next };
+}
+
 /**
  * Map a single ProgressEvent (kind=pipeline.stage) onto the new UI state
  * for the stage it references, given the previous UI state.

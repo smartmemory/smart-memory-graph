@@ -4,7 +4,10 @@
  *
  * Topology comes from the one-shot `pipeline.dag` event; UI state advances
  * on subsequent `pipeline.stage` events using the derivation rules in
- * docs/features/VIS-PIPELINE-DAG-1/design.md.
+ * docs/features/VIS-PIPELINE-DAG-1/design.md. The per-stage event log
+ * (`eventsByStage`, feeds RunLogPanel) is kind-agnostic: any event naming a
+ * stage is kept (e.g. Studio `studio.job` wrapper events like relink), while
+ * `statusByStage`/`errorByStage` stay `pipeline.stage`-derived.
  *
  * UI state machine (derived from contract status + payload.reason):
  *   pending      → declared in DAG, no event yet
@@ -22,7 +25,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeProgress } from '@smartmemory/sdk-js/progress';
-import { deriveStageStatus, fillNeverEntered } from '../core/pipelineDagState';
+import { appendStagedEvent, deriveStageStatus, fillNeverEntered } from '../core/pipelineDagState';
 
 /**
  * @param {Object} opts
@@ -68,7 +71,10 @@ export function usePipelineDag({ runId, baseUrl, token, enabled = true, clock = 
       setTopology(payload || null);
       return;
     }
-    if (kind === 'pipeline.stage' && stage) {
+    if (!stage) return;
+    if (kind === 'pipeline.stage') {
+      // DAG state machine + node error tooltips derive from pipeline.stage
+      // events ONLY — other kinds must not advance or clobber node states.
       setStatusByStage((prev) => {
         const nextUiState = deriveStageStatus({
           previous: prev[stage],
@@ -77,12 +83,6 @@ export function usePipelineDag({ runId, baseUrl, token, enabled = true, clock = 
         });
         if (nextUiState === prev[stage]) return prev;
         return { ...prev, [stage]: nextUiState };
-      });
-      // Phase 5: keep the latest 50 events per stage for the log panel.
-      setEventsByStage((prev) => {
-        const list = prev[stage] || [];
-        const next = list.length >= 50 ? [...list.slice(-49), progressEvent] : [...list, progressEvent];
-        return { ...prev, [stage]: next };
       });
       // Phase 5: capture error message for hover tooltip.
       if (status === 'error' && payload?.error) {
@@ -94,6 +94,10 @@ export function usePipelineDag({ runId, baseUrl, token, enabled = true, clock = 
         }));
       }
     }
+    // Log panel is kind-agnostic: every staged event (pipeline.stage,
+    // studio.job, evolver.result, …) is kept, latest 50 per stage, so
+    // wrapper-job events like Studio's relink are visible in the run log.
+    setEventsByStage((prev) => appendStagedEvent(prev, progressEvent));
   };
 
   // --- Clock-driven path (Phase 3): consume events from the shared clock ---

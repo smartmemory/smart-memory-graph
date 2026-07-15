@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.9
+
+### Changed (2026-07-15)
+
+- **RunLogPanel / `usePipelineDag`**: the per-stage event log (`eventsByStage`) is now
+  kind-agnostic — every progress event that names a stage is kept (latest 50 per stage),
+  not just `kind=pipeline.stage`. Studio wrapper-job events (`studio.job`, e.g. relink)
+  now appear in the Run Inspector log; previously they were fetched by the replay clock
+  and silently dropped at render. The DAG state machine and node error tooltips
+  (`statusByStage`/`errorByStage`) remain derived from `pipeline.stage` events only.
+- **RunLogPanel rows** render `payload.message` when present and tag non-`pipeline.stage`
+  kinds (e.g. `[studio.job]`) so interleaved wrapper rows are distinguishable.
+- New pure helper `appendStagedEvent` (+ `MAX_EVENTS_PER_STAGE`) exported from
+  `core/pipelineDagState`, with unit coverage in `tests/runLogPanel.test.js`.
+
 ## 0.2.6
 
 ### Changed (CORE-DECISION-PROVENANCE-LOOKUP-1, 2026-05-23)
