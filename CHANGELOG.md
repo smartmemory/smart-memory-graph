@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.12
+
+### Fixed (2026-08-12, Codex adversarial-review findings on 0.2.11) — GRAPH-MULTIHOP-VIZ-1
+
+- **`shouldEnterRetrievalReplay` decided on the raw max hop, not the deduped groups.**
+  `[a@hop0, a@hop2]` has a raw max of 2, but earliest-hop dedup groups it to
+  `[['a'], [], []]` — every follow-up frame empty. Replay was entered and played two
+  blank hops, the same degenerate animation the hop-0-only rule exists to refuse. It now
+  decides on the grouping (does any hop >= 1 still hold results?), and its warning
+  distinguishes "the planner did not chain" from "every follow-up hop held only
+  duplicates".
+- **An implausible `hop_index` could crash or freeze the page.** `groupByRetrievalHop`
+  allocates a dense `max + 1` array, so a single row carrying `hop_index: 4294967295`
+  threw `RangeError: Invalid array length`, and smaller values forced huge allocations.
+  This is reachable because core deliberately preserves a pre-existing `hop_index`, so a
+  stale value written by an older build can reach the client. Values above the new
+  exported `MAX_HONOURED_HOP` (64) are now treated as unstamped, with a WARNING.
+
+New tests cover out-of-order duplicates (`[a@2, a@0]`, which exercises the move/splice
+branch the original suite never reached), duplicate-move ordering, the dedup-collapse
+replay refusal, and the absurd-hop guard. 26 tests here, 325 across the package.
+
 ## 0.2.11
 
 ### Added (2026-08-12) — retrieval-hop grouping (GRAPH-MULTIHOP-VIZ-1)

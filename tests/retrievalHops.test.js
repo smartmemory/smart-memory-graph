@@ -96,6 +96,27 @@ describe('groupByRetrievalHop', () => {
     const groups = groupByRetrievalHop([r('a', 0), r('a', 2)]);
     expect(groups).toEqual([['a'], [], []]);
   });
+
+  it('keeps the earliest hop when the LATER hop is seen first (out-of-order input)', () => {
+    // Exercises the move/splice branch: a naive "first input occurrence wins" would
+    // leave 'a' at hop 2. Results are not guaranteed to arrive in hop order.
+    const groups = groupByRetrievalHop([r('a', 2), r('a', 0)]);
+    expect(groups).toEqual([['a'], [], []]);
+  });
+
+  it('moves only the duplicate, preserving the order of other ids in both groups', () => {
+    const groups = groupByRetrievalHop([r('x', 2), r('a', 2), r('y', 2), r('a', 0), r('b', 0)]);
+    expect(groups[0]).toEqual(['a', 'b']);
+    expect(groups[2]).toEqual(['x', 'y']);
+  });
+
+  it('refuses an absurd hop_index instead of allocating a huge array', () => {
+    // Core deliberately preserves a pre-existing hop_index, so a stale or malformed
+    // value can reach the client. Array.from({length: 2**32}) throws RangeError.
+    expect(() => groupByRetrievalHop([r('a', 0), r('boom', 4294967295)])).not.toThrow();
+    const groups = groupByRetrievalHop([r('a', 0), r('boom', 4294967295)]);
+    expect(groups).toEqual([['a']]);
+  });
 });
 
 describe('shouldEnterRetrievalReplay', () => {
@@ -109,6 +130,20 @@ describe('shouldEnterRetrievalReplay', () => {
 
   it('is false when hop_index is absent entirely', () => {
     expect(shouldEnterRetrievalReplay([r('a'), r('b')])).toBe(false);
+  });
+
+  it('is false when dedup collapses every follow-up hop to empty', () => {
+    // Raw max is 2, but earliest-hop dedup leaves [['a'], [], []] — every follow-up
+    // frame is empty, so replay would show two blank hops. Must refuse.
+    expect(shouldEnterRetrievalReplay([r('a', 0), r('a', 2)])).toBe(false);
+  });
+
+  it('is true when a follow-up hop still has content after dedup', () => {
+    expect(shouldEnterRetrievalReplay([r('a', 0), r('a', 2), r('b', 1)])).toBe(true);
+  });
+
+  it('refuses an absurd hop_index rather than entering replay on it', () => {
+    expect(shouldEnterRetrievalReplay([r('a', 0), r('boom', 4294967295)])).toBe(false);
   });
 
   it('warns when it refuses a stamped-but-degenerate set (no silent degradation)', () => {

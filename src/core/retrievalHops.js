@@ -30,10 +30,31 @@ function resultId(result) {
   return typeof id === 'string' && id ? id : null;
 }
 
-/** Read a valid 0-based hop index off a result, or null when absent/malformed. */
+/**
+ * Upper bound on a hop index we will honour.
+ *
+ * Core's `max_hops` is a small integer (the service default is 3), so anything past
+ * this is stale or malformed rather than a real traversal depth. The bound is load
+ * bearing, not defensive dressing: `groupByRetrievalHop` allocates a dense array of
+ * `max + 1` slots, so an unbounded value turns one bad row into a `RangeError:
+ * Invalid array length` (at 2**32) or a multi-gigabyte allocation that freezes the
+ * page. Core deliberately preserves a pre-existing `hop_index`, so a value written by
+ * an older build can reach the client and must not be trusted blindly.
+ */
+export const MAX_HONOURED_HOP = 64;
+
+/** Read a valid 0-based hop index off a result, or null when absent/malformed/absurd. */
 function hopOf(result) {
   const hop = result?.metadata?.hop_index;
-  return Number.isInteger(hop) && hop >= 0 ? hop : null;
+  if (!Number.isInteger(hop) || hop < 0) return null;
+  if (hop > MAX_HONOURED_HOP) {
+    console.warn(
+      `[@smartmemory/graph] ignoring implausible hop_index=${hop} ` +
+        `(max honoured ${MAX_HONOURED_HOP}) — treating the result as unstamped.`,
+    );
+    return null;
+  }
+  return hop;
 }
 
 /**
@@ -101,27 +122,36 @@ export function groupByRetrievalHop(results) {
 /**
  * Should the canvas enter retrieval-hop replay for this result set?
  *
- * Only when a follow-up hop actually contributed (`max >= 1`). A set whose
- * maximum hop is 0 means the planner stopped at hop 0: animating it produces a
- * single degenerate frame that reads as a broken animation rather than as a
- * demonstration of chaining. Callers should render everything at once instead.
+ * Only when some follow-up hop still has content AFTER earliest-hop dedup. Two
+ * distinct sets fail that test and both would animate blank or single frames:
+ * a planner that stopped at hop 0, and a set whose only later-hop entries are
+ * duplicates of hop-0 ids (raw max says 2, every follow-up group is empty).
+ * Callers should render everything at once instead.
  *
- * The hop-0-only case is warned about (project no-silent-degradation rule): the
- * results WERE stamped, so multi-hop ran and simply did not chain, and a caller
- * expecting an animation deserves to know why there isn't one. The absent-field
- * case is silent — that is just an ordinary single-hop search, not a degradation.
+ * Refusal warns whenever results were stamped at all (project no-silent-degradation
+ * rule): multi-hop ran and simply did not produce animatable chaining, and a caller
+ * expecting an animation deserves to know why there isn't one. An entirely absent
+ * `hop_index` is silent — that is an ordinary single-hop search, not a degradation.
  *
  * @param {Array<object>} results
  * @returns {boolean}
  */
 export function shouldEnterRetrievalReplay(results) {
-  const max = maxRetrievalHop(results);
-  if (max >= 1) return true;
-  if (max === 0) {
+  // Decide on the GROUPS, not the raw max. Earliest-hop dedup can empty every
+  // follow-up group while leaving a high raw max: `[a@hop0, a@hop2]` has max 2 but
+  // groups to [['a'], [], []], which would replay two blank frames — the same
+  // degenerate animation the hop-0-only rule exists to refuse.
+  const groups = groupByRetrievalHop(results);
+  if (groups.some((group, hop) => hop >= 1 && group.length > 0)) return true;
+
+  if (groups.length > 0) {
+    const reason =
+      groups.length === 1
+        ? 'the planner did not chain'
+        : 'every follow-up hop held only duplicates of earlier results';
     console.warn(
-      '[@smartmemory/graph] multi-hop search returned hop-0 results only ' +
-        '(the planner did not chain) — rendering all results at once instead of ' +
-        'a single-frame hop animation.',
+      `[@smartmemory/graph] multi-hop search produced no animatable chaining (${reason}) — ` +
+        'rendering all results at once instead of a degenerate hop animation.',
     );
   }
   return false;
