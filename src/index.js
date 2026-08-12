@@ -95,6 +95,13 @@ export {
   buildAdjacency,
   DEFAULT_MAX_NODES_PER_HOP,
 } from './core/multiHopBfs';
+// GRAPH-MULTIHOP-VIZ-1 — retrieval-hop grouping. Sibling of multiHopBfs above, but
+// groups by which SEARCH hop surfaced a result, not by graph distance.
+export {
+  groupByRetrievalHop,
+  maxRetrievalHop,
+  shouldEnterRetrievalReplay,
+} from './core/retrievalHops';
 export { exportPNG, exportSVG } from './core/export';
 export { saveRecording, getLastRecording, getAllRecordings, clearRecordings } from './core/eventStore';
 

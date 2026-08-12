@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.11
+
+### Added (2026-08-12) — retrieval-hop grouping (GRAPH-MULTIHOP-VIZ-1)
+
+- **`src/core/retrievalHops.js`**: `groupByRetrievalHop`, `maxRetrievalHop`,
+  `shouldEnterRetrievalReplay`. Groups search results by the hop that surfaced them,
+  read from `metadata.hop_index` (stamped by core's `MultiHopSearch.execute()`).
+
+  This is deliberately a **sibling of, not a replacement for, `multiHopBfs.js`**. That
+  module groups by graph distance from a clicked node ("what is near this?"); this one
+  groups by retrieval provenance ("how did the search get here?"). They disagree — a
+  result first surfaced at retrieval hop 2 may sit one edge away in the graph, or be
+  unconnected in the loaded subgraph. Only the retrieval grouping demonstrates
+  multi-hop retrieval, so both feed the same animation as separate inputs.
+
+  Two behaviours are contract, not incidental: the returned array is indexed **by hop
+  number** (a hop that surfaced nothing leaves an empty slot, so hop N keeps its colour
+  and timing regardless of hop N-1), and `shouldEnterRetrievalReplay` refuses a
+  hop-0-only set — animating one group produces a single degenerate frame that reads as
+  a bug. The refusal warns, since the results *were* stamped and the caller expecting an
+  animation deserves to know why there isn't one; an absent `hop_index` stays silent
+  because that is just an ordinary single-hop search.
+
+  Results with no `hop_index` are skipped rather than bucketed into hop 0 — bucketing
+  would silently assert they were directly retrieved.
+
+  20 tests. No existing behaviour changed; `useMultiHopReplay`'s BFS path is untouched.
+
 ## 0.2.10
 
 ### Fixed (2026-07-15, adversarial-review finding on 0.2.9)
