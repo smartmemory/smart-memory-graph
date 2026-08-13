@@ -6,3 +6,7 @@ dist/
 .secrets
 .act.secrets
 .idea/
+
+# macOS finder metadata — never useful in the repo
+.DS_Store
+**/.DS_Store
