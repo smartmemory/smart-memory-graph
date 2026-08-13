@@ -120,6 +120,104 @@ export function groupByRetrievalHop(results) {
 }
 
 /**
+ * Place bridge nodes (entities linking results together) onto the hop timeline.
+ *
+ * Why this exists: a multi-hop search chains THROUGH entities — the planner reads
+ * entities off hop-N results to build the hop-N+1 query — but the entity itself is
+ * never a search result, so it carries no `hop_index` and appears in no group. Left
+ * out, hop 0 and hop 1 render as two disconnected clusters and the "how the search
+ * chained" claim is not actually drawn. (Measured, not assumed: a real chained result
+ * set had ZERO result-to-result edges and 11 shared entity bridges.)
+ *
+ * A bridge joins the EARLIEST hop of any result it touches. That is deliberately not
+ * a provenance claim — an entity has no retrieval hop — it is an availability claim,
+ * and a true one: an entity attached to a hop-N result was on the table when hop N's
+ * results were, which is precisely when the planner could read it. Revealing it then
+ * is what lets the hop-N → bridge → hop-N+1 edges light up in order.
+ *
+ * A bridge touching no grouped result is DROPPED, never defaulted into hop 0 —
+ * same rule `groupByRetrievalHop` applies to unstamped results, for the same reason.
+ *
+ * @param {Array<Array<string>>} hopGroups — from `groupByRetrievalHop`
+ * @param {Array<{id: string, neighbourIds: string[]}>} bridges
+ * @returns {Array<Array<string>>} new groups; input is not mutated
+ */
+export function assignBridgesToHops(hopGroups, bridges) {
+  if (!Array.isArray(hopGroups) || hopGroups.length === 0) return [];
+
+  // Evidence map, built ONCE from the input groups and never written to afterwards.
+  // Keeping it immutable is what stops a bridge from being justified by another
+  // bridge: with a shared map, `b1 -> m0` then `b2 -> b1` would give b2 a hop even
+  // though b2 touches no result at all, silently contradicting this function's rule.
+  const resultHopById = new Map();
+  hopGroups.forEach((group, hop) => {
+    if (!Array.isArray(group)) return;
+    for (const id of group) {
+      if (typeof id === 'string' && id && !resultHopById.has(id)) resultHopById.set(id, hop);
+    }
+  });
+
+  // Clone, deduping by earliest hop. An id repeated across groups would otherwise be
+  // revealed twice, in two different colours — the same double-reveal
+  // `groupByRetrievalHop` dedups away, which this must not reintroduce.
+  const groups = hopGroups.map(() => []);
+  hopGroupsForEachDedup(hopGroups, resultHopById, groups);
+
+  if (!Array.isArray(bridges) || bridges.length === 0) return groups;
+
+  const assignedIds = new Set(resultHopById.keys());
+  let orphans = 0;
+  let malformed = 0;
+
+  for (const bridge of bridges) {
+    const id = bridge?.id;
+    if (typeof id !== 'string' || !id) {
+      malformed += 1;
+      continue;
+    }
+    if (assignedIds.has(id)) continue; // already a result, or a duplicate bridge
+
+    let earliest = Infinity;
+    for (const neighbourId of bridge.neighbourIds || []) {
+      const hop = resultHopById.get(neighbourId); // RESULTS only — never other bridges
+      if (hop !== undefined && hop < earliest) earliest = hop;
+    }
+    if (earliest === Infinity) {
+      orphans += 1;
+      continue;
+    }
+
+    groups[earliest].push(id);
+    assignedIds.add(id);
+  }
+
+  // Dropping is correct — a bridge with no grouped result has no honest hop — but it
+  // is still data going in and not coming out, so it is never silent (project
+  // no-silent-degradation rule). Aggregated, not per-item, to stay readable.
+  if (orphans > 0 || malformed > 0) {
+    console.warn(
+      `[@smartmemory/graph] assignBridgesToHops dropped ${orphans} bridge(s) touching no ` +
+        `grouped result and ${malformed} malformed entry(ies) — they carry no honest hop, ` +
+        'so they are omitted from the animation rather than defaulted into hop 0.',
+    );
+  }
+
+  return groups;
+}
+
+/** Fill `out` from `groups`, placing each id once at its earliest hop. */
+function hopGroupsForEachDedup(hopGroups, earliestHopById, out) {
+  hopGroups.forEach((group, hop) => {
+    if (!Array.isArray(group)) return;
+    for (const id of group) {
+      if (typeof id !== 'string' || !id) continue;
+      if (earliestHopById.get(id) !== hop) continue; // keep only the earliest occurrence
+      if (!out[hop].includes(id)) out[hop].push(id);
+    }
+  });
+}
+
+/**
  * Should the canvas enter retrieval-hop replay for this result set?
  *
  * Only when some follow-up hop still has content AFTER earliest-hop dedup. Two

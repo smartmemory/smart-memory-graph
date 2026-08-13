@@ -3,6 +3,7 @@ import {
   groupByRetrievalHop,
   maxRetrievalHop,
   shouldEnterRetrievalReplay,
+  assignBridgesToHops,
 } from '../src/core/retrievalHops';
 
 /**
@@ -158,5 +159,108 @@ describe('shouldEnterRetrievalReplay', () => {
     shouldEnterRetrievalReplay([r('a'), r('b')]);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe('assignBridgesToHops', () => {
+  const b = (id, ...neighbourIds) => ({ id, neighbourIds });
+
+  it('places a bridge in the EARLIEST hop of any result it touches', () => {
+    // The bridge entity touches a hop-0 result and a hop-1 result — it was on the
+    // table at hop 0, which is exactly when the planner could read it.
+    const groups = assignBridgesToHops([['m0'], ['m1']], [b('babbage', 'm1', 'm0')]);
+    expect(groups[0]).toEqual(['m0', 'babbage']);
+    expect(groups[1]).toEqual(['m1']);
+  });
+
+  it('is insensitive to neighbour ordering', () => {
+    const a = assignBridgesToHops([['m0'], ['m1']], [b('e', 'm0', 'm1')]);
+    const c = assignBridgesToHops([['m0'], ['m1']], [b('e', 'm1', 'm0')]);
+    expect(a).toEqual(c);
+  });
+
+  it('DROPS a bridge that touches no grouped result — never defaults it to hop 0', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const groups = assignBridgesToHops([['m0'], ['m1']], [b('orphan', 'somewhere-else')]);
+    expect(groups).toEqual([['m0'], ['m1']]);
+    // Dropping is right — an unattached bridge has no honest hop — but it is data in
+    // and not out, so it must not be silent (project no-silent-degradation rule).
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('REFUSES to justify a bridge with another bridge', () => {
+    // b1 attaches to a real result; b2 attaches only to b1. Assigning b2 would mean
+    // reading a hop off a node that never had one — the exact false-provenance claim
+    // this function exists to avoid. Regression: an earlier version wrote assigned
+    // bridges back into the evidence map, so b2 silently inherited hop 0.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const groups = assignBridgesToHops([['m0']], [b('b1', 'm0'), b('b2', 'b1')]);
+    expect(groups).toEqual([['m0', 'b1']]);
+    expect(groups.flat()).not.toContain('b2');
+    warn.mockRestore();
+  });
+
+  it('is insensitive to bridge ORDER when one bridge references another', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const forward = assignBridgesToHops([['m0']], [b('b1', 'm0'), b('b2', 'b1')]);
+    const reverse = assignBridgesToHops([['m0']], [b('b2', 'b1'), b('b1', 'm0')]);
+    expect(forward).toEqual(reverse);
+    warn.mockRestore();
+  });
+
+  it('dedups an id repeated across groups down to its earliest hop', () => {
+    // A double-revealed node would flash in two different hop colours. Callers using
+    // groupByRetrievalHop never produce this, but the exported utility must not
+    // depend on its caller to hold its contract.
+    const groups = assignBridgesToHops([['m0'], ['m0', 'm1']], []);
+    expect(groups).toEqual([['m0'], ['m1']]);
+  });
+
+  it('dedups repeated bridge entries', () => {
+    const groups = assignBridgesToHops([['m0']], [b('e', 'm0'), b('e', 'm0')]);
+    expect(groups).toEqual([['m0', 'e']]);
+  });
+
+  it('never duplicates a bridge id that is already a result', () => {
+    const groups = assignBridgesToHops([['m0'], ['m1']], [b('m1', 'm0')]);
+    expect(groups[0]).toEqual(['m0']);
+    expect(groups[1]).toEqual(['m1']);
+  });
+
+  it('does not mutate the input groups', () => {
+    const input = [['m0'], ['m1']];
+    assignBridgesToHops(input, [b('e', 'm0')]);
+    expect(input).toEqual([['m0'], ['m1']]);
+  });
+
+  it('assigns each bridge once even when several bridges share a hop', () => {
+    const groups = assignBridgesToHops(
+      [['m0', 'm2'], ['m1']],
+      [b('e1', 'm0'), b('e2', 'm2', 'm1'), b('e3', 'm1')],
+    );
+    expect(groups[0]).toEqual(['m0', 'm2', 'e1', 'e2']);
+    expect(groups[1]).toEqual(['m1', 'e3']);
+  });
+
+  it('tolerates empty/missing bridge input and empty groups', () => {
+    expect(assignBridgesToHops([['m0']], [])).toEqual([['m0']]);
+    expect(assignBridgesToHops([['m0']], null)).toEqual([['m0']]);
+    expect(assignBridgesToHops([], [b('e', 'm0')])).toEqual([]);
+    expect(assignBridgesToHops(null, [b('e', 'm0')])).toEqual([]);
+  });
+
+  it('skips malformed bridge entries rather than throwing, and says so', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const groups = assignBridgesToHops([['m0']], [null, { id: '' }, { id: 'e' }, b('ok', 'm0')]);
+    expect(groups).toEqual([['m0', 'ok']]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('keeps an empty hop empty when no bridge reaches it', () => {
+    const groups = assignBridgesToHops([['m0'], [], ['m2']], [b('e', 'm2')]);
+    expect(groups[1]).toEqual([]);
+    expect(groups[2]).toEqual(['m2', 'e']);
   });
 });

@@ -101,7 +101,15 @@ export {
   groupByRetrievalHop,
   maxRetrievalHop,
   shouldEnterRetrievalReplay,
+  assignBridgesToHops,
 } from './core/retrievalHops';
+// GRAPH-MULTIHOP-VIZ-1 — the frame/timing plan both hop groupings above feed into.
+export {
+  buildReplayPlan,
+  buildBfsHopNodeSets,
+  HOP_COLORS,
+  HOP_DELAY_MS,
+} from './core/hopReplayPlan';
 export { exportPNG, exportSVG } from './core/export';
 export { saveRecording, getLastRecording, getAllRecordings, clearRecordings } from './core/eventStore';
 

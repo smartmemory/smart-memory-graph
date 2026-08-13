@@ -38,6 +38,13 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
  *   of opening its own SSE subscription. Used by Run Inspector to lockstep the
  *   graph view with <PipelineDag> on a single playhead. (VIS-PIPELINE-DAG-1 Phase 4)
  * @param {import('react').ReactNode} [props.toolbarRightActions] - Extra controls rendered at toolbar right side
+ * @param {Array<Array<string>>} [props.hopGroups] - Precomputed retrieval-hop groups
+ *   (index = hop number, value = node ids) driving the hop reveal animation.
+ *   GRAPH-MULTIHOP-VIZ-1: produce these with `groupByRetrievalHop(results)` and gate
+ *   on `shouldEnterRetrievalReplay(results)` — pass an empty array to render the set
+ *   all at once instead. Independent of the BFS replay reachable from DetailPanel.
+ * @param {any} [props.autoReplayKey] - Changing this value replays `hopGroups` from
+ *   the start. Pass a per-search stamp so a re-run of the same query animates again.
  * @param {string} [props.className] - Additional CSS classes
  * @param {Object} [props.theme] - Optional consumer-scoped canvas theme.
  *   When omitted, the default dark semantic palette is used (web/studio/insights).
@@ -69,6 +76,8 @@ export default function GraphExplorer({
   replayRunId,
   clock = null,
   toolbarRightActions,
+  hopGroups = null,
+  autoReplayKey = null,
   showOriginLegend = true,
   hideSelectionToolbar = false,
   className = '',
@@ -316,6 +325,50 @@ export default function GraphExplorer({
     cytoscape,
     graphData: { nodes, edges },
   });
+
+  // Retrieval-hop replay (GRAPH-MULTIHOP-VIZ-1 G3).
+  // Held in a ref so the autoplay effect below depends only on `autoReplayKey` —
+  // the caller rebuilds `hopGroups` on every render, and depending on the array
+  // itself would restart the animation mid-flight on any unrelated re-render.
+  const hopGroupsRef = useRef(hopGroups);
+  hopGroupsRef.current = hopGroups;
+
+  const hasHopGroups = Array.isArray(hopGroups) && hopGroups.length > 0;
+  const { startRetrievalReplay, cancelReplay } = multiHop;
+
+  // No stopReplay() first: it would start a 350ms restore-to-opacity-1 animation
+  // that races the new run's dim-to-0.08. The replay driver already stops in-flight
+  // animations, clears its own timers, and resets leftover styles before dimming.
+  const replayHopGroups = useCallback(() => {
+    const groups = hopGroupsRef.current;
+    if (!Array.isArray(groups) || groups.length === 0) return;
+    startRetrievalReplay(groups);
+  }, [startRetrievalReplay]);
+
+  // A running replay is animating elements that a data change is about to replace.
+  // Nothing else cancels it: the merge below swaps the canvas contents while the old
+  // run's timers keep firing — recolouring any ids the two sets share and driving the
+  // hop indicator for a search that is no longer on screen. If the new set never
+  // starts a replay of its own (a hop-0-only search), the old one runs to completion
+  // over it. Cancel on the data identity, not on a render.
+  useEffect(() => {
+    cancelReplay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nodes, edges]);
+
+  // Autoplay once the canvas actually holds the elements. `cytoscape.ready` alone
+  // is not enough: the setElements/merge effect below runs on the same commit, so
+  // firing here would dim and reveal an empty canvas. The delay lets the merge and
+  // its layout land first.
+  useEffect(() => {
+    if (autoReplayKey == null) return;
+    if (!cytoscape.ready) return;
+    if (!hasHopGroups) return;
+    if (!nodes.length) return;
+    const timer = setTimeout(replayHopGroups, 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoReplayKey, cytoscape.ready, hasHopGroups, nodes.length]);
 
   // Wire node click/dblclick handlers to Cytoscape events
   useEffect(() => {
@@ -638,7 +691,11 @@ export default function GraphExplorer({
             <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
           )}
           <div className="flex items-center gap-2">
-            {multiHop.HOP_COLORS.slice(0, (multiHop.hopStats?.length || 0) + 1).map((color, i) => (
+            {/* One dot per FRAME, not per HOP_COLORS entry — a 6-hop replay cycles
+                the 4 colours and must still show 6 dots. In BFS mode frame 0 is the
+                clicked start node; in retrieval mode frame 0 is retrieval hop 0
+                (the original query's own results), so it is labelled as such. */}
+            {Array.from({ length: multiHop.frameCount }, (_, i) => (
               <div
                 key={i}
                 className="flex items-center gap-1"
@@ -646,21 +703,31 @@ export default function GraphExplorer({
               >
                 <div
                   className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: color }}
+                  style={{ backgroundColor: multiHop.HOP_COLORS[i % multiHop.HOP_COLORS.length] }}
                 />
                 <span className="text-xs">
-                  {i === 0 ? 'start' : `hop ${i}`}
+                  {multiHop.replayMode === 'bfs' && i === 0 ? 'start' : `hop ${i}`}
                 </span>
               </div>
             ))}
           </div>
           {multiHop.replayState === 'done' && (
-            <button
-              onClick={multiHop.stopReplay}
-              className="ml-2 text-xs text-cyan-400 hover:text-white underline"
-            >
-              Reset
-            </button>
+            <>
+              {multiHop.replayMode === 'retrieval' && hasHopGroups && (
+                <button
+                  onClick={replayHopGroups}
+                  className="ml-2 text-xs text-cyan-400 hover:text-white underline"
+                >
+                  Replay
+                </button>
+              )}
+              <button
+                onClick={multiHop.stopReplay}
+                className="ml-2 text-xs text-cyan-400 hover:text-white underline"
+              >
+                Reset
+              </button>
+            </>
           )}
         </div>
       )}

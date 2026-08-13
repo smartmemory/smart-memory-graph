@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.2.13
+
+### Added (2026-08-13) — GRAPH-MULTIHOP-VIZ-1 G3
+
+- **`hopReplayPlan.js` (new, pure).** The frame/timing plan `useMultiHopReplay` used to derive
+  internally, extracted so BOTH hop groupings drive one animation driver: `buildReplayPlan`
+  (frames, colours, delays), `buildBfsHopNodeSets` (the BFS derivation lifted out of the hook),
+  and the exported `HOP_COLORS` / `HOP_DELAY_MS`. The hook now holds no grouping logic at all.
+  BFS timing is unchanged and pinned by test: a seeded plan reproduces the shipped schedule
+  exactly (start node at t=0, hop *i* at *i*x700ms). An unseeded retrieval plan renders hop 0 at
+  t=0 rather than leaving a blank leading beat.
+- **`useMultiHopReplay().startRetrievalReplay(hopNodeSets)`.** Second entry point taking
+  precomputed groups (from `groupByRetrievalHop`) instead of BFS. Also returns `replayMode`
+  (`'bfs' | 'retrieval'`) and `frameCount`, and now clears its timers on unmount — a replay
+  started just before a route change kept firing into a destroyed canvas.
+- **`assignBridgesToHops(hopGroups, bridges)`** in `retrievalHops.js`. Places bridge nodes
+  (entities shared by several results) on the hop timeline at the earliest hop of any result they
+  touch. Multi-hop chains THROUGH entities, which are never search results, so without this the
+  hops render as disconnected clusters. A bridge touching no grouped result is dropped, never
+  defaulted into hop 0 — the same refusal unstamped results get.
+- **`GraphExplorer` props `hopGroups` + `autoReplayKey`.** Drive a retrieval-hop replay from a
+  caller-supplied grouping; a changed key re-plays. Both are grouping-source-agnostic — the
+  component never learns what a search result is. No new DATA prop was needed: controlled mode
+  (`data`, no `adapter`) already existed.
+
+### Fixed (2026-08-13, incl. Codex adversarial-review findings) — mostly pre-existing in `useMultiHopReplay`
+
+- **`stopReplay` threw and left the canvas permanently dimmed.** It animated
+  `{'border-color': null}`; Cytoscape lowercases every animated value as a colour string, so the
+  restore aborted with `Cannot read properties of null (reading 'toLowerCase')` and every element
+  stayed at opacity 0.08 with no way back. Latent before this release (only a user click reached
+  it), immediate once autoplay did. Colours are now removed via `removeStyle`, never animated to
+  null.
+- **Edges lit before their endpoints.** The `visited` set was fully populated before the first
+  frame fired, so an edge into a hop-3 node drew bright at hop 1 against a still-dimmed endpoint.
+  The code contradicted its own comment ("connecting to previously-revealed nodes"); the comment
+  was right. Reveal is now progressive, and edges within a single hop are drawn too.
+- **The hop indicator showed at most 4 dots and mislabelled retrieval hops.** Dot count came from
+  `HOP_COLORS.length` via `hopStats`, so a 6-hop replay lost two beats; it now comes from
+  `frameCount`. Frame 0 is labelled `start` only in BFS mode — in retrieval mode it is `hop 0`,
+  the original query's own result set.
+
+- **`removeStyle` does not cancel an in-flight Cytoscape animation.** An element stopped
+  mid-reveal simply finished and reapplied its hop colour *after* the restore had run, so the
+  `border-color` fix above was necessary but not sufficient. `cy.elements().stop(true)` now
+  precedes both a reset and a re-run. Reset also clears every replay-owned bypass (`opacity`,
+  `border-width`, `border-color`, `line-color`, edge `width`) once the fade completes, instead of
+  leaving the canvas on animated values the stylesheet no longer controls.
+- **A running replay was not cancelled when the canvas data was replaced.** New `cancelReplay()`
+  (abandon without the restore animation, for when the animated elements are about to be replaced),
+  fired by `GraphExplorer` on data identity change. Without it, an earlier run's timers kept driving
+  the hop indicator and recolouring ids shared with the new data — and if the new data never started
+  a replay, the old one ran to completion over it.
+- **`assignBridgesToHops` could justify a bridge with another bridge.** Assigned bridges were
+  written into the same map used as provenance evidence, so a bridge attached only to *another*
+  bridge silently inherited a hop, contradicting the function's stated rule. Evidence is now an
+  immutable result-only map, input groups are deduped by earliest hop while cloning, and dropped
+  orphan/malformed bridges WARN rather than vanishing.
+
+Neither of the first two was reachable by unit test (this package's vitest environment is `node`,
+with no DOM and no Cytoscape canvas); both were found by mounting the real component against a
+real captured multi-hop payload in a browser. The bridge-provenance regression is mutation-tested:
+reintroducing it fails exactly two of the new tests. 28 new tests, 353 across the package.
+
 ## 0.2.12
 
 ### Fixed (2026-08-12, Codex adversarial-review findings on 0.2.11) — GRAPH-MULTIHOP-VIZ-1
