@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Added (2026-09-04) — DIST-LITE-9 Ask Panel
+
+- **`AskPanel`** — a question box over `POST /memory/ask`. Renders the answer, an optional
+  reasoning disclosure, the memories it was grounded in, and the relations it used. Needs
+  only an `adapter` prop, has no viewer-specific imports and no dependency on
+  `GraphExplorer`: a host places the two side by side and connects them through `onSelect`.
+- **`AskResult`** — the pure presentational half, exported so a host can drive its own
+  state. `AskPanel` is a thin container over it.
+- **`onSelect(id, meta)`** — evidence rows pass `(item_id, {kind:'evidence', item})`;
+  relation rows pass `(edgeId, {kind:'relation', relation, sourceId, targetId})` where
+  `edgeId` is `${source_id}->${target_id}:${type}`, the same id `normalizeAPIResponse`
+  builds. A relation the server sent without node ids renders but is not clickable —
+  guessing an id would silently select the wrong edge.
+- **`ask(question, {limit, reasoning})`** on `createFetchAdapter` and `createSDKAdapter`.
+  The SDK adapter falls back to raw HTTP when the installed SDK predates `memories.ask`.
+- **`core/askState.js`** exported from the index: `askReducer`, `runAsk`,
+  `normalizeAskResponse`, `relationEdgeId`, `evidenceSelection`, `relationSelection` and
+  the status constants, so a host can build its own ask UI over the same contract.
+- Ask-panel styles in `graph.css`, self-contained so a host needs no Tailwind for it.
+
+### Fixed (2026-09-04)
+
+- **Component tests could not render.** vitest's esbuild transform defaulted to the classic
+  JSX runtime, so any test that rendered a component died on `React is not defined` while
+  every consuming app built fine. `vitest.config.js` now sets `jsx: 'automatic'`.
+
 ## 0.2.13
 
 ### Added (2026-08-13) — GRAPH-MULTIHOP-VIZ-1 G3

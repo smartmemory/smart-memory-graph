@@ -34,6 +34,20 @@
  * @property {function(string, number=): Promise<Object>} searchMemories
  *   Hybrid search for memories.
  *
+ * @property {function(string, {limit?: number, reasoning?: boolean}=): Promise<AskResponse>} ask
+ *   Grounded question answering (DIST-LITE-9). POSTs /memory/ask. Served identically by
+ *   the lite daemon and the hosted API. Rejects rather than returning a fallback answer
+ *   when the server's LLM cannot answer.
+ *
+ * @typedef {Object} AskResponse
+ * @property {string} answer - One or two sentences answering the question.
+ * @property {string} reasoning - Reasoning citing the evidence; may be an empty string.
+ * @property {Array<{item_id: string, content: string}>} evidence
+ *   The retrieved memories, captured before the model ran.
+ * @property {Array<{source: string, type: string, target: string, source_id: string, target_id: string}>} relations
+ *   One-hop entity relations. `source_id`/`target_id` make each row addressable:
+ *   `${source_id}->${target_id}:${type}` is the edge id normalizeAPIResponse builds.
+ *
  * @property {function(string): Promise<Object>} getMemory
  *   Fetch a single memory by ID.
  *

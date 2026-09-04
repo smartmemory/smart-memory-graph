@@ -3,3 +3,30 @@
 @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fade-in { animation: fade-in 0.3s ease-out; }
 .cytoscape-container { width: 100%; height: 100%; }
+
+/* --- Ask panel (DIST-LITE-9) ------------------------------------------------
+   Self-contained so a host can mount <AskPanel> beside <GraphExplorer> without
+   bringing Tailwind. Colors are the same dark surface the graph chrome uses. */
+.sm-ask-panel { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; overflow-y: auto; background: #0f172a; color: #e2e8f0; font-size: 0.8125rem; }
+.sm-ask-form { display: flex; gap: 0.5rem; }
+.sm-ask-input { flex: 1; min-width: 0; padding: 0.5rem 0.625rem; border: 1px solid #334155; border-radius: 0.375rem; background: #1e293b; color: inherit; font: inherit; }
+.sm-ask-input:focus { outline: 2px solid #3b82f6; outline-offset: -1px; }
+.sm-ask-input:disabled { opacity: 0.6; }
+.sm-ask-submit { padding: 0.5rem 0.875rem; border: 0; border-radius: 0.375rem; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
+.sm-ask-submit:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+.sm-ask-status { margin: 0; color: #94a3b8; }
+.sm-ask-error { margin: 0; padding: 0.5rem 0.625rem; border: 1px solid #7f1d1d; border-radius: 0.375rem; background: #450a0a; color: #fecaca; }
+.sm-ask-result { display: flex; flex-direction: column; gap: 0.75rem; }
+.sm-ask-answer { margin: 0; font-size: 0.9375rem; line-height: 1.5; color: #f8fafc; }
+.sm-ask-reasoning summary { cursor: pointer; color: #94a3b8; }
+.sm-ask-reasoning p { margin: 0.375rem 0 0; color: #cbd5e1; line-height: 1.5; }
+.sm-ask-section-title { margin: 0 0 0.375rem; font-size: 0.6875rem; letter-spacing: 0.05em; text-transform: uppercase; color: #64748b; }
+.sm-ask-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.sm-ask-row { display: flex; width: 100%; gap: 0.5rem; align-items: baseline; padding: 0.4375rem 0.5rem; border: 1px solid #1e293b; border-radius: 0.375rem; background: #111c33; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.sm-ask-row:hover:not(:disabled) { border-color: #3b82f6; background: #16233d; }
+.sm-ask-row:disabled { cursor: default; opacity: 0.75; }
+.sm-ask-row-content { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sm-ask-row-id { flex: none; color: #64748b; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6875rem; }
+.sm-ask-relation-source, .sm-ask-relation-target { color: #e2e8f0; }
+.sm-ask-relation-type { color: #38bdf8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6875rem; }
+.sm-ask-empty { margin: 0; color: #94a3b8; }

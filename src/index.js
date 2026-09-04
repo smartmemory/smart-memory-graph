@@ -21,6 +21,10 @@ export { default as PipelineDag, buildElements as buildPipelineDagElements } fro
 export { default as ReplayScrubBar, fmtSeconds as formatReplayTime } from './components/ReplayScrubBar';
 export { default as RunLogPanel } from './components/RunLogPanel';
 export { default as DecisionDetailBlock } from './components/DecisionDetailBlock';
+// DIST-LITE-9 — ask a question, get a grounded answer plus its evidence. Standalone:
+// needs only an adapter, and pairs with GraphExplorer through its onSelect callback.
+export { default as AskPanel } from './components/AskPanel';
+export { default as AskResult } from './components/AskResult';
 
 // --- Hooks ---
 export { useGraphData } from './hooks/useGraphData';
@@ -90,6 +94,21 @@ export {
   UI_STATES as PIPELINE_DAG_UI_STATES,
 } from './core/pipelineDagState';
 export { searchWikipedia } from './core/wikipedia';
+// DIST-LITE-9 — ask lifecycle + selection payloads, exported so a host can build its
+// own ask UI (or its own onSelect mapping) over the same contract.
+export {
+  askReducer,
+  normalizeAskResponse,
+  relationEdgeId,
+  evidenceSelection,
+  relationSelection,
+  runAsk,
+  INITIAL_ASK_STATE,
+  ASK_IDLE,
+  ASK_LOADING,
+  ASK_ANSWERED,
+  ASK_ERROR,
+} from './core/askState';
 export {
   bfsExpand,
   buildAdjacency,

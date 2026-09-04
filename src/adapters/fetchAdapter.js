@@ -40,6 +40,13 @@ export function createFetchAdapter({ apiUrl, getToken, getTeamId }) {
     deleteOntologyPattern: (name, type) => request('DELETE', `/memory/ontology/patterns/${encodeURIComponent(name)}?entity_type=${encodeURIComponent(type)}`),
     getTemporalSnapshot: (ts, limit = 2000) => request('GET', `/memory/temporal/at/${encodeURIComponent(ts)}?limit=${limit}`),
     searchMemories: (query, topK = 20) => request('POST', '/memory/search', { query, top_k: topK, enable_hybrid: true }),
+    // DIST-LITE-9 — grounded question answering. The lite daemon (:9014) and the hosted
+    // API serve the identical body, so AskPanel works against either through this method.
+    ask: (question, { limit = 5, reasoning = true } = {}) => {
+      const body = { question, limit };
+      if (reasoning !== true) body.reasoning = reasoning;
+      return request('POST', '/memory/ask', body);
+    },
     getMemory: (id) => request('GET', `/memory/${encodeURIComponent(id)}`),
     getLinks: (id) => request('GET', `/memory/${encodeURIComponent(id)}/links`),
     getNeighbors: (id) => request('GET', `/memory/${encodeURIComponent(id)}/neighbors`),

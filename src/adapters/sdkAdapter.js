@@ -35,6 +35,15 @@ export function createSDKAdapter(client) {
     searchMemories: (query, topK = 20) =>
       client.memories.search(query, { topK, enableHybrid: true }),
 
+    // DIST-LITE-9. Falls back to the underlying HTTP client when the installed SDK
+    // predates `memories.ask` — the same pattern the decision methods below use.
+    ask: (question, { limit = 5, reasoning = true } = {}) => {
+      if (client.memories?.ask) return client.memories.ask(question, { limit, reasoning });
+      const body = { question, limit };
+      if (reasoning !== true) body.reasoning = reasoning;
+      return (client.http || client._http || client).post?.('/memory/ask', body);
+    },
+
     getMemory: (id) =>
       client.memories.get(id),
 
