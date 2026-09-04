@@ -28,8 +28,11 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
  * @param {GraphAnnotations} [props.annotations] - Annotation overlay.
  *   Shape: { nodes: Record<id, {kind, value}[]>, edges: Record<id, {kind, value}[]>,
  *            activeKinds: string[], precedence?: string[] }
- * @param {string} [props.wsUrl] - WebSocket URL for streaming (deprecated — use sseBaseUrl)
- * @param {string} [props.wsToken] - JWT token for WebSocket auth (deprecated — use sseToken)
+ * @param {string} [props.wsToken] - DEPRECATED alias for sseToken. There is no
+ *   WebSocket transport any more (PLAT-PUSH-SSE-1); this only survives because
+ *   smart-memory-studio still passes it
+ *   (web/src/components/shared/containers/AdaptiveResultsContainer.jsx). Pass
+ *   sseToken instead — this alias goes away once studio migrates.
  * @param {string} [props.sseBaseUrl] - SmartMemory API base URL for SSE progress stream
  * @param {string} [props.sseToken] - Bearer JWT for SSE auth
  * @param {string} [props.replayRunId] - When set, replays a specific run (passes runId+fromSeq:0)
@@ -69,7 +72,6 @@ export default function GraphExplorer({
   adapter,
   data: externalData,
   annotations,
-  wsUrl,
   wsToken,
   sseBaseUrl,
   sseToken,
@@ -205,7 +207,9 @@ export default function GraphExplorer({
   // Replay not available state: set when 404 + no IDB recording found
   const [replayNotAvailable, setReplayNotAvailable] = useState(false);
 
-  // Streaming — SSE transport (sseBaseUrl/sseToken) preferred; wsUrl/wsToken kept for backward compat.
+  // Streaming — SSE only. `wsUrl` is gone (it was declared and never read);
+  // `wsToken` remains a deprecated alias for `sseToken` for the one caller
+  // that still passes it. PLAT-PUSH-SSE-1.
   // VIS-PIPELINE-DAG-1 Phase 4: when a `clock` prop is provided, the clock owns SSE
   // and we consume events released through it — but useGraphStream still needs `enabled`
   // to be true so the clock-driven path actually runs.

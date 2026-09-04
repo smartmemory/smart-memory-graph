@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Removed (2026-09-04) — PLAT-PUSH-SSE-1
+
+- **`GraphExplorer`'s `wsUrl` prop.** It was declared and never read: the component moved
+  to Server-Sent Events some time ago and the WebSocket endpoints it named no longer exist.
+  Passing it was a no-op, which made hosts believe they had configured streaming when they
+  had not. `wsToken` survives as a deprecated alias for `sseToken` for the one caller that
+  still passes it (smart-memory-studio); pass `sseToken` instead.
+
 ### Added (2026-09-04) — DIST-LITE-9 Ask Panel
 
 - **`AskPanel`** — a question box over `POST /memory/ask`. Renders the answer, an optional
