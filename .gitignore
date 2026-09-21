@@ -10,3 +10,6 @@ dist/
 # macOS finder metadata — never useful in the repo
 .DS_Store
 **/.DS_Store
+
+# session flush scratch (per-session, not shared state)
+session-context*
