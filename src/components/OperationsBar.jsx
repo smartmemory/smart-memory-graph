@@ -14,6 +14,7 @@ const STATUS_COLORS = {
   connected: 'bg-green-500',
   connecting: 'bg-yellow-500 animate-pulse',
   disconnected: 'bg-red-500',
+  reconnecting: 'bg-yellow-500',
 };
 
 // Row heights: 1 row = 40px, 2 rows = 72px, 3 rows = 104px

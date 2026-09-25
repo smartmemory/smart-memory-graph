@@ -34,6 +34,8 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
  *   (web/src/components/shared/containers/AdaptiveResultsContainer.jsx). Pass
  *   sseToken instead — this alias goes away once studio migrates.
  * @param {string} [props.sseBaseUrl] - SmartMemory API base URL for SSE progress stream
+ * @param {Object} [props.auth] - SDK AuthCore for live credentials and session recovery
+ * @param {string} [props.workspaceId] - Recreate the subscription when scope changes
  * @param {string} [props.sseToken] - Bearer JWT for SSE auth
  * @param {string} [props.replayRunId] - When set, replays a specific run (passes runId+fromSeq:0)
  * @param {Object} [props.clock] - Optional shared replay clock from useReplayClock().
@@ -75,6 +77,8 @@ export default function GraphExplorer({
   wsToken,
   sseBaseUrl,
   sseToken,
+  auth,
+  workspaceId,
   replayRunId,
   clock = null,
   toolbarRightActions,
@@ -215,11 +219,13 @@ export default function GraphExplorer({
   // to be true so the clock-driven path actually runs.
   const effectiveSseBase = sseBaseUrl || '';
   const effectiveSseToken = sseToken || wsToken;
-  const sseEnabled = !!(sseBaseUrl || sseToken || replayRunId || clock);
+  const sseEnabled = !!(auth || sseBaseUrl || sseToken || replayRunId || clock);
 
   const stream = useGraphStream({
     sseBaseUrl: effectiveSseBase,
     token: effectiveSseToken,
+    auth,
+    workspaceId,
     enabled: sseEnabled,
     runId: replayRunId,
     clock,
@@ -600,6 +606,11 @@ export default function GraphExplorer({
 
   return (
     <div ref={rootRef} className={`flex min-w-0 flex-col bg-slate-900 overflow-hidden ${className || 'h-full w-full'}`}>
+      {stream.error && (
+        <div role="alert" className="px-4 py-2 text-sm text-red-300 bg-red-950">
+          Event stream unavailable: {stream.error}
+        </div>
+      )}
       {loading && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/80 pointer-events-none">
           <div className="text-center">

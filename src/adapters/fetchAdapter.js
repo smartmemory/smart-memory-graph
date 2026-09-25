@@ -6,6 +6,7 @@
  * @param {string} config.apiUrl - Base API URL (e.g., 'http://localhost:9001')
  * @param {function(): string|null} config.getToken - Returns current JWT token
  * @param {function(): string|null} config.getTeamId - Returns current team ID
+ * @param {typeof fetch} [config.fetchFn] - Inject an SDK auth fetch for hosted session recovery
  * @returns {GraphAPIAdapter}
  */
 /** Read a cookie value by name (browser-only, non-httpOnly). */
@@ -14,7 +15,7 @@ function getCookie(name) {
   return match ? decodeURIComponent(match.split('=')[1]) : null;
 }
 
-export function createFetchAdapter({ apiUrl, getToken, getTeamId }) {
+export function createFetchAdapter({ apiUrl, getToken, getTeamId, fetchFn = globalThis.fetch.bind(globalThis) }) {
   async function request(method, path, body = null) {
     const headers = { 'Content-Type': 'application/json' };
     const token = getToken();
@@ -24,7 +25,7 @@ export function createFetchAdapter({ apiUrl, getToken, getTeamId }) {
     if (team) headers['X-Workspace-Id'] = team;
     const opts = { method, headers, credentials: 'include' };
     if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(`${apiUrl}${path}`, opts);
+    const res = await fetchFn(`${apiUrl}${path}`, opts);
     if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
     return res.status === 204 ? null : res.json();
   }

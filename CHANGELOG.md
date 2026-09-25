@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed (2026-09-25) — UI-IDLE-DISCONNECT-1
+
+- Added injectable fetchFn transport and GraphExplorer auth/workspaceId props. Streams now use SDK session recovery, backoff, cursor resume, visibility/online recovery, replay deduplication, and scoped cleanup. Existing static-token/local adapters remain supported.
+
 ### Removed (2026-09-04) — PLAT-PUSH-SSE-1
 
 - **`GraphExplorer`'s `wsUrl` prop.** It was declared and never read: the component moved

@@ -20,6 +20,8 @@ import { subscribeProgress } from '@smartmemory/sdk-js/progress';
  * @param {Object} options
  * @param {string} [options.sseBaseUrl] - SmartMemory API base URL (e.g. 'http://localhost:9001')
  * @param {string} [options.token] - Bearer JWT for SSE auth
+ * @param {Object} [options.auth] - SDK auth; refresh and stream recovery are SDK-owned
+ * @param {string} [options.workspaceId] - Scope lifecycle key; never reuse a cursor across scopes
  * @param {boolean} [options.enabled=true] - Toggle connection
  * @param {number} [options.bufferSize=100] - Ring buffer capacity
  * @param {string} [options.runId] - When set, subscribes in replay mode (run_id + from_seq=0)
@@ -43,6 +45,8 @@ export function useGraphStream(options = {}) {
   const {
     sseBaseUrl = '',
     token,
+    auth,
+    workspaceId,
     enabled = true,
     bufferSize = 100,
     runId,
@@ -58,6 +62,7 @@ export function useGraphStream(options = {}) {
   } = options;
 
   const [status, setStatus] = useState('disconnected');
+  const [streamError, setStreamError] = useState(null);
   const [operations, setOperations] = useState(() => {
     try {
       const saved = sessionStorage.getItem('graph:operations');
@@ -367,6 +372,7 @@ export function useGraphStream(options = {}) {
   // SSE connection via subscribeProgress (skipped when a clock is provided)
   useEffect(() => {
     unmountedRef.current = false;
+    setStreamError(null);
 
     if (!enabled) {
       setStatus('disconnected');
@@ -379,15 +385,27 @@ export function useGraphStream(options = {}) {
 
     let unmounted = false;
     let subscription = null;
+    let terminal = false;
 
     // Reset SSE-failed gate on each new connection attempt
     sseFailedReasonRef.current = null;
     setStatus('connecting');
 
+    const seen = new Set();
     const subscribeOpts = {
       baseUrl: sseBaseUrl,
+      auth,
+      workspaceId,
       onEvent(progressEvent) {
-        if (unmounted || isPausedRef.current) return;
+        if (unmounted) return;
+        setStatus('connected');
+        sseFailedReasonRef.current = null;
+        if (isPausedRef.current) return;
+        // Scope replay is inclusive: suppress a repeated boundary frame.
+        const eventKey = `${progressEvent.run_id}:${progressEvent.seq}`;
+        if (seen.has(eventKey)) return;
+        seen.add(eventKey);
+        if (seen.size > 10000) seen.delete(seen.values().next().value);
 
         // Translate ProgressEvent into the legacy classified-event shape so the
         // existing batching + callback-dispatch pipeline (flushBatch) is unchanged.
@@ -408,6 +426,8 @@ export function useGraphStream(options = {}) {
         const errMsg = err?.message || String(err) || '';
         const reason = errMsg || 'SSE connection failed after retries';
         console.warn('[useGraphStream] SSE error:', err);
+        terminal = true;
+        setStreamError(reason);
         setStatus('disconnected');
         // Flip the IDB gate on so subsequent recording flushes persist for offline replay.
         // shouldSaveToIDB(reason) will log the warning per no-silent-degradation.md.
@@ -425,6 +445,8 @@ export function useGraphStream(options = {}) {
       },
       onReconnect() {
         if (unmounted) return;
+        setStatus('reconnecting');
+        sseFailedReasonRef.current = 'SSE reconnecting';
         callbacksRef.current.onReconnect?.();
       },
     };
@@ -439,11 +461,14 @@ export function useGraphStream(options = {}) {
       subscribeOpts.fromSeq = 0;
     }
 
+    const unsubscribeConnection = auth?.connection?.subscribe((snapshot) => {
+      if (!unmounted && !terminal) setStatus(snapshot.status === 'signed_out' ? 'disconnected' : snapshot.status);
+    });
     subscription = subscribeProgress(subscribeOpts);
-    setStatus('connected');
 
     return () => {
       unmounted = true;
+      unsubscribeConnection?.();
       unmountedRef.current = true;
       if (batchTimerRef.current) {
         clearTimeout(batchTimerRef.current);
@@ -455,11 +480,14 @@ export function useGraphStream(options = {}) {
         if (buf[key]?.timer) clearTimeout(buf[key].timer);
       }
       recordingBufferRef.current = {};
+      batchRef.current = [];
+      pendingElementsRef.current = [];
+      canonicalMapRef.current = {};
       if (subscription) {
         subscription.close();
       }
     };
-  }, [sseBaseUrl, token, enabled, runId, flushBatch, clockSubscribe]);
+  }, [sseBaseUrl, token, auth, workspaceId, enabled, runId, flushBatch, clockSubscribe]);
 
   const pause = useCallback(() => {
     isPausedRef.current = true;
@@ -515,7 +543,7 @@ export function useGraphStream(options = {}) {
     return { nodes: cn, edges: ce };
   }, [operations]);
 
-  return { status, operations, opsPerSecond, isPaused, pause, resume, drainPending, clearOperations, pushOperation, getStateUpTo, recordingBufferRef };
+  return { status, error: streamError, operations, opsPerSecond, isPaused, pause, resume, drainPending, clearOperations, pushOperation, getStateUpTo, recordingBufferRef };
 }
 
 // ---------------------------------------------------------------------------
