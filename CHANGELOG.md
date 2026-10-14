@@ -206,9 +206,11 @@ replay refusal, and the absurd-hop guard. 26 tests here, 325 across the package.
 
 ### Added
 
-- **Optional `theme` prop on `<GraphExplorer>`** — opt-in per-consumer canvas theming without affecting other apps. Shape: `{ mode: 'light'|'dark', palette?: { node, edge, label, labelOutline, selectionBorder } }`. `palette` fields are direct CSS colors (hex, rgb(), named, or live values from `getComputedStyle`); each field overrides the corresponding mode default. `palette.node` collapses the per-type memory/entity/grounding fills to one color while preserving size differentiation. Annotation overlays (search match, contradictions) keep their signal colors regardless of theme. Theme changes re-apply at runtime via `cy.style().fromJson(...).update()` keyed on the serialized theme. Default behavior unchanged when `theme` is omitted — web/studio/insights render identically. Used by smartmemory-obsidian to mirror Obsidian's `--graph-node`/`--graph-line`/`--graph-text` CSS variables.
+- **Optional `theme` prop on `<GraphExplorer>`** — opt-in per-consumer canvas theming without affecting other apps. Shape: `{ mode: 'light'|'dark', palette?: { node, edge, label, labelOutline, selectionBorder } }`. `palette` fields are direct CSS colors (hex, rgb(), named, or live values from `getComputedStyle`); each field overrides the corresponding mode default. `palette.node` collapses the per-type memory/entity/grounding fills to one color while preserving size differentiation. Annotation overlays (search match, contradictions) keep their signal colors regardless of theme. Theme changes re-apply at runtime via `cy.style().fromJson(...).update()` keyed on the serialized theme. Default behavior unchanged when `theme` is omitted — web/studio/insights render identically. Used by smart-memory-obsidian to mirror Obsidian's `--graph-node`/`--graph-line`/`--graph-text` CSS variables.
 
 ## Unreleased
+
+- Repo references renamed `smartmemory-*` -> `smart-memory-*` in docs, scripts and config (INFRA-REPO-RENAME-1).
 
 ### Added
 
