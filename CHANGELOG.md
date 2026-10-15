@@ -18,8 +18,12 @@
   The DetailPanel stays open when its single-node delete fails.
 - **`hideSelectionToolbar` now also disables keyboard deletion**, so a host that hides the
   destructive toolbar (Obsidian does) has no keyboard back door.
-- `SearchBar`'s window-wide Cmd/Ctrl+K is scoped to its explorer, so a host editor keeps its own
-  Cmd/Ctrl+K.
+- `SearchBar`'s Cmd/Ctrl+K and Escape listen on its explorer (the host window only when it is
+  rendered standalone), so a host editor keeps its own Cmd/Ctrl+K. Fix round 1: every graph
+  shortcut, inside the explorer or out, now yields to any other editable element (input, textarea,
+  select, contenteditable, the DetailPanel rename input). Cmd/Ctrl+K from the rename input used to
+  steal focus, and the blur saved the half-typed label to the backend. Only the search input itself
+  keeps Cmd/Ctrl+K.
 - New `src/core/graphKeyboard.js` (pure rules) and `tests/graphExplorerKeyboard.test.js`.
 
 ## 1.5.0 — 2026-09-27

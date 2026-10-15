@@ -72,24 +72,27 @@ export default function SearchBar({ nodes, onSearch, onNodeSelect }) {
     return () => clearTimeout(debounceRef.current);
   }, []);
 
-  // Keyboard shortcut: Cmd/Ctrl+K to focus search
+  // Keyboard shortcut: Cmd/Ctrl+K to focus search, Escape to leave it.
+  // GRAPH-KEY-DELETE-1: inside an explorer the listener sits on that explorer, not on the host
+  // window, so a host editor keeps its Cmd/Ctrl+K (Obsidian inserts a link with it). Even inside
+  // the explorer it yields to any other editable element: stealing focus from the DetailPanel
+  // rename input blurs it, and that blur saves the edit to the backend.
   useEffect(() => {
+    const input = inputRef.current;
+    const listenOn = input?.closest('[data-graph-explorer]') ?? window;
     const handler = (e) => {
+      if (!shortcutAppliesTo(e.target, { ownInput: input, activeElement: input?.ownerDocument.activeElement })) return;
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        // GRAPH-KEY-DELETE-1: inside an explorer only react to that explorer's own events, so
-        // a host editor keeps its Cmd/Ctrl+K (Obsidian inserts a link with it).
-        const scope = inputRef.current?.closest('[data-graph-explorer]') ?? null;
-        if (!shortcutAppliesTo(e.target, { scope, ownInput: inputRef.current })) return;
         e.preventDefault();
-        inputRef.current?.focus();
+        input?.focus();
       }
       if (e.key === 'Escape') {
-        inputRef.current?.blur();
+        input?.blur();
         setIsFocused(false);
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    listenOn.addEventListener('keydown', handler);
+    return () => listenOn.removeEventListener('keydown', handler);
   }, []);
 
   return (

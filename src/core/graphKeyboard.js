@@ -56,12 +56,14 @@ export function describeDeletion({ memories = 0, entities = 0 }) {
 }
 
 /**
- * Whether a window-level shortcut (the search box's Cmd/Ctrl+K) may act on `target`.
- * Inside an explorer, only events from within that explorer count. A search box rendered
- * on its own has no explorer to scope to, so it only yields to text editing elsewhere.
+ * Whether a shortcut that is not owned by the explorer root (the search box's Cmd/Ctrl+K and
+ * Escape) may act for this event. Same rule as `classifyGraphKey`: text editing always wins,
+ * whether the event target or the focused element is the editor, inside the explorer or out.
+ * The one exception is the search input itself, so Cmd/Ctrl+K still works while it has focus
+ * (focusing it again blurs nothing). The caller scopes WHERE it listens (the explorer, never
+ * the host window when an explorer exists).
  */
-export function shortcutAppliesTo(target, { scope, ownInput }) {
-  if (scope) return !!target && typeof scope.contains === 'function' && scope.contains(target);
-  if (target && target === ownInput) return true;
-  return !isEditableTarget(target);
+export function shortcutAppliesTo(target, { ownInput = null, activeElement = null } = {}) {
+  const blocks = (el) => !!el && el !== ownInput && isEditableTarget(el);
+  return !blocks(target) && !blocks(activeElement);
 }

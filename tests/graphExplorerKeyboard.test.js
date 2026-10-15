@@ -58,6 +58,9 @@ const makeAdapter = (over = {}) => ({
   getFullGraph: vi.fn(async () => ({ nodes: [], edges: [] })),
   deleteNode: vi.fn(async () => {}),
   deleteEntityNode: vi.fn(async () => {}),
+  getGroundingStatus: vi.fn(async () => ({ grounded: false })),
+  updateEntityNode: vi.fn(async () => {}),
+  createOntologyPattern: vi.fn(async () => {}),
   ...over,
 });
 const cy = () => globalThis.__graphKeyCy;
@@ -78,7 +81,7 @@ async function selectIds(ids) {
 // Dispatches a real keydown the way a keystroke arrives: at the focused element.
 // Returns the event so a test can read defaultPrevented.
 async function press(target, key, init = {}) {
-  if (target !== document.body) target.focus?.();
+  if (target !== document.body) await act(async () => { target.focus?.(); });
   const ev = new window.KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
   await act(async () => { target.dispatchEvent(ev); });
   return ev;
@@ -148,26 +151,56 @@ describe('keys outside the graph never delete or select', () => {
   }
 });
 
-describe('keys inside the explorer but not on the graph surface', () => {
-  it('Backspace in a field inside the explorer is left to the field', async () => {
-    const input = rootEl().querySelector('input[type="text"]');
-    expect(input).not.toBeNull();
-    const ev = await press(input, 'Backspace');
-    expect(ev.defaultPrevented).toBe(false);
-    expect(q('[data-testid="graph-delete-confirm-dialog"]')).toBeNull();
-    expect(deleteCalls()).toBe(0);
-  });
+// Opens the DetailPanel rename input for the entity and types a new label, the way a user does.
+async function startEntityRename() {
+  await act(async () => cy().getElementById('e1').emit('tap'));
+  const title = [...rootEl().querySelectorAll('h2')].find((x) => x.textContent === 'Entity one');
+  await click(title);
+  const input = rootEl().querySelector('input[value="Entity one"]');
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  await act(async () => { setter.call(input, 'Renamed entity'); input.dispatchEvent(new window.Event('input', { bubbles: true })); });
+  return input;
+}
+const addInGraph = (tag, attrs = {}) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  rootEl().appendChild(el);
+  return el;
+};
+
+describe('an editable element owns focus: no graph shortcut acts, inside the explorer or out', () => {
+  // GRAPH-KEY-DELETE-1 class: a graph shortcut that acts while an editor has focus. Cmd+K from the
+  // DetailPanel rename input used to steal focus; the blur then saved the edit to the backend.
+  const KEYS = [['Delete', {}], ['Backspace', {}], ['a', { metaKey: true }], ['a', { ctrlKey: true }], ['k', { metaKey: true }], ['k', { ctrlKey: true }]];
+  const SOURCES = [
+    ['explorer search input', async () => rootEl().querySelector('input[type="text"]')],
+    ['in-graph contenteditable', async () => addInGraph('div', { contenteditable: 'true', tabindex: '0' })],
+    ['in-graph textarea', async () => addInGraph('textarea')],
+    ['in-graph select', async () => addInGraph('select')],
+    ['DetailPanel rename input (edited)', startEntityRename],
+  ];
+  for (const [name, make] of SOURCES) {
+    it(`${name}: every shortcut key is left to the editor`, async () => {
+      const el = await make();
+      expect(el).not.toBeNull();
+      const searchInput = rootEl().querySelector('input[type="text"]');
+      for (const [key, init] of KEYS) {
+        // Cmd/Ctrl+K inside the search input itself is the one allowed shortcut (it re-focuses itself).
+        if (key === 'k' && el === searchInput) continue;
+        const ev = await press(el, key, init);
+        expect(ev.defaultPrevented, `${key} ${JSON.stringify(init)}`).toBe(false);
+        expect(document.activeElement).toBe(el);
+        expect(q('[data-testid="graph-delete-confirm-dialog"]')).toBeNull();
+        expect(selected()).toEqual(['e1', 'm1', 'm2']);
+      }
+      expect(deleteCalls()).toBe(0);
+      expect(adapter.updateEntityNode).not.toHaveBeenCalled();
+      expect(adapter.createOntologyPattern).not.toHaveBeenCalled();
+    });
+  }
   it('Backspace on a button inside the explorer does not open the confirm', async () => {
     const btn = rootEl().querySelector('button');
     await press(btn, 'Backspace');
-    expect(q('[data-testid="graph-delete-confirm-dialog"]')).toBeNull();
-    expect(deleteCalls()).toBe(0);
-  });
-  it('Backspace in a contenteditable placed inside the explorer is left alone', async () => {
-    const ed = document.createElement('div');
-    ed.setAttribute('contenteditable', 'true');
-    rootEl().appendChild(ed);
-    await press(ed, 'Backspace');
     expect(q('[data-testid="graph-delete-confirm-dialog"]')).toBeNull();
     expect(deleteCalls()).toBe(0);
   });
@@ -287,15 +320,35 @@ describe('a failed backend delete keeps the node and says so', () => {
   });
 });
 
-describe('search box Cmd/Ctrl+K is scoped to the explorer', () => {
-  it('from the host editor: not prevented', async () => {
-    const ev = await press(q('#host-editor'), 'k', { metaKey: true });
-    expect(ev.defaultPrevented).toBe(false);
+describe('search box Cmd/Ctrl+K and Escape are scoped to the explorer and yield to editors', () => {
+  const search = () => rootEl().querySelector('input[type="text"]');
+  it('from outside the explorer (every host source): not prevented, search not focused', async () => {
+    for (const sel of ['#host-editor', '#host-input', '#host-textarea', '#host-button', '#host-plain', 'body']) {
+      for (const init of [{ metaKey: true }, { ctrlKey: true }]) {
+        const ev = await press(q(sel), 'k', init);
+        expect(ev.defaultPrevented, `${sel} ${JSON.stringify(init)}`).toBe(false);
+        expect(document.activeElement).not.toBe(search());
+      }
+    }
   });
-  it('from the explorer surface: prevented and focuses the search input', async () => {
-    const ev = await press(rootEl(), 'k', { ctrlKey: true });
-    expect(ev.defaultPrevented).toBe(true);
-    expect(document.activeElement).toBe(rootEl().querySelector('input[type="text"]'));
+  it('from the explorer surface or the search input itself: prevented, search input focused', async () => {
+    for (const from of [rootEl(), search()]) {
+      for (const init of [{ metaKey: true }, { ctrlKey: true }]) {
+        const ev = await press(from, 'k', init);
+        expect(ev.defaultPrevented).toBe(true);
+        expect(document.activeElement).toBe(search());
+      }
+    }
+  });
+  it('Escape in the search input leaves it', async () => {
+    await press(rootEl(), 'k', { metaKey: true });
+    // jsdom only: React's legacy input polyfill (used because jsdom lacks native `input` support) reads its
+    // tracked input after our handler blurred it and throws a reported-not-fatal error. Browsers never take that path.
+    const mute = (e) => e.preventDefault();
+    window.addEventListener('error', mute);
+    await press(search(), 'Escape');
+    window.removeEventListener('error', mute);
+    expect(document.activeElement).not.toBe(search());
   });
 });
 
@@ -316,26 +369,28 @@ describe('graphKeyboard pure rules', () => {
   for (const [name, e, s, active, want] of ROWS) {
     it(`classify: ${name}`, () => expect(classifyGraphKey(e, s, active)).toBe(want));
   }
-  it('isEditableTarget covers the editing elements', () => {
+  it('isEditableTarget covers the editing elements; describeDeletion names what is removed', () => {
     expect(isEditableTarget({ nodeType: 1, tagName: 'SELECT' })).toBe(true);
     expect(isEditableTarget({ nodeType: 1, tagName: 'DIV', isContentEditable: true })).toBe(true);
     expect(isEditableTarget({ nodeType: 1, tagName: 'DIV', closest: () => ({ getAttribute: () => 'true' }) })).toBe(true);
     expect(isEditableTarget({ nodeType: 1, tagName: 'DIV', closest: () => ({ getAttribute: () => 'false' }) })).toBe(false);
     expect(isEditableTarget(null)).toBe(false);
-  });
-  it('describeDeletion names what is removed', () => {
     expect(describeDeletion({ memories: 37 })).toBe('Delete 37 memories from SmartMemory?');
     expect(describeDeletion({ memories: 1 })).toBe('Delete 1 memory from SmartMemory?');
     expect(describeDeletion({ entities: 2 })).toBe('Delete 2 entities from SmartMemory?');
   });
-  it('shortcutAppliesTo: scoped, and standalone yielding to editors', () => {
-    const inside = { nodeType: 1, tagName: 'DIV' };
-    const scope = { contains: (t) => t === inside };
-    expect(shortcutAppliesTo(inside, { scope })).toBe(true);
-    expect(shortcutAppliesTo({ nodeType: 1, tagName: 'DIV' }, { scope })).toBe(false);
+  it('shortcutAppliesTo: editors block it unless it is the search input itself', () => {
     const own = { nodeType: 1, tagName: 'INPUT' };
-    expect(shortcutAppliesTo(own, { scope: null, ownInput: own })).toBe(true);
-    expect(shortcutAppliesTo({ nodeType: 1, tagName: 'TEXTAREA' }, { scope: null, ownInput: own })).toBe(false);
-    expect(shortcutAppliesTo({ nodeType: 1, tagName: 'DIV' }, { scope: null, ownInput: own })).toBe(true);
+    const div = { nodeType: 1, tagName: 'DIV' };
+    const ROWS = [
+      ['plain target, nothing active', div, null, true],
+      ['own input', own, own, true],
+      ['other textarea target', { nodeType: 1, tagName: 'TEXTAREA' }, null, false],
+      ['plain target, other input active', div, { nodeType: 1, tagName: 'INPUT' }, false],
+      ['plain target, editable host active', div, { nodeType: 1, tagName: 'DIV', isContentEditable: true }, false],
+    ];
+    for (const [name, target, active, want] of ROWS) {
+      expect(shortcutAppliesTo(target, { ownInput: own, activeElement: active }), name).toBe(want);
+    }
   });
 });
