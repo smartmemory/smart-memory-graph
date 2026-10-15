@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { getNodeColor } from '../core/graphColors';
+import { shortcutAppliesTo } from '../core/graphKeyboard';
 
 /**
  * Search bar for graph nodes.
@@ -75,6 +76,10 @@ export default function SearchBar({ nodes, onSearch, onNodeSelect }) {
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        // GRAPH-KEY-DELETE-1: inside an explorer only react to that explorer's own events, so
+        // a host editor keeps its Cmd/Ctrl+K (Obsidian inserts a link with it).
+        const scope = inputRef.current?.closest('[data-graph-explorer]') ?? null;
+        if (!shortcutAppliesTo(e.target, { scope, ownInput: inputRef.current })) return;
         e.preventDefault();
         inputRef.current?.focus();
       }

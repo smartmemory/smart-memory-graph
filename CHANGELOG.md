@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Fixed (2026-10-15) — GRAPH-KEY-DELETE-1
+
+- **Graph keyboard shortcuts no longer act outside the graph.** `GraphExplorer` listened for
+  Delete/Backspace and Cmd/Ctrl+A on `window`, so in a host app (Obsidian's note editor, any
+  rich-text field) Cmd+A then Backspace deleted every visible memory from the backend, and one
+  stray Backspace deleted a clicked node. The shortcuts now live on the explorer root (focusable,
+  `tabIndex=0`) and fire only while the root itself has focus, never from a field, editor or
+  button, and Cmd/Ctrl+A is no longer `preventDefault`ed in the host.
+- **Deleting nodes asks first.** Keyboard Delete/Backspace and the selection toolbar's Delete
+  button open an in-graph confirm that names the count ("Delete 37 memories from SmartMemory?").
+- **A failed backend delete no longer removes the node.** Only nodes whose delete succeeded leave
+  the graph; failures stay (and stay selected) with a visible "Could not delete N of M items"
+  alert. A graph with no adapter reports that it is read-only instead of dropping nodes locally.
+  The DetailPanel stays open when its single-node delete fails.
+- **`hideSelectionToolbar` now also disables keyboard deletion**, so a host that hides the
+  destructive toolbar (Obsidian does) has no keyboard back door.
+- `SearchBar`'s window-wide Cmd/Ctrl+K is scoped to its explorer, so a host editor keeps its own
+  Cmd/Ctrl+K.
+- New `src/core/graphKeyboard.js` (pure rules) and `tests/graphExplorerKeyboard.test.js`.
+
 ## 1.5.0 — 2026-09-27
 
 ### Fixed (2026-09-25) — UI-IDLE-DISCONNECT-1

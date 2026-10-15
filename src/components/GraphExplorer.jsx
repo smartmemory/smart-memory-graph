@@ -17,6 +17,7 @@ import { useGraphInteraction } from '../hooks/useGraphInteraction';
 import { useMultiHopReplay } from '../hooks/useMultiHopReplay';
 import { useUrlState } from '../hooks/useUrlState';
 import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscapeConvert';
+import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/graphKeyboard';
 
 /**
  * Main graph explorer component.
@@ -50,6 +51,8 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
  *   all at once instead. Independent of the BFS replay reachable from DetailPanel.
  * @param {any} [props.autoReplayKey] - Changing this value replays `hopGroups` from
  *   the start. Pass a per-search stamp so a re-run of the same query animates again.
+ * @param {boolean} [props.hideSelectionToolbar] - Hides the Move/Isolate/Delete toolbar AND
+ *   disables keyboard Delete/Backspace deletion: the host opts out of destructive graph actions.
  * @param {string} [props.className] - Additional CSS classes
  * @param {Object} [props.theme] - Optional consumer-scoped canvas theme.
  *   When omitted, the default dark semantic palette is used (web/studio/insights).
@@ -462,53 +465,111 @@ export default function GraphExplorer({
     }
   }, [annotations, cytoscape.ready, nodes, edges]);
 
-  // Delete nodes by id — calls backend for all node categories, removes from graph
+  // Delete nodes by id: calls the backend per node and removes from the graph ONLY the nodes
+  // whose backend delete succeeded (GRAPH-KEY-DELETE-1). A failed delete leaves the node in
+  // place and is surfaced, because a node that vanishes from the graph while it still exists
+  // in SmartMemory reads as "deleted" and comes back on the next refresh.
+  const [pendingDelete, setPendingDelete] = useState(null); // { ids, message } awaiting confirm
+  const [deleteFailure, setDeleteFailure] = useState(null); // { failed, total } | { message }
+  const deletingRef = useRef(false);
+
   const deleteNodes = useCallback(async (ids) => {
-    if (!ids || ids.length === 0) return;
-    const cy = cytoscape.cy.current;
-    await Promise.allSettled(
-      ids.map(async (id) => {
-        if (!adapter) return;
-        const node = cy?.getElementById(id);
-        const category = node?.data('category');
-        try {
+    if (!ids || ids.length === 0 || deletingRef.current) return { deleted: [], failed: [] };
+    deletingRef.current = true;
+    try {
+      const cy = cytoscape.cy.current;
+      const results = await Promise.allSettled(
+        ids.map(async (id) => {
+          if (!adapter) throw new Error('no adapter to delete with');
+          const category = cy?.getElementById(id)?.data('category');
           if (category === 'memory') {
             await adapter.deleteNode(id);
           } else {
             await adapter.deleteEntityNode(id);
           }
-        } catch { /* best effort */ }
-      })
-    );
-    cytoscape.removeNodes(ids);
+        })
+      );
+      const deleted = [];
+      const failed = [];
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') deleted.push(ids[i]);
+        else {
+          failed.push(ids[i]);
+          console.warn(`[GraphExplorer] delete failed for ${ids[i]}; node kept in graph:`, r.reason);
+        }
+      });
+      if (deleted.length > 0) cytoscape.removeNodes(deleted);
+      setDeleteFailure(failed.length > 0 ? { failed: failed.length, total: ids.length } : null);
+      return { deleted, failed };
+    } finally {
+      deletingRef.current = false;
+    }
   }, [adapter, cytoscape]);
 
-  const handleDeleteSelected = useCallback(
-    () => deleteNodes([...cytoscape.selectedNodeIds]),
-    [deleteNodes, cytoscape.selectedNodeIds]
-  );
+  // Every multi-node delete (keyboard or the selection toolbar) goes through a confirm that
+  // names the count. The ids are frozen when the prompt opens.
+  const requestDelete = useCallback(() => {
+    const ids = [...cytoscape.selectedNodeIds];
+    if (ids.length === 0) return;
+    if (!adapter) {
+      console.warn('[GraphExplorer] delete requested with no adapter; nothing was deleted and the nodes were kept.');
+      setDeleteFailure({ message: 'This graph is read-only: there is no adapter to delete with.' });
+      return;
+    }
+    const cy = cytoscape.cy.current;
+    let memories = 0;
+    for (const id of ids) {
+      if (cy?.getElementById(id)?.data('category') === 'memory') memories += 1;
+    }
+    setDeleteFailure(null);
+    setPendingDelete({ ids, message: describeDeletion({ memories, entities: ids.length - memories }) });
+  }, [adapter, cytoscape]);
 
-  // Single-node delete from DetailPanel — closes panel after deletion
+  const closePendingDelete = useCallback(() => {
+    setPendingDelete(null);
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const confirmPendingDelete = useCallback(async () => {
+    const ids = pendingDelete?.ids;
+    setPendingDelete(null);
+    rootRef.current?.focus({ preventScroll: true });
+    if (ids) await deleteNodes(ids);
+  }, [pendingDelete, deleteNodes]);
+
+  // Single-node delete from DetailPanel (it has its own inline confirm). The panel stays open
+  // when the delete failed so the failure is visible next to the node.
   const handleDeleteNode = useCallback(async (id) => {
-    await deleteNodes([id]);
-    interaction.closeDetailPanel?.();
+    const { failed } = await deleteNodes([id]);
+    if (failed.length === 0) interaction.closeDetailPanel?.();
   }, [deleteNodes, interaction]);
 
-  // Keyboard shortcuts: Delete/Backspace removes selection, Cmd/Ctrl+A selects all
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      const active = document.activeElement?.tagName;
-      if (['INPUT', 'TEXTAREA'].includes(active)) return;
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        handleDeleteSelected();
-      } else if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        e.preventDefault();
-        cytoscape.selectAll();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleDeleteSelected, cytoscape]);
+  // Keyboard shortcuts, scoped to the graph (GRAPH-KEY-DELETE-1): they act only while the
+  // explorer root itself has focus, never on a window-wide listener, so a host's editor,
+  // fields and buttons keep their own Backspace / Delete / Cmd+A.
+  const handleRootKeyDown = useCallback((e) => {
+    const action = classifyGraphKey(e, rootRef.current, document.activeElement);
+    if (action === 'delete') {
+      // A host that hides the selection toolbar has opted out of destructive graph actions
+      // (Obsidian does, in graph-view.tsx): the keyboard is not a back door around that.
+      if (hideSelectionToolbar) return;
+      e.preventDefault();
+      requestDelete();
+    } else if (action === 'select-all') {
+      e.preventDefault();
+      cytoscape.selectAll();
+    }
+  }, [requestDelete, cytoscape, hideSelectionToolbar]);
+
+  // A press on the canvas or chrome gives the root focus so the shortcuts above reach it;
+  // presses on fields, buttons and links keep their own focus.
+  const handleRootMouseDown = useCallback((e) => {
+    const t = e.target;
+    if (isEditableTarget(t)) return;
+    const own = t.closest?.('button, a, [role="button"], [tabindex]');
+    if (own && own !== rootRef.current) return;
+    rootRef.current?.focus({ preventScroll: true });
+  }, []);
 
   // Operations bar click handler — scrub to event state
   const handleOperationClick = useCallback((op) => {
@@ -605,7 +666,14 @@ export default function GraphExplorer({
   }
 
   return (
-    <div ref={rootRef} className={`flex min-w-0 flex-col bg-slate-900 overflow-hidden ${className || 'h-full w-full'}`}>
+    <div
+      ref={rootRef}
+      data-graph-explorer=""
+      tabIndex={0}
+      onKeyDown={handleRootKeyDown}
+      onMouseDown={handleRootMouseDown}
+      className={`flex min-w-0 flex-col bg-slate-900 overflow-hidden outline-none ${className || 'h-full w-full'}`}
+    >
       {stream.error && (
         <div role="alert" className="px-4 py-2 text-sm text-red-300 bg-red-950">
           Event stream unavailable: {stream.error}
@@ -812,7 +880,7 @@ export default function GraphExplorer({
           </button>
           <button
             type="button"
-            onClick={handleDeleteSelected}
+            onClick={requestDelete}
             className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
           >
             Delete
@@ -826,6 +894,46 @@ export default function GraphExplorer({
             className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
           >
             ✕
+          </button>
+        </div>
+      )}
+      {pendingDelete && (
+        <div
+          role="alertdialog"
+          aria-modal="false"
+          aria-label="Confirm delete"
+          data-testid="graph-delete-confirm-dialog"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closePendingDelete(); } }}
+          className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-800 border border-red-700 text-slate-200 px-4 py-2 rounded-lg text-sm shadow-lg"
+        >
+          <span>{pendingDelete.message}</span>
+          <button
+            type="button"
+            data-testid="graph-delete-confirm"
+            onClick={confirmPendingDelete}
+            className="text-red-400 hover:text-red-300 font-medium"
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            data-testid="graph-delete-cancel"
+            autoFocus
+            onClick={closePendingDelete}
+            className="text-slate-400 hover:text-slate-200"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+      {deleteFailure && (
+        <div role="alert" data-testid="graph-delete-failure" className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-950 border border-red-700 text-red-200 px-4 py-2 rounded-lg text-sm shadow-lg">
+          <span>
+            {deleteFailure.message
+              || `Could not delete ${deleteFailure.failed} of ${deleteFailure.total} ${deleteFailure.total === 1 ? 'item' : 'items'}. ${deleteFailure.failed === 1 ? 'It is' : 'They are'} still in the graph.`}
+          </span>
+          <button type="button" onClick={() => setDeleteFailure(null)} className="text-red-400 hover:text-red-200 underline">
+            Dismiss
           </button>
         </div>
       )}
