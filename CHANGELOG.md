@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed (2026-10-18) — UI-REFRESH-FU-2
+
+- **The graph never refetches while the tab is hidden, from any entry point.** A refresh signal that
+  arrived while the trailing fetch was already waiting for the tab to come back went straight to the
+  adapter, so a save finishing after the user left the tab fetched in the background. Every signal
+  now goes through one shared refresh scheduler (`src/core/refreshScheduler.js`, also used by
+  smart-memory-web, byte for byte): a signal during a fetch gives exactly one trailing fetch, nothing
+  runs while hidden, and one fetch runs when the tab is visible again. `useGraphData`'s own
+  in-flight and dirty flags are gone.
+
 ### Fixed (2026-10-18) — UI-REFRESH-FU-1
 
 - **A refresh signal that arrives during an in-flight graph fetch is no longer lost.** `useGraphData`
