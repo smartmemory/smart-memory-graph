@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { normalizeAPIResponse } from '../core/normalize';
 import { coalesceGraphData } from '../core/coalesce';
 import { MEMORY_TYPE_SET } from '../core/graphColors';
@@ -8,19 +8,45 @@ import { MEMORY_TYPE_SET } from '../core/graphColors';
  * Refactored: accepts adapter parameter, returns GraphNode/GraphEdge instead of Cytoscape elements.
  *
  * @param {GraphAPIAdapter} adapter
+ * @param {Object} [options]
+ * @param {*} [options.refreshSignal] - Any value. When it changes after mount, the graph is
+ *   refetched in the background: no loading state, a failure keeps the current graph and logs a
+ *   warning, and unchanged data keeps the same arrays. Hosts bump it on focus, on an interval
+ *   and after their own writes so data written by another client shows up (UI-REFRESH-1).
  * @returns {{ nodes, edges, loading, error, stats, refresh, incrementStats }}
  */
-export function useGraphData(adapter) {
+export function useGraphData(adapter, { refreshSignal } = {}) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ nodes: 0, edges: 0, types: {} });
+  // Latest-request guard and in-flight count: a slow earlier fetch must not overwrite a newer
+  // one, and a background refresh never piles onto a fetch that is still running.
+  const seqRef = useRef(0);
+  const inFlightRef = useRef(0);
+  const lastDataRef = useRef(null);
 
-  const fetchGraph = useCallback(async () => {
+  const fetchGraph = useCallback(async (options) => {
     if (!adapter) return;
-    setLoading(true);
-    setError(null);
+    const background = options?.background === true;
+    if (background && inFlightRef.current > 0) return;
+    const seq = ++seqRef.current;
+    const isCurrent = () => seq === seqRef.current;
+    inFlightRef.current += 1;
+    if (!background) {
+      setLoading(true);
+      setError(null);
+    }
+    // Same data as last time: keep the existing arrays so the canvas merge does not re-run.
+    const publish = (nextNodes, nextEdges, nextStats) => {
+      const key = JSON.stringify([nextNodes, nextEdges]);
+      if (key === lastDataRef.current) return;
+      lastDataRef.current = key;
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      setStats(nextStats);
+    };
     try {
       let graphNodes, graphEdges;
       try {
@@ -44,10 +70,7 @@ export function useGraphData(adapter) {
           : [];
 
         if (memories.length === 0) {
-          setNodes([]);
-          setEdges([]);
-          setStats({ nodes: 0, edges: 0, types: {} });
-          setLoading(false);
+          if (isCurrent()) publish([], [], { nodes: 0, edges: 0, types: {} });
           return;
         }
 
@@ -115,19 +138,33 @@ export function useGraphData(adapter) {
         typeCounts[node.type] = (typeCounts[node.type] || 0) + 1;
       }
 
-      setNodes(coalescedNodes);
-      setEdges(coalescedEdges);
-      setStats({ nodes: coalescedNodes.length, edges: coalescedEdges.length, types: typeCounts });
+      if (!isCurrent()) return; // a newer fetch owns the state
+      setError(null); // a background success also clears an earlier failed load
+      publish(coalescedNodes, coalescedEdges, { nodes: coalescedNodes.length, edges: coalescedEdges.length, types: typeCounts });
     } catch (err) {
-      setError(err.message);
+      if (!isCurrent()) return;
+      if (background) {
+        console.warn('[useGraphData] background refresh failed, keeping the current graph:', err?.message || err);
+      } else {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      inFlightRef.current -= 1;
+      if (isCurrent()) setLoading(false);
     }
   }, [adapter]);
 
   useEffect(() => {
     fetchGraph();
   }, [fetchGraph]);
+
+  // Background refetch when the host's signal changes (not on mount: the effect above loads).
+  const lastSignalRef = useRef(refreshSignal);
+  useEffect(() => {
+    if (Object.is(lastSignalRef.current, refreshSignal)) return;
+    lastSignalRef.current = refreshSignal;
+    fetchGraph({ background: true });
+  }, [refreshSignal, fetchGraph]);
 
   const incrementStats = useCallback((addedNodes, addedEdges) => {
     const nodeArr = Array.isArray(addedNodes) ? addedNodes : [];
@@ -143,5 +180,8 @@ export function useGraphData(adapter) {
     });
   }, []);
 
-  return { nodes, edges, loading, error, stats, refresh: fetchGraph, incrementStats };
+  // refresh() stays a foreground reload; callers pass it around as a bare callback.
+  const refresh = useCallback(() => fetchGraph(), [fetchGraph]);
+
+  return { nodes, edges, loading, error, stats, refresh, incrementStats };
 }

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Fixed (2026-10-17) — UI-REFRESH-1
+
+- **The graph refreshes without a page reload.** New `GraphExplorer` prop `refreshSignal`
+  (passed to `useGraphData(adapter, { refreshSignal })`): when it changes, the graph is refetched
+  in the background. No loading flash, a failed refresh keeps the current graph and logs a
+  warning, unchanged data keeps the same arrays, and a background fetch never stacks on one that
+  is still running. Fetches carry a latest-request guard, so a slow older response cannot
+  overwrite a newer one.
+- **A refresh merges in place instead of rebuilding the canvas** (`src/internal/graphMerge.js`).
+  Surviving nodes keep their position, selection and runtime classes (their data and
+  data-derived classes update), new nodes are seated beside a neighbour instead of at the graph
+  origin where they stacked out of sight, deleted elements are removed, and an edge whose
+  endpoint is missing is skipped with a warning instead of throwing out of `cy.add()`.
+- **A node type that first appears after a filter toggle is shown.** Turning one type off used to
+  snapshot "the active types", so every later type (the first decision, a new entity or relation
+  type) was filtered out. The filter now records what was turned off. "Deselect all" still means
+  "show only what I pick".
+- New tests: `tests/graphMerge.test.js`, `tests/graphFilters.test.js`, `tests/graphDataRefresh.test.js`.
+
 ### Fixed (2026-10-15) — GRAPH-KEY-DELETE-1
 
 - **Graph keyboard shortcuts no longer act outside the graph.** `GraphExplorer` listened for

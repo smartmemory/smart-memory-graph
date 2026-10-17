@@ -54,6 +54,9 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  * @param {boolean} [props.hideSelectionToolbar] - Hides the Move/Isolate/Delete toolbar AND
  *   disables keyboard Delete/Backspace deletion: the host opts out of destructive graph actions.
  * @param {string} [props.className] - Additional CSS classes
+ * @param {*} [props.refreshSignal] - Change it to refetch the graph in the background (no
+ *   loading flash, the canvas is diff-merged in place). Hosts bump it on window focus, on a
+ *   visible-tab interval and after their own writes (UI-REFRESH-1).
  * @param {Object} [props.theme] - Optional consumer-scoped canvas theme.
  *   When omitted, the default dark semantic palette is used (web/studio/insights).
  *   Applies to nodes/edges only — surrounding chrome stays under consumer CSS.
@@ -92,10 +95,11 @@ export default function GraphExplorer({
   className = '',
   onNodeOpen,
   theme = null,
+  refreshSignal,
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
   // Hybrid mode: adapter powers refresh/reconnect, external data merges as overlay.
-  const internalData = useGraphData(adapter || null);
+  const internalData = useGraphData(adapter || null, { refreshSignal });
   const externalNodes = externalData?.nodes || [];
   const externalEdges = externalData?.edges || [];
   const hasExternal = externalNodes.length > 0 || externalEdges.length > 0;

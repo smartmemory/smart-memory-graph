@@ -1,5 +1,31 @@
 import { useState, useCallback, useMemo } from 'react';
 
+// Type-filter state per family (UI-REFRESH-1). `null` shows every type. `{ hidden }` shows every
+// type except the ones the user turned off, so a type that first appears after a toggle (a
+// refresh brings the first decision node) is visible. `{ only }` is set by "deselect all" and
+// shows only what the user picks afterwards, so a later type stays hidden there.
+// The old shape snapshotted "the active types" at the first toggle, which silently hid every
+// type that arrived later.
+function resolveActiveTypes(state, available) {
+  if (state === null) return new Set(available);
+  if (state.only) return new Set(state.only);
+  return new Set(available.filter((t) => !state.hidden.has(t)));
+}
+
+function toggleTypeState(state, type) {
+  if (state === null) return { hidden: new Set([type]) };
+  const key = state.only ? 'only' : 'hidden';
+  const next = new Set(state[key]);
+  if (next.has(type)) next.delete(type);
+  else next.add(type);
+  return { [key]: next };
+}
+
+// Legacy explicit-set shape: an iterable of exactly the active types, or null for all.
+function fromActiveSet(active) {
+  return active == null ? null : { only: new Set(active) };
+}
+
 /**
  * Filter state for graph nodes and edges.
  * Refactored: operates on GraphNode[] instead of Cytoscape elements.
@@ -8,9 +34,9 @@ import { useState, useCallback, useMemo } from 'react';
  * @param {GraphEdge[]} edges - Array of graph edges
  */
 export function useGraphFilters(nodes, edges) {
-  const [activeMemoryTypes, setActiveMemoryTypes] = useState(null);
-  const [activeEntityTypes, setActiveEntityTypes] = useState(null);
-  const [activeRelationTypes, setActiveRelationTypes] = useState(null);
+  const [memoryTypeState, setMemoryTypeState] = useState(null);
+  const [entityTypeState, setEntityTypeState] = useState(null);
+  const [relationTypeState, setRelationTypeState] = useState(null);
 
   // Streamed types/nodes (not in the initial arrays)
   const [streamedTypes, setStreamedTypes] = useState({ memory: new Set(), entity: new Set(), relation: new Set() });
@@ -76,17 +102,20 @@ export function useGraphFilters(nodes, edges) {
     };
   }, [nodes, edges, streamedTypes]);
 
-  const activeMemorySet = useMemo(() => {
-    return activeMemoryTypes === null ? new Set(availableTypes.memoryTypes) : activeMemoryTypes;
-  }, [activeMemoryTypes, availableTypes.memoryTypes]);
+  const activeMemorySet = useMemo(
+    () => resolveActiveTypes(memoryTypeState, availableTypes.memoryTypes),
+    [memoryTypeState, availableTypes.memoryTypes],
+  );
 
-  const activeEntitySet = useMemo(() => {
-    return activeEntityTypes === null ? new Set(availableTypes.entityTypes) : activeEntityTypes;
-  }, [activeEntityTypes, availableTypes.entityTypes]);
+  const activeEntitySet = useMemo(
+    () => resolveActiveTypes(entityTypeState, availableTypes.entityTypes),
+    [entityTypeState, availableTypes.entityTypes],
+  );
 
-  const activeEdgeTypes = useMemo(() => {
-    return activeRelationTypes === null ? new Set(availableTypes.relationTypes) : activeRelationTypes;
-  }, [activeRelationTypes, availableTypes.relationTypes]);
+  const activeEdgeTypes = useMemo(
+    () => resolveActiveTypes(relationTypeState, availableTypes.relationTypes),
+    [relationTypeState, availableTypes.relationTypes],
+  );
 
   // Compute visible node IDs (includes both API and streamed nodes)
   const visibleNodeIds = useMemo(() => {
@@ -111,44 +140,23 @@ export function useGraphFilters(nodes, edges) {
     return ids;
   }, [nodes, activeMemorySet, activeEntitySet, streamedNodeMap]);
 
-  const toggleMemoryType = useCallback((type) => {
-    setActiveMemoryTypes((prev) => {
-      const current = prev === null ? new Set(availableTypes.memoryTypes) : new Set(prev);
-      if (current.has(type)) current.delete(type);
-      else current.add(type);
-      return current;
-    });
-  }, [availableTypes.memoryTypes]);
+  const toggleMemoryType = useCallback((type) => setMemoryTypeState((prev) => toggleTypeState(prev, type)), []);
+  const toggleEntityType = useCallback((type) => setEntityTypeState((prev) => toggleTypeState(prev, type)), []);
+  const toggleRelationType = useCallback((type) => setRelationTypeState((prev) => toggleTypeState(prev, type)), []);
 
-  const toggleEntityType = useCallback((type) => {
-    setActiveEntityTypes((prev) => {
-      const current = prev === null ? new Set(availableTypes.entityTypes) : new Set(prev);
-      if (current.has(type)) current.delete(type);
-      else current.add(type);
-      return current;
-    });
-  }, [availableTypes.entityTypes]);
-
-  const toggleRelationType = useCallback((type) => {
-    setActiveRelationTypes((prev) => {
-      const current = prev === null ? new Set(availableTypes.relationTypes) : new Set(prev);
-      if (current.has(type)) current.delete(type);
-      else current.add(type);
-      return current;
-    });
-  }, [availableTypes.relationTypes]);
-
-  const selectAllMemoryTypes = useCallback(() => setActiveMemoryTypes(null), []);
-  const deselectAllMemoryTypes = useCallback(() => setActiveMemoryTypes(new Set()), []);
-  const selectAllEntityTypes = useCallback(() => setActiveEntityTypes(null), []);
-  const deselectAllEntityTypes = useCallback(() => setActiveEntityTypes(new Set()), []);
-  const selectAllRelationTypes = useCallback(() => setActiveRelationTypes(null), []);
-  const deselectAllRelationTypes = useCallback(() => setActiveRelationTypes(new Set()), []);
+  const selectAllMemoryTypes = useCallback(() => setMemoryTypeState(null), []);
+  const deselectAllMemoryTypes = useCallback(() => setMemoryTypeState({ only: new Set() }), []);
+  const selectAllEntityTypes = useCallback(() => setEntityTypeState(null), []);
+  const deselectAllEntityTypes = useCallback(() => setEntityTypeState({ only: new Set() }), []);
+  const selectAllRelationTypes = useCallback(() => setRelationTypeState(null), []);
+  const deselectAllRelationTypes = useCallback(() => setRelationTypeState({ only: new Set() }), []);
+  // Legacy setter: a Set of active relation types (exactly those), or null for all.
+  const setActiveRelationTypes = useCallback((active) => setRelationTypeState(fromActiveSet(active)), []);
 
   return {
     activeMemoryTypes: activeMemorySet,
     activeEntityTypes: activeEntitySet,
-    activeRelationTypes,
+    activeRelationTypes: relationTypeState === null ? null : activeEdgeTypes,
     activeEdgeTypes,
     availableTypes,
     visibleNodeIds,
