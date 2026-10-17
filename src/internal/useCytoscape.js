@@ -4,6 +4,7 @@ import cola from 'cytoscape-cola';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import dagre from 'cytoscape-dagre';
 import { getCytoscapeStyles } from './cytoscapeStyles';
+import { applyGraphMerge } from './graphMerge';
 import { ANNOTATION_PRECEDENCE, CHANNEL_LOCKED_KINDS } from '../core/graphColors';
 
 export function removeIdsFromSelection(selectedIds, removedIds) {
@@ -265,32 +266,7 @@ export function useCytoscape(containerRef, options = {}) {
   const mergeElements = useCallback((elements) => {
     const cy = cyRef.current;
     if (!cy) return { isInitial: true };
-
-    const existingIds = new Set(cy.nodes().map((n) => n.id()));
-    const isInitial = existingIds.size === 0;
-
-    // Snapshot positions of every existing node before replace.
-    const savedPositions = {};
-    if (!isInitial) {
-      cy.nodes().forEach((n) => {
-        savedPositions[n.id()] = { ...n.position() };
-      });
-    }
-
-    cy.batch(() => {
-      cy.elements().remove();
-      cy.add(elements);
-      // Restore saved positions for nodes that survived the refresh.
-      if (!isInitial) {
-        cy.nodes().forEach((n) => {
-          const pos = savedPositions[n.id()];
-          if (pos) n.position(pos);
-        });
-      }
-      restoreDimmingState(cy);
-    });
-
-    return { isInitial };
+    return applyGraphMerge(cy, elements, { afterMerge: restoreDimmingState });
   }, []);
 
   const firstLayoutRef = useRef(true);
