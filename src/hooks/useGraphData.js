@@ -13,6 +13,9 @@ import { MEMORY_TYPE_SET } from '../core/graphColors';
  *   refetched in the background: no loading state, a failure keeps the current graph and logs a
  *   warning, and unchanged data keeps the same arrays. Hosts bump it on focus, on an interval
  *   and after their own writes so data written by another client shows up (UI-REFRESH-1).
+ *   A signal that arrives while a fetch is in flight is never dropped: it marks the data dirty
+ *   and, when that fetch settles (success or error), one trailing fetch runs, waiting for the
+ *   tab to be visible first (UI-REFRESH-FU-1).
  * @returns {{ nodes, edges, loading, error, stats, refresh, incrementStats }}
  */
 export function useGraphData(adapter, { refreshSignal } = {}) {
@@ -26,11 +29,40 @@ export function useGraphData(adapter, { refreshSignal } = {}) {
   const seqRef = useRef(0);
   const inFlightRef = useRef(0);
   const lastDataRef = useRef(null);
+  // A background trigger skipped because a fetch was pending: the data may be older than a write.
+  const dirtyRef = useRef(false);
+  const mountedRef = useRef(true);
+  const fetchRef = useRef(null);
+  const stopWaitingRef = useRef(null);
+
+  // One trailing fetch for whatever arrived during a flight, never while the tab is hidden.
+  const drainDirty = useCallback(() => {
+    if (!mountedRef.current || !dirtyRef.current || inFlightRef.current > 0) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      if (stopWaitingRef.current) return;
+      const onVisible = () => {
+        if (document.visibilityState === 'hidden') return;
+        stopWaitingRef.current?.();
+        drainDirty();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+      stopWaitingRef.current = () => {
+        document.removeEventListener('visibilitychange', onVisible);
+        stopWaitingRef.current = null;
+      };
+      return;
+    }
+    fetchRef.current?.({ background: true });
+  }, []);
 
   const fetchGraph = useCallback(async (options) => {
     if (!adapter) return;
     const background = options?.background === true;
-    if (background && inFlightRef.current > 0) return;
+    if (background && inFlightRef.current > 0) {
+      dirtyRef.current = true; // the pending request may predate this signal: refetch once it settles
+      return;
+    }
+    dirtyRef.current = false; // this fetch reads the server after every signal so far
     const seq = ++seqRef.current;
     const isCurrent = () => seq === seqRef.current;
     inFlightRef.current += 1;
@@ -151,8 +183,21 @@ export function useGraphData(adapter, { refreshSignal } = {}) {
     } finally {
       inFlightRef.current -= 1;
       if (isCurrent()) setLoading(false);
+      drainDirty();
     }
-  }, [adapter]);
+  }, [adapter, drainDirty]);
+
+  useEffect(() => {
+    fetchRef.current = fetchGraph;
+  }, [fetchGraph]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopWaitingRef.current?.();
+    };
+  }, []);
 
   useEffect(() => {
     fetchGraph();

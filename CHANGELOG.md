@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed (2026-10-18) — UI-REFRESH-FU-1
+
+- **A refresh signal that arrives during an in-flight graph fetch is no longer lost.** `useGraphData`
+  used to mark the signal handled and skip the fetch while one was pending, so a save made during a
+  focus or interval refresh stayed invisible until some later signal. A skipped trigger now marks
+  the data dirty, and when the pending fetch settles (success or error) exactly one trailing fetch
+  runs, waiting for the tab to be visible first. No extra fetch when nothing arrived during the
+  flight, and no loop.
+
 ### Fixed (2026-10-17) — UI-REFRESH-1
 
 - **The graph refreshes without a page reload.** New `GraphExplorer` prop `refreshSignal`
