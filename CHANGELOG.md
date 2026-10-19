@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Changed (2026-10-19) — DEPS-VITEST-4-GRAPH-1
+
+- **vitest 3 -> 4 (`^4.1.11`).** The dev-only test runner moves to the release that clears its CRITICAL
+  advisory (DEPS-AUDIT-1). Nothing smart-memory-web imports changes: vitest is a devDependency, and the
+  475 existing tests are collected unchanged (same names, none removed). `vitest.config.js` now reads
+  `import.meta.dirname` instead of `__dirname`, and sets the automatic JSX runtime through `oxc` on vite 8
+  (vitest 4's vite; the `esbuild` key is ignored there), keeping `esbuild` for older vite. New
+  `tests/dependencyFloors.test.js` pins vitest and every `@vitest/*` package at or above 4.1.11.
+  Install note: npm 10.9.x crashes (`edgesOut`) resolving vitest >= 4.1.11; use npm 11.
+
 ### Fixed (2026-10-18) — UI-REFRESH-FU-2
 
 - **The graph never refetches while the tab is hidden, from any entry point.** A refresh signal that
