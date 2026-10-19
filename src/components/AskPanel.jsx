@@ -1,4 +1,4 @@
-import { useCallback, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import AskResult from './AskResult';
 import {
   ASK_ANSWERED,
@@ -29,6 +29,10 @@ import {
  * @param {number} [props.limit=5] - How many memories to retrieve as evidence.
  * @param {string} [props.placeholder] - Input placeholder.
  * @param {string} [props.className] - Additional CSS classes on the root element.
+ * @param {{question: string, result: Object}} [props.initialAnswer] - A previous answer to show on mount
+ *   (no new ask call), e.g. restored by the host after navigation. The input starts with its question.
+ * @param {function({question: string, result: Object}|null): void} [props.onAnswerChange] - Fired with the
+ *   current answer whenever it changes (null while idle, loading or failed), so a host can persist it.
  */
 export default function AskPanel({
   adapter,
@@ -36,9 +40,24 @@ export default function AskPanel({
   limit = 5,
   placeholder = 'Ask a question about your memories…',
   className = '',
+  initialAnswer = null,
+  onAnswerChange,
 }) {
-  const [state, dispatch] = useReducer(askReducer, INITIAL_ASK_STATE);
-  const [draft, setDraft] = useState('');
+  const [state, dispatch] = useReducer(askReducer, initialAnswer, (restored) =>
+    restored?.question && restored?.result
+      ? { ...INITIAL_ASK_STATE, status: ASK_ANSWERED, question: restored.question, result: restored.result }
+      : INITIAL_ASK_STATE
+  );
+  const [draft, setDraft] = useState(() => (initialAnswer?.question && initialAnswer?.result ? initialAnswer.question : ''));
+
+  const onAnswerChangeRef = useRef(onAnswerChange);
+  onAnswerChangeRef.current = onAnswerChange;
+  useEffect(() => {
+    if (!onAnswerChangeRef.current) return;
+    onAnswerChangeRef.current(
+      state.status === ASK_ANSWERED ? { question: state.question, result: state.result } : null
+    );
+  }, [state.status, state.question, state.result]);
   const inputRef = useRef(null);
 
   const submit = useCallback(

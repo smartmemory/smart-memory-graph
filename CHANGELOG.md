@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (2026-10-19) — WEB-SEARCH-PERSIST-1
+
+- **AskPanel can start from a saved answer.** New optional props `initialAnswer` (`{question, result}`) and `onAnswerChange`. With both fields present the panel opens answered with that question and result, and `onAnswerChange` reports `{question, result}` when answered, else `null`, so a host page can keep the answer across navigation. Without the props nothing changes.
+
 ### Fixed (2026-10-19) — UI-REFRESH-FU-M1
 
 - **Graph tests run from any worktree.** `tests/helpers/dom.js` found jsdom through `../../../smart-memory-sdk-js/node_modules`, which only resolves from the main checkout, so a `.worktrees/<name>/` run failed before collection. It now resolves jsdom from the installed `node_modules/@smartmemory/sdk-js` link, so it works at any depth. Test helper only, no runtime change.
