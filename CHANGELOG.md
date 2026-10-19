@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed (2026-10-19) — UI-REFRESH-FU-M1
+
+- **Graph tests run from any worktree.** `tests/helpers/dom.js` found jsdom through `../../../smart-memory-sdk-js/node_modules`, which only resolves from the main checkout, so a `.worktrees/<name>/` run failed before collection. It now resolves jsdom from the installed `node_modules/@smartmemory/sdk-js` link, so it works at any depth. Test helper only, no runtime change.
+
 ### Changed (2026-10-19) — DEPS-VITEST-4-GRAPH-1
 
 - **vitest 3 -> 4 (`^4.1.11`).** The dev-only test runner moves to the release that clears its CRITICAL
