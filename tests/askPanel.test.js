@@ -20,12 +20,14 @@ import {
   ASK_ANSWERED,
   ASK_ERROR,
   ASK_LOADING,
+  EVIDENCE_FIELDS,
   INITIAL_ASK_STATE,
   askReducer,
   evidenceSelection,
   normalizeAskResponse,
   normalizeInitialAnswer,
   relationEdgeId,
+  RELATION_FIELDS,
   relationSelection,
   runAsk,
 } from '../src/core/askState.js';
@@ -153,6 +155,67 @@ describe('normalizeAskResponse row shapes', () => {
     const normalized = normalizeAskResponse(raw);
     expect(normalized.evidence).toEqual(evidence);
     expect(normalized.relations).toEqual(relations);
+  });
+});
+
+// WEB-SEARCH-PERSIST-FU-1 class guard: a saved or live answer is plain JSON, and an object such
+// as {"toString":null} throws in any template literal (relationEdgeId) or as a React child. Every
+// field AskResult renders, keys on or interpolates gets one row per malformed shape the brief
+// names. `{"toString":null}` comes from JSON.parse, as it would from sessionStorage.
+describe('normalizeAskResponse field class guard', () => {
+  const NO_TO_STRING = JSON.parse('{"toString":null}');
+  const ev = (item) => ({ answer: 'a', evidence: [{ item_id: 'm1', content: 'c', ...item }] });
+  const rel = (row) => ({ answer: 'a', relations: [{ type: 'knows', source: 'A', target: 'B', source_id: 'a', target_id: 'b', ...row }] });
+  const LABELS_ONLY = { type: 'knows', source: 'A', target: 'B' };
+  const rows = [
+    { name: 'evidence item_id {"toString":null}', raw: ev({ item_id: NO_TO_STRING }), evidence: [], relations: [] },
+    { name: 'evidence item_id array', raw: ev({ item_id: ['m1'] }), evidence: [], relations: [] },
+    { name: 'evidence item_id nested object', raw: ev({ item_id: { id: { id: 'm1' } } }), evidence: [], relations: [] },
+    { name: 'evidence item_id NaN', raw: ev({ item_id: NaN }), evidence: [], relations: [] },
+    { name: 'evidence content {"toString":null}', raw: ev({ content: NO_TO_STRING }), evidence: [{ item_id: 'm1', content: '' }], relations: [] },
+    { name: 'evidence content array', raw: ev({ content: ['c'] }), evidence: [{ item_id: 'm1', content: '' }], relations: [] },
+    { name: 'evidence content nested object', raw: ev({ content: { text: { v: 'c' } } }), evidence: [{ item_id: 'm1', content: '' }], relations: [] },
+    { name: 'evidence content NaN', raw: ev({ content: NaN }), evidence: [{ item_id: 'm1', content: '' }], relations: [] },
+    { name: 'relation source_id {"toString":null} (review H2 repro)', raw: rel({ source_id: NO_TO_STRING }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation source_id array', raw: rel({ source_id: ['a'] }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation source_id nested object', raw: rel({ source_id: { id: { id: 'a' } } }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation source_id NaN', raw: rel({ source_id: NaN }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation target_id {"toString":null}', raw: rel({ target_id: NO_TO_STRING }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation target_id array', raw: rel({ target_id: ['b'] }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation target_id nested object', raw: rel({ target_id: { id: { id: 'b' } } }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation target_id NaN', raw: rel({ target_id: NaN }), evidence: [], relations: [LABELS_ONLY] },
+    { name: 'relation type {"toString":null}', raw: rel({ type: NO_TO_STRING }), evidence: [], relations: [] },
+    { name: 'relation source {"toString":null}', raw: rel({ source: NO_TO_STRING }), evidence: [], relations: [{ type: 'knows', source: '', target: 'B', source_id: 'a', target_id: 'b' }] },
+    { name: 'relation target {"toString":null}', raw: rel({ target: NO_TO_STRING }), evidence: [], relations: [{ type: 'knows', source: 'A', target: '', source_id: 'a', target_id: 'b' }] },
+    { name: 'unknown fields are dropped from both rows', raw: { answer: 'a', evidence: [{ item_id: 'm1', content: 'c', extra: NO_TO_STRING }], relations: [{ ...LABELS_ONLY, weight: NO_TO_STRING }] }, evidence: [{ item_id: 'm1', content: 'c' }], relations: [LABELS_ONLY] },
+  ];
+
+  it.each(rows)('$name', ({ raw, evidence, relations }) => {
+    const normalized = normalizeAskResponse(raw);
+    expect(normalized.evidence).toEqual(evidence);
+    expect(normalized.relations).toEqual(relations);
+    // The same input through the saved-answer path renders, selectable view included.
+    expect(() =>
+      renderToStaticMarkup(createElement(AskPanel, { adapter: fakeAdapter(), initialAnswer: { question: 'q', result: raw }, onSelect: () => {} })),
+    ).not.toThrow();
+  });
+
+  it('a relation whose ids were dropped renders its labels and is not selectable', () => {
+    const html = renderToStaticMarkup(createElement(AskResult, { result: normalizeAskResponse(rel({ source_id: NO_TO_STRING })), onSelect: () => {} }));
+    expect(html).toContain('>A</span>');
+    expect(html).toContain('>knows</span>');
+    expect(html).not.toContain('data-edge-id');
+    expect(html).toMatch(/data-testid="ask-relation-row"[^>]*disabled=""/);
+  });
+
+  it('every built row holds only the declared fields', () => {
+    const extra = { answer: 'a', evidence: [{ ...ASK_RESPONSE.evidence[0], score: 1, __proto__x: 1 }], relations: ASK_RESPONSE.relations.map((r) => ({ ...r, weight: 2 })) };
+    const normalized = normalizeAskResponse(extra);
+    for (const row of normalized.evidence) for (const key of Object.keys(row)) expect(EVIDENCE_FIELDS).toContain(key);
+    for (const row of normalized.relations) for (const key of Object.keys(row)) expect(RELATION_FIELDS).toContain(key);
+    // A built row is a new object, never the input.
+    expect(normalized.evidence[0]).not.toBe(extra.evidence[0]);
+    expect(normalized.relations[0]).not.toBe(extra.relations[0]);
   });
 });
 

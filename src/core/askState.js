@@ -51,24 +51,28 @@ export function askReducer(state, action) {
  * Missing arrays become empty ones so the view never crashes, but nothing is invented:
  * a response with no `answer` field yields an empty answer, which the view reports as a
  * failure rather than rendering as a blank success.
+ *
+ * Evidence and relation rows are BUILT from the contract's fields (ask-contract.json
+ * `additionalProperties: false`), never passed through: a saved answer is replayed through
+ * this (WEB-SEARCH-PERSIST-FU-1), and any field AskResult renders, keys on or interpolates
+ * (`relationEdgeId`) that held an object such as `{"toString":null}` would throw. Each field
+ * is text (a string or a finite number) or left out, and unknown fields are dropped.
  */
 export function normalizeAskResponse(raw) {
-  const body = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const body = isRecord(raw) ? raw : {};
   return {
     answer: typeof body.answer === 'string' ? body.answer : '',
     reasoning: typeof body.reasoning === 'string' ? body.reasoning : '',
-    evidence: Array.isArray(body.evidence)
-      ? body.evidence.filter((e) => isRecord(e) && e.item_id && isText(e.item_id)).map(textFields(['content']))
-      : [],
-    relations: Array.isArray(body.relations)
-      ? body.relations.filter((r) => isRecord(r) && r.type && isText(r.type)).map(textFields(['source', 'target']))
-      : [],
+    evidence: Array.isArray(body.evidence) ? body.evidence.map(buildEvidence).filter(Boolean) : [],
+    relations: Array.isArray(body.relations) ? body.relations.map(buildRelation).filter(Boolean) : [],
   };
 }
 
-// AskResult renders these fields as React children, which must be text, never an object.
-// A row whose id or type is not text is dropped above; any other rendered field that is not
-// text is blanked here (WEB-SEARCH-PERSIST-FU-1: a saved answer is replayed through this).
+/** The fields of a built evidence row (contract `evidence.items`). */
+export const EVIDENCE_FIELDS = ['item_id', 'content'];
+/** The fields of a built relation row (contract `relations.items`). */
+export const RELATION_FIELDS = ['source', 'type', 'target', 'source_id', 'target_id'];
+
 function isRecord(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v);
 }
@@ -77,14 +81,33 @@ function isText(v) {
   return typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v));
 }
 
-function textFields(keys) {
-  return (row) => {
-    const bad = keys.filter((k) => row[k] != null && !isText(row[k]));
-    if (bad.length === 0) return row;
-    const fixed = { ...row };
-    for (const k of bad) fixed[k] = '';
-    return fixed;
+// Non-empty text: an id or a type, which addresses something and so cannot be blank.
+function isKey(v) {
+  return isText(v) && v !== '';
+}
+
+// An evidence row is addressed by item_id (list key, selection), so a row without one is
+// dropped. Content AskResult renders as a child: text, or '' when it is not.
+function buildEvidence(row) {
+  if (!isRecord(row) || !isKey(row.item_id)) return null;
+  return { item_id: row.item_id, content: isText(row.content) ? row.content : '' };
+}
+
+// A relation row needs a type (rendered, keyed, part of the edge id), else it is dropped.
+// Labels are text or ''. Node ids are kept only when both are text: without them the row
+// renders with its labels but is not selectable (relationEdgeId returns null).
+function buildRelation(row) {
+  if (!isRecord(row) || !isKey(row.type)) return null;
+  const relation = {
+    source: isText(row.source) ? row.source : '',
+    type: row.type,
+    target: isText(row.target) ? row.target : '',
   };
+  if (isKey(row.source_id) && isKey(row.target_id)) {
+    relation.source_id = row.source_id;
+    relation.target_id = row.target_id;
+  }
+  return relation;
 }
 
 /**
