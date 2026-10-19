@@ -2,11 +2,15 @@
 
 ## Unreleased
 
-### Added (2026-10-19) — WEB-SEARCH-PERSIST-1
+### Fixed (2026-10-20): WEB-SEARCH-PERSIST-FU-1 (security)
+
+- **A malformed saved answer no longer crashes AskPanel.** `initialAnswer` now goes through `normalizeInitialAnswer` (new, exported from `core/askState.js`): the question must be a non-empty string, the result goes through `normalizeAskResponse` like a live answer, and a result with no answer text starts the panel empty. Before, `{question: 'q', result: {answer: 'partial'}}` threw in AskResult and a numeric question threw on submit. `normalizeAskResponse` also drops evidence rows whose id is not text and relation rows whose type is not text, and blanks a non-text `content`, `source` or `target`, so no object reaches the view as a React child. Live answers in the documented shape are unchanged. Tests: `tests/askPanel.test.js` (saved-answer table, response-shape table).
+
+### Added (2026-10-19): WEB-SEARCH-PERSIST-1
 
 - **AskPanel can start from a saved answer.** New optional props `initialAnswer` (`{question, result}`) and `onAnswerChange`. With both fields present the panel opens answered with that question and result, and `onAnswerChange` reports `{question, result}` when answered, else `null`, so a host page can keep the answer across navigation. Without the props nothing changes.
 
-### Fixed (2026-10-19) — UI-REFRESH-FU-M1
+### Fixed (2026-10-19): UI-REFRESH-FU-M1
 
 - **Graph tests run from any worktree.** `tests/helpers/dom.js` found jsdom through `../../../smart-memory-sdk-js/node_modules`, which only resolves from the main checkout, so a `.worktrees/<name>/` run failed before collection. It now resolves jsdom from the installed `node_modules/@smartmemory/sdk-js` link, so it works at any depth. Test helper only, no runtime change.
 

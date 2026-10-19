@@ -6,6 +6,7 @@ import {
   ASK_LOADING,
   INITIAL_ASK_STATE,
   askReducer,
+  normalizeInitialAnswer,
   runAsk,
 } from '../core/askState';
 
@@ -31,6 +32,8 @@ import {
  * @param {string} [props.className] - Additional CSS classes on the root element.
  * @param {{question: string, result: Object}} [props.initialAnswer] - A previous answer to show on mount
  *   (no new ask call), e.g. restored by the host after navigation. The input starts with its question.
+ *   It is checked like a live answer (normalizeInitialAnswer): a non-string or empty question, or a
+ *   result with no answer text, starts the panel empty.
  * @param {function({question: string, result: Object}|null): void} [props.onAnswerChange] - Fired with the
  *   current answer whenever it changes (null while idle, loading or failed), so a host can persist it.
  */
@@ -43,12 +46,14 @@ export default function AskPanel({
   initialAnswer = null,
   onAnswerChange,
 }) {
-  const [state, dispatch] = useReducer(askReducer, initialAnswer, (restored) =>
-    restored?.question && restored?.result
-      ? { ...INITIAL_ASK_STATE, status: ASK_ANSWERED, question: restored.question, result: restored.result }
+  // Read once on mount. A malformed saved answer starts the panel empty instead of crashing it.
+  const [restored] = useState(() => normalizeInitialAnswer(initialAnswer));
+  const [state, dispatch] = useReducer(askReducer, restored, (saved) =>
+    saved
+      ? { ...INITIAL_ASK_STATE, status: ASK_ANSWERED, question: saved.question, result: saved.result }
       : INITIAL_ASK_STATE
   );
-  const [draft, setDraft] = useState(() => (initialAnswer?.question && initialAnswer?.result ? initialAnswer.question : ''));
+  const [draft, setDraft] = useState(() => (restored ? restored.question : ''));
 
   const onAnswerChangeRef = useRef(onAnswerChange);
   onAnswerChangeRef.current = onAnswerChange;

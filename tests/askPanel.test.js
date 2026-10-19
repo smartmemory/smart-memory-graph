@@ -24,6 +24,7 @@ import {
   askReducer,
   evidenceSelection,
   normalizeAskResponse,
+  normalizeInitialAnswer,
   relationEdgeId,
   relationSelection,
   runAsk,
@@ -95,6 +96,63 @@ describe('AskPanel initial render', () => {
 
   it('mounts with only an adapter prop', () => {
     expect(() => renderToStaticMarkup(createElement(AskPanel, { adapter: fakeAdapter() }))).not.toThrow();
+  });
+});
+
+// WEB-SEARCH-PERSIST-FU-1: a host-saved answer is checked like a live one before it renders.
+// One row per shape: valid, each malformed field, and non-object payloads.
+describe('AskPanel initialAnswer', () => {
+  const rows = [
+    { name: 'valid saved answer', initialAnswer: { question: 'Did Yara take it?', result: ASK_RESPONSE }, answered: true },
+    { name: 'partial result, answer only (review H2 row 3)', initialAnswer: { question: 'q', result: { answer: 'partial' } }, answered: true },
+    { name: 'numeric question', initialAnswer: { question: 42, result: ASK_RESPONSE }, answered: false },
+    { name: 'empty question', initialAnswer: { question: '', result: ASK_RESPONSE }, answered: false },
+    { name: 'whitespace question', initialAnswer: { question: '   ', result: ASK_RESPONSE }, answered: false },
+    { name: 'result with no answer text', initialAnswer: { question: 'q', result: { evidence: [] } }, answered: false },
+    { name: 'result is an array', initialAnswer: { question: 'q', result: ['a'] }, answered: false },
+    { name: 'result is a string', initialAnswer: { question: 'q', result: 'answer' }, answered: false },
+    { name: 'initialAnswer is an array', initialAnswer: ['q', ASK_RESPONSE], answered: false },
+    { name: 'evidence content is an object', initialAnswer: { question: 'q', result: { answer: 'a', evidence: [{ item_id: 'm1', content: { x: 1 } }] } }, answered: true },
+    { name: 'relation endpoints are objects', initialAnswer: { question: 'q', result: { answer: 'a', relations: [{ type: 'knows', source: {}, target: [] }] } }, answered: true },
+  ];
+
+  it.each(rows)('$name', ({ initialAnswer, answered }) => {
+    const adapter = fakeAdapter();
+    let html;
+    expect(() => {
+      html = renderToStaticMarkup(createElement(AskPanel, { adapter, initialAnswer }));
+    }).not.toThrow();
+    expect(html.includes('data-testid="ask-result"')).toBe(answered);
+    if (answered) expect(html).toContain(`value="${initialAnswer.question}"`);
+    else expect(html).toContain('value=""');
+    expect(adapter.ask).not.toHaveBeenCalled();
+  });
+
+  it('hands the normalized answer to the view, the same shape a live answer has', () => {
+    expect(normalizeInitialAnswer({ question: 'q', result: { answer: 'partial' } })).toEqual({
+      question: 'q',
+      result: { answer: 'partial', reasoning: '', evidence: [], relations: [] },
+    });
+  });
+});
+
+// normalizeAskResponse is the one path for live and saved answers: rows whose rendered
+// fields are not text are dropped or blanked, never handed to the view.
+describe('normalizeAskResponse row shapes', () => {
+  const rows = [
+    { name: 'documented shape is kept as is', raw: ASK_RESPONSE, evidence: ASK_RESPONSE.evidence, relations: ASK_RESPONSE.relations },
+    { name: 'evidence id is an object', raw: { answer: 'a', evidence: [{ item_id: { id: 'm' }, content: 'c' }] }, evidence: [], relations: [] },
+    { name: 'evidence entry is a string', raw: { answer: 'a', evidence: ['m1'] }, evidence: [], relations: [] },
+    { name: 'evidence content is an object', raw: { answer: 'a', evidence: [{ item_id: 'm1', content: { x: 1 } }] }, evidence: [{ item_id: 'm1', content: '' }], relations: [] },
+    { name: 'relation type is an object', raw: { answer: 'a', relations: [{ type: { t: 1 }, source: 'A', target: 'B' }] }, evidence: [], relations: [] },
+    { name: 'relation endpoints are objects', raw: { answer: 'a', relations: [{ type: 'knows', source: {}, target: 'B' }] }, evidence: [], relations: [{ type: 'knows', source: '', target: 'B' }] },
+    { name: 'body is an array', raw: [{ answer: 'a' }], evidence: [], relations: [] },
+  ];
+
+  it.each(rows)('$name', ({ raw, evidence, relations }) => {
+    const normalized = normalizeAskResponse(raw);
+    expect(normalized.evidence).toEqual(evidence);
+    expect(normalized.relations).toEqual(relations);
   });
 });
 

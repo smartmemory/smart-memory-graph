@@ -99,6 +99,7 @@ export { searchWikipedia } from './core/wikipedia';
 export {
   askReducer,
   normalizeAskResponse,
+  normalizeInitialAnswer,
   relationEdgeId,
   evidenceSelection,
   relationSelection,

@@ -53,13 +53,52 @@ export function askReducer(state, action) {
  * failure rather than rendering as a blank success.
  */
 export function normalizeAskResponse(raw) {
-  const body = raw && typeof raw === 'object' ? raw : {};
+  const body = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   return {
     answer: typeof body.answer === 'string' ? body.answer : '',
     reasoning: typeof body.reasoning === 'string' ? body.reasoning : '',
-    evidence: Array.isArray(body.evidence) ? body.evidence.filter((e) => e && e.item_id) : [],
-    relations: Array.isArray(body.relations) ? body.relations.filter((r) => r && r.type) : [],
+    evidence: Array.isArray(body.evidence)
+      ? body.evidence.filter((e) => isRecord(e) && e.item_id && isText(e.item_id)).map(textFields(['content']))
+      : [],
+    relations: Array.isArray(body.relations)
+      ? body.relations.filter((r) => isRecord(r) && r.type && isText(r.type)).map(textFields(['source', 'target']))
+      : [],
   };
+}
+
+// AskResult renders these fields as React children, which must be text, never an object.
+// A row whose id or type is not text is dropped above; any other rendered field that is not
+// text is blanked here (WEB-SEARCH-PERSIST-FU-1: a saved answer is replayed through this).
+function isRecord(v) {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+function isText(v) {
+  return typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v));
+}
+
+function textFields(keys) {
+  return (row) => {
+    const bad = keys.filter((k) => row[k] != null && !isText(row[k]));
+    if (bad.length === 0) return row;
+    const fixed = { ...row };
+    for (const k of bad) fixed[k] = '';
+    return fixed;
+  };
+}
+
+/**
+ * A host-supplied saved answer (`AskPanel` `initialAnswer`), checked the way a live answer is:
+ * the question must be a non-empty string, the result goes through normalizeAskResponse, and a
+ * result with no answer text is no answer (the rule runAsk applies). Returns
+ * `{question, result}` or null, in which case the panel starts empty.
+ */
+export function normalizeInitialAnswer(initialAnswer) {
+  if (!isRecord(initialAnswer)) return null;
+  const { question, result } = initialAnswer;
+  if (typeof question !== 'string' || !question.trim() || !isRecord(result)) return null;
+  const normalized = normalizeAskResponse(result);
+  return normalized.answer ? { question, result: normalized } : null;
 }
 
 /**
