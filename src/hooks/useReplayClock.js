@@ -35,7 +35,11 @@ const TICK_MS = 50;
  * @param {Object} opts
  * @param {string} opts.runId
  * @param {string} [opts.baseUrl]
- * @param {string} [opts.token]
+ * @param {string} [opts.token]            - Static Bearer token; ignored when `auth` is set.
+ * @param {Object} [opts.auth]             - SDK auth (`client.auth`). Supplies the live Authorization,
+ *   the selected `X-Workspace-Id` and cookie credentials on every (re)connect, and owns 401 refresh.
+ *   `/memory/progress/stream` is team_required, so a cookie/SSO session MUST pass this: a bare token
+ *   carries no workspace and the server answers 400 for every run (STUDIO-RUN-INSPECTOR-STREAM-ERROR-1).
  * @param {boolean} [opts.enabled=true]
  * @param {boolean} [opts.autoplay=false]   - Start playing as soon as first event arrives.
  * @param {number}  [opts.tickMs=50]        - Override the tick interval (mostly for tests).
@@ -44,6 +48,7 @@ export function useReplayClock({
   runId,
   baseUrl,
   token,
+  auth,
   enabled = true,
   autoplay = false,
   tickMs = TICK_MS,
@@ -142,7 +147,7 @@ export function useReplayClock({
 
     const opts = {
       baseUrl,
-      token,
+      ...(auth ? { auth } : { token }),
       runId,
       fromSeq: 0,
       onEvent(progressEvent) {
@@ -173,7 +178,7 @@ export function useReplayClock({
       }
       subRef.current = null;
     };
-  }, [runId, baseUrl, token, enabled, sync, fanoutReset]);
+  }, [runId, baseUrl, token, auth, enabled, sync, fanoutReset]);
 
   // --- Tick interval ---
   useEffect(() => {

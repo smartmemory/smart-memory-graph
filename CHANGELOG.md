@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed (2026-10-20): STUDIO-RUN-INSPECTOR-STREAM-ERROR-1
+
+- **`useReplayClock` accepts SDK `auth`.** The replay request now carries the live Authorization, the selected `X-Workspace-Id` and cookie credentials on every (re)connect, with SDK-owned 401 refresh, the same as `useGraphStream`. Before, the hook only took a static `token`, so a cookie/SSO session (Studio's Run Inspector) sent no workspace and `/memory/progress/stream` (team_required) answered 400/401 for every run, shown as "stream error" with 0 events. A static `token` still works when `auth` is absent. Tests: `tests/replayClockAuth.test.js` (workspace + credentials sent, a 404 is terminal and never retried, legacy token path).
+
 ### Fixed (2026-10-20): WEB-SEARCH-PERSIST-FU-1 (security)
 
 - **Answer rows are built, never passed through (fix round 1).** `normalizeAskResponse` now constructs each evidence row as `{item_id, content}` and each relation row as `{source, type, target}` plus `source_id` and `target_id` only when both are non-empty text. Every field is a string or a finite number, and unknown fields are dropped (the contract rows are `additionalProperties: false`). Before, a relation `source_id` such as `{"toString":null}` from a saved answer survived and threw in `relationEdgeId` while AskResult rendered. Now that relation renders its labels and is not selectable. New exports `EVIDENCE_FIELDS` and `RELATION_FIELDS`. Tests: `tests/askPanel.test.js` (field class guard table: item_id, content, source_id and target_id each as `{"toString":null}`, an array, a nested object and NaN, plus type, source, target, unknown fields, and a declared-keys guard).
