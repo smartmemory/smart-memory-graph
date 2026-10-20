@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed (2026-10-20): STUDIO-RUN-INSPECTOR-EMPTY-GRAPH-1
+
+- **`useReplayClock({ follow: true })` opens a finished run at its end state.** The inspector released events at their recorded wall-clock pace, so a run whose drips span 30 minutes showed an empty graph for 30 minutes. In follow mode every arriving event is released at once (`ReplayClock.advanceTo(ts)`: `now = max(now, ts)`, plus any event that arrived behind the released cursor, so an out-of-order arrival is never lost). `seek()` and `pause()` leave follow mode; the handle exposes `following`. Default `follow: false`, so existing callers are unchanged.
+- **`maxGapSec` caps idle gaps during playback** (`new ReplayClock({ maxGapSec })`, `useReplayClock({ maxGapSec })`): when the next unreleased event is more than the cap beyond `now`, `tick()` jumps `now` to that event minus the cap. Tests: `tests/replayClock.test.js` (`advanceTo` and gap-cap row tables, 28 -> 42), new `tests/replayClockFollow.test.js` (5: the no-follow repro, follow, seek and pause leave follow, gap cap after a seek).
+
 ### Fixed (2026-10-20): STUDIO-RUN-INSPECTOR-STREAM-ERROR-1
 
 - **`useReplayClock` accepts SDK `auth`.** The replay request now carries the live Authorization, the selected `X-Workspace-Id` and cookie credentials on every (re)connect, with SDK-owned 401 refresh, the same as `useGraphStream`. Before, the hook only took a static `token`, so a cookie/SSO session (Studio's Run Inspector) sent no workspace and `/memory/progress/stream` (team_required) answered 400/401 for every run, shown as "stream error" with 0 events. A static `token` still works when `auth` is absent. Tests: `tests/replayClockAuth.test.js` (workspace + credentials sent, a 404 is terminal and never retried, legacy token path).
