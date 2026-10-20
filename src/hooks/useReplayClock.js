@@ -17,6 +17,7 @@
  *     firstTs,     // earliest buffered event ts (or null)
  *     lastTs,      // latest buffered event ts (or null)
  *     durationSec, // lastTs - firstTs (or 0)
+ *     following,   // true while follow mode releases every arriving event at once
  *     pause(), play(), setSpeed(s), seek(ts),
  *     subscribe(cb) → unsubscribe()    // cb(event) per released event
  *   }
@@ -27,7 +28,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { subscribeProgress } from '@smartmemory/sdk-js/progress';
-import { ReplayClock } from '../core/replayClock';
+import { ReplayClock, eventTimestamp } from '../core/replayClock';
 
 const TICK_MS = 50;
 
@@ -43,6 +44,10 @@ const TICK_MS = 50;
  * @param {boolean} [opts.enabled=true]
  * @param {boolean} [opts.autoplay=false]   - Start playing as soon as first event arrives.
  * @param {number}  [opts.tickMs=50]        - Override the tick interval (mostly for tests).
+ * @param {boolean} [opts.follow=false]     - Follow mode: every arriving event is released at once (the playhead jumps
+ *   to it), so a completed run opens at its END state: graph hydrated, DAG terminal, full log. `seek()` and `pause()`
+ *   leave follow mode; scrub to the start to watch the replay (STUDIO-RUN-INSPECTOR-EMPTY-GRAPH-1).
+ * @param {number}  [opts.maxGapSec]        - Cap on idle virtual time between events during playback (ReplayClock).
  */
 export function useReplayClock({
   runId,
@@ -52,13 +57,16 @@ export function useReplayClock({
   enabled = true,
   autoplay = false,
   tickMs = TICK_MS,
+  follow = false,
+  maxGapSec,
 } = {}) {
   // The clock instance survives across renders; its state is mirrored into
   // React state via the snapshot fields below so consumers re-render.
   const clockRef = useRef(null);
   if (clockRef.current === null) {
-    clockRef.current = new ReplayClock();
+    clockRef.current = new ReplayClock({ maxGapSec });
   }
+  const followingRef = useRef(follow);
 
   const [snapshot, setSnapshot] = useState({
     now: null,
@@ -68,6 +76,7 @@ export function useReplayClock({
     lastTs: null,
     durationSec: 0,
     isReady: false,
+    following: follow,
     // Bumps on every reset (runId change, seek-backward) so consumers that
     // accumulate state from released events know to discard prior accumulator.
     resetGeneration: 0,
@@ -81,6 +90,15 @@ export function useReplayClock({
   useEffect(() => {
     autoplayRef.current = autoplay;
   }, [autoplay]);
+  const maxGapRef = useRef(maxGapSec);
+  useEffect(() => {
+    maxGapRef.current = maxGapSec;
+    clockRef.current.maxGapSec = typeof maxGapSec === 'number' && maxGapSec > 0 ? maxGapSec : null;
+  }, [maxGapSec]);
+  const followPropRef = useRef(follow);
+  useEffect(() => {
+    followPropRef.current = follow;
+  }, [follow]);
 
   const sync = useCallback((extra = {}) => {
     const c = clockRef.current;
@@ -136,10 +154,11 @@ export function useReplayClock({
     // stable clock handle stays the same, so usePipelineDag's effect doesn't
     // re-fire — and old statusByStage would carry into the new run until
     // the next seek().
-    clockRef.current = new ReplayClock();
+    clockRef.current = new ReplayClock({ maxGapSec: maxGapRef.current });
+    followingRef.current = followPropRef.current;
     fanoutReset();
     setError(null);
-    sync({ resetGeneration: snapshotRef.current.resetGeneration + 1 });
+    sync({ resetGeneration: snapshotRef.current.resetGeneration + 1, following: followingRef.current });
 
     if (!enabled || !runId) return undefined;
 
@@ -158,6 +177,10 @@ export function useReplayClock({
         // First event just arrived — optionally autoplay.
         if (!wasReady && autoplayRef.current) {
           clockRef.current.play();
+        }
+        // Follow mode: release this event (and any late arrival) now instead of waiting for the playhead.
+        if (followingRef.current) {
+          fanoutEvents(clockRef.current.advanceTo(eventTimestamp(progressEvent)));
         }
         sync();
       },
@@ -178,7 +201,7 @@ export function useReplayClock({
       }
       subRef.current = null;
     };
-  }, [runId, baseUrl, token, auth, enabled, sync, fanoutReset]);
+  }, [runId, baseUrl, token, auth, enabled, sync, fanoutReset, fanoutEvents]);
 
   // --- Tick interval ---
   useEffect(() => {
@@ -206,7 +229,8 @@ export function useReplayClock({
 
   const pause = useCallback(() => {
     clockRef.current.pause();
-    sync();
+    followingRef.current = false;
+    sync({ following: false });
   }, [sync]);
 
   const setSpeed = useCallback((s) => {
@@ -219,10 +243,11 @@ export function useReplayClock({
     // accumulators (DAG terminal states are sticky — replaying released
     // events into existing state would not downgrade `complete` → `active`).
     fanoutReset();
+    followingRef.current = false;
     const released = clockRef.current.seek(ts);
     if (released.length > 0) fanoutEvents(released);
     // Bump resetGeneration so memoized consumers see the discontinuity.
-    sync({ resetGeneration: snapshotRef.current.resetGeneration + 1 });
+    sync({ resetGeneration: snapshotRef.current.resetGeneration + 1, following: false });
   }, [fanoutEvents, fanoutReset, sync]);
 
   const subscribe = useCallback((cb) => {
@@ -255,6 +280,7 @@ export function useReplayClock({
       lastTs: snapshot.lastTs,
       durationSec: snapshot.durationSec,
       isReady: snapshot.isReady,
+      following: snapshot.following,
       resetGeneration: snapshot.resetGeneration,
       error,
       play,

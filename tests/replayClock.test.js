@@ -333,3 +333,84 @@ describe('ReplayClock dedupe by (run_id, seq)', () => {
     expect(c._events).toHaveLength(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// STUDIO-RUN-INSPECTOR-EMPTY-GRAPH-1: advanceTo (follow mode) and the idle-gap cap
+// ---------------------------------------------------------------------------
+
+describe('ReplayClock.advanceTo', () => {
+  const ts = (evs) => evs.map((e) => e.payload.original_ts);
+  // One row per case: setup events, the advanceTo target, released ts, resulting now.
+  const ROWS = [
+    { name: 'releases everything up to ts', add: [1000, 1010, 1020], to: 1010, released: [1000, 1010], now: 1010 },
+    { name: 'to the last event releases the whole buffer', add: [1000, 1800, 2800], to: 2800, released: [1000, 1800, 2800], now: 2800 },
+    { name: 'never moves now backward', add: [1000, 1010], pre: 1010, to: 1000, released: [], now: 1010 },
+    { name: 'before the first event sets now', add: [], to: 500, released: [], now: 500 },
+    { name: 'non-numeric ts is a no-op', add: [1000], to: 'x', released: [], now: 1000 },
+  ];
+  it.each(ROWS)('$name', ({ add, pre, to, released, now }) => {
+    const c = new ReplayClock();
+    add.forEach((t) => c.addEvent(makeEvent(t)));
+    if (pre !== undefined) c.advanceTo(pre);
+    expect(ts(c.advanceTo(to))).toEqual(released);
+    expect(c.now).toBe(now);
+  });
+
+  it('releases an event that arrived behind the released cursor (follow mode never loses it)', () => {
+    const c = new ReplayClock();
+    c.addEvent(makeEvent(1000));
+    c.addEvent(makeEvent(1010));
+    expect(ts(c.advanceTo(1010))).toEqual([1000, 1010]);
+    c.addEvent(makeEvent(1005)); // late arrival, behind the cursor
+    expect(ts(c.advanceTo(1005))).toEqual([1005]);
+    expect(ts(c.advanceTo(1010))).toEqual([]); // released once only
+    expect(c.now).toBe(1010);
+  });
+
+  it('seek drops pending late arrivals (seek re-releases them itself)', () => {
+    const c = new ReplayClock();
+    c.addEvent(makeEvent(1000));
+    c.addEvent(makeEvent(1010));
+    c.advanceTo(1010);
+    c.addEvent(makeEvent(1005));
+    expect(ts(c.seek(1010))).toEqual([1000, 1005, 1010]);
+    expect(ts(c.advanceTo(1010))).toEqual([]);
+  });
+
+  it('is independent of pause (follow releases while paused)', () => {
+    const c = new ReplayClock();
+    c.addEvent(makeEvent(1000));
+    expect(c.paused).toBe(true);
+    expect(ts(c.advanceTo(1000))).toEqual([1000]);
+  });
+});
+
+describe('ReplayClock maxGapSec (idle-gap cap in tick)', () => {
+  // A 30-minute run: two events 1800 s apart. Rows: cap, tick ms, expected released ts after one tick, now.
+  const ROWS = [
+    { name: 'no cap waits the full gap', cap: undefined, tickMs: 1000, released: [1000], now: 1001 },
+    { name: 'cap 2s: jumps to next - 2, then advances 1s', cap: 2, tickMs: 1000, released: [1000], now: 2799 },
+    { name: 'cap 2s: a 2s tick reaches the next event', cap: 2, tickMs: 2000, released: [1000, 2800], now: 2800 },
+    { name: 'gap within the cap is not shortened', cap: 5000, tickMs: 1000, released: [1000], now: 1001 },
+    { name: 'non-positive cap is ignored', cap: 0, tickMs: 1000, released: [1000], now: 1001 },
+  ];
+  it.each(ROWS)('$name', ({ cap, tickMs, released, now }) => {
+    const c = new ReplayClock({ maxGapSec: cap });
+    c.addEvent(makeEvent(1000));
+    c.addEvent(makeEvent(2800));
+    c.play();
+    const first = c.tick(1); // releases 1000 (now 1000.001)
+    const second = c.tick(tickMs);
+    expect([...first, ...second].map((e) => e.payload.original_ts)).toEqual(released);
+    expect(c.now).toBeCloseTo(now, 2);
+  });
+
+  it('does nothing once every event is released', () => {
+    const c = new ReplayClock({ maxGapSec: 2 });
+    c.addEvent(makeEvent(1000));
+    c.play();
+    c.tick(1);
+    c.tick(1000);
+    expect(c.now).toBeCloseTo(1001.001, 3);
+  });
+});

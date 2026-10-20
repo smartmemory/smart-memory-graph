@@ -31,7 +31,14 @@ export function eventTimestamp(event) {
 }
 
 export class ReplayClock {
-  constructor() {
+  /**
+   * @param {Object} [opts]
+   * @param {number} [opts.maxGapSec] - Cap on idle virtual time in tick(): when the next unreleased event is more than
+   *   this many seconds beyond `now`, `now` jumps to that event's ts minus the cap, so a 30-minute run with long quiet
+   *   stretches replays in watchable time (STUDIO-RUN-INSPECTOR-EMPTY-GRAPH-1). Unset or non-positive = no cap.
+   */
+  constructor({ maxGapSec } = {}) {
+    this.maxGapSec = typeof maxGapSec === 'number' && maxGapSec > 0 ? maxGapSec : null;
     this.now = null;          // virtual epoch seconds; null until first event
     this.paused = true;       // starts paused — caller must play() when ready
     this.speed = DEFAULT_SPEED;
@@ -42,6 +49,9 @@ export class ReplayClock {
     /** Set of seen (run_id, seq) keys for reconnect-dedupe per
      *  PLAT-PROGRESS-1 contract: "Clients order and dedupe on this [seq]." */
     this._seen = new Set();
+    /** Events inserted behind the released cursor since the last advanceTo()/seek(). tick() never releases them;
+     *  advanceTo() does, so follow mode never loses an out-of-order arrival. */
+    this._late = [];
   }
 
   /**
@@ -91,6 +101,7 @@ export class ReplayClock {
     // (Happens when out-of-order events arrive after we've already advanced.)
     if (i < this._releasedIdx) {
       this._releasedIdx += 1;
+      this._late.push(event);
     }
 
     // First event sets the starting `now`. Caller is responsible for play().
@@ -110,6 +121,10 @@ export class ReplayClock {
   tick(realDeltaMs) {
     if (this.paused || this.now === null) return [];
     if (typeof realDeltaMs !== 'number' || realDeltaMs <= 0) return [];
+    if (this.maxGapSec !== null && this._releasedIdx < this._events.length) {
+      const nextTs = this._events[this._releasedIdx].ts;
+      if (nextTs - this.now > this.maxGapSec) this.now = nextTs - this.maxGapSec;
+    }
     this.now += (realDeltaMs / 1000) * this.speed;
     return this._releaseUpTo(this.now);
   }
@@ -125,6 +140,21 @@ export class ReplayClock {
       this._releasedIdx += 1;
     }
     return released;
+  }
+
+  /**
+   * Move `now` forward to `ts` (never backward) and release everything up to it, plus any event that arrived behind
+   * the released cursor since the last advanceTo()/seek(). This is follow mode's release path: every arriving event is
+   * released at once, so a completed run opens at its END state instead of replaying its recorded wall-clock pace.
+   *
+   * Returns the released events (late arrivals first, then in ts order).
+   */
+  advanceTo(ts) {
+    if (typeof ts !== 'number') return [];
+    this.now = this.now === null ? ts : Math.max(this.now, ts);
+    const late = this._late;
+    this._late = [];
+    return late.concat(this._releaseUpTo(this.now));
   }
 
   play() {
@@ -152,6 +182,7 @@ export class ReplayClock {
     if (typeof targetTs !== 'number') return [];
     this.now = targetTs;
     this._releasedIdx = 0;
+    this._late = [];
     return this._releaseUpTo(targetTs);
   }
 
