@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed (2026-10-21): DEPS-SEC-FLOOR-GUARD-CLASS-1
+
+- Test (security, DEPS-SEC-FLOOR-GUARD-CLASS-1): `tests/dependencyFloors.test.js` judges a declared range by the lowest version it admits, ordered by full semver precedence (a prerelease sorts below its release), instead of the first numeric triple after stripping the operator. `<6.4.3`, `<=6.4.3`, `^4.1.11-rc.0` and `^4.1.12 || 4.0.18` now fail a stable floor, range syntax the check cannot model fails closed, and installed versions use the same ordering. One row table covers the repros and each grammar form.
+
 ### Fixed (2026-10-20): STUDIO-RUN-INSPECTOR-EMPTY-GRAPH-1
 
 - **`useReplayClock({ follow: true })` opens a finished run at its end state.** The inspector released events at their recorded wall-clock pace, so a run whose drips span 30 minutes showed an empty graph for 30 minutes. In follow mode every arriving event is released at once (`ReplayClock.advanceTo(ts)`: `now = max(now, ts)`, plus any event that arrived behind the released cursor, so an out-of-order arrival is never lost). `seek()` and `pause()` leave follow mode; the handle exposes `following`. Default `follow: false`, so existing callers are unchanged.
