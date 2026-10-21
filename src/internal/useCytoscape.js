@@ -11,6 +11,7 @@ import {
   countRelayoutRequest,
   revealRelayoutRequest,
 } from './countRelayout';
+import { runCheckedLayout } from './checkedLayout';
 import { ANNOTATION_PRECEDENCE, CHANNEL_LOCKED_KINDS } from '../core/graphColors';
 
 export { containerHasArea };
@@ -404,12 +405,17 @@ export function useCytoscape(containerRef, options = {}) {
       }
     }
 
-    const layout = cy.layout(config);
-    layout.one('layoutstop', () => {
+    const fitOnStop = () => {
       if (config.fit === false) return;
       cy.resize();
       cy.fit(getFitElements(cy), getFitPadding(cy));
-    });
+    };
+    // A layout is done only when it moved the nodes (checkedLayout.js): one that stops before
+    // its first animation frame is re-run, and a hidden document is waited out.
+    const run = () => {
+      countRelayoutRef.current.markLaidOut();
+      runCheckedLayout(cy, config, { onStop: fitOnStop, label: 'graph' });
+    };
 
     if (isFirstLayout) {
       requestAnimationFrame(() => {
@@ -420,14 +426,12 @@ export function useCytoscape(containerRef, options = {}) {
           firstLayoutRef.current = true;
           return;
         }
-        countRelayoutRef.current.markLaidOut();
-        layout.run();
+        run();
       });
       return;
     }
 
-    countRelayoutRef.current.markLaidOut();
-    layout.run();
+    run();
   }, []);
   runLayoutRef.current = runLayout;
 
