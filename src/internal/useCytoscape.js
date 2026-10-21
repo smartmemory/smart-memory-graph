@@ -5,7 +5,15 @@ import coseBilkent from 'cytoscape-cose-bilkent';
 import dagre from 'cytoscape-dagre';
 import { getCytoscapeStyles } from './cytoscapeStyles';
 import { applyGraphMerge } from './graphMerge';
+import { containerHasArea } from './containerGate';
+import {
+  createCountRelayout,
+  countRelayoutRequest,
+  revealRelayoutRequest,
+} from './countRelayout';
 import { ANNOTATION_PRECEDENCE, CHANNEL_LOCKED_KINDS } from '../core/graphColors';
+
+export { containerHasArea };
 
 export function removeIdsFromSelection(selectedIds, removedIds) {
   const removed = new Set(removedIds);
@@ -57,18 +65,6 @@ export function getFitElements(cy) {
 }
 
 /**
- * True when the cy container has a nonzero width AND height. A layout run against a 0x0
- * container (hidden tab, panel not laid out yet) places and fits nodes against degenerate
- * bounds, and nothing re-runs it when the size settles unless the caller arranges that.
- */
-export function containerHasArea(cy) {
-  const el = cy && typeof cy.container === 'function' ? cy.container() : null;
-  if (!el) return false;
-  const rect = el.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0;
-}
-
-/**
  * What the container ResizeObserver does for one notification. A hidden-to-visible flip
  * (area, not width alone: a container that gains height only is the same bug) re-runs the
  * layout that was deferred while hidden, or the default instant layout when none was.
@@ -95,6 +91,20 @@ export function useCytoscape(containerRef, options = {}) {
   const [autoFit, setAutoFit] = useState(true);
   const autoFitRef = useRef(true);
   useEffect(() => { autoFitRef.current = autoFit; }, [autoFit]);
+
+  // GRAPH-PKG-RELAYOUT-1: the layout the user last asked for, and the debounced re-layout that
+  // runs it again when the node or edge count changes (see countRelayout.js).
+  const lastLayoutNameRef = useRef(null);
+  const countRelayoutRef = useRef(null);
+  if (countRelayoutRef.current === null) {
+    countRelayoutRef.current = createCountRelayout({
+      getCy: () => cyRef.current,
+      run: () => {
+        const { layoutName, options } = countRelayoutRequest(lastLayoutNameRef.current, autoFitRef.current);
+        runLayoutRef.current?.(layoutName, options);
+      },
+    });
+  }
 
   const [selectedNodeIds, setSelectedNodeIds] = useState(new Set());
   const [selectionMode, setSelectionModeState] = useState(false);
@@ -209,15 +219,10 @@ export function useCytoscape(containerRef, options = {}) {
         runLayoutRef.current?.(pending.layoutName, pending.options);
       } else if (action === 'relayout') {
         // Container went from hidden (0px) to visible — anything laid out before
-        // now has degenerate positions. Re-run layout instantly (no entrance
-        // animation — that's for first load only).
-        const layout = cy.layout({
-          name: 'cose-bilkent', quality: 'default', animate: false,
-          randomize: true, nodeDimensionsIncludeLabels: true,
-          fit: true, padding: 30, idealEdgeLength: 110,
-          nodeRepulsion: 10000, edgeElasticity: 0.12,
-        });
-        layout.run();
+        // now has degenerate positions. Re-run the layout the user chose instantly
+        // (no entrance animation — that's for first load only).
+        const { layoutName, options } = revealRelayoutRequest(lastLayoutNameRef.current);
+        runLayoutRef.current?.(layoutName, options);
       } else if (action === 'fit') {
         cy.fit(getFitElements(cy), getFitPadding(cy));
       }
@@ -230,6 +235,7 @@ export function useCytoscape(containerRef, options = {}) {
 
     return () => {
       resizeObserver.disconnect();
+      countRelayoutRef.current.cancel();
       cy.destroy();
       cyRef.current = null;
       setCyReady(false);
@@ -300,7 +306,9 @@ export function useCytoscape(containerRef, options = {}) {
   const mergeElements = useCallback((elements) => {
     const cy = cyRef.current;
     if (!cy) return { isInitial: true };
-    return applyGraphMerge(cy, elements, { afterMerge: restoreDimmingState });
+    const result = applyGraphMerge(cy, elements, { afterMerge: restoreDimmingState });
+    if (result.added.length || result.removed.length) countRelayoutRef.current.schedule();
+    return result;
   }, []);
 
   const firstLayoutRef = useRef(true);
@@ -316,6 +324,7 @@ export function useCytoscape(containerRef, options = {}) {
       pendingLayoutRef.current = { layoutName, options };
       return;
     }
+    lastLayoutNameRef.current = layoutName;
 
     const isFirstLayout = firstLayoutRef.current;
     const shouldAnimate = !isFirstLayout;
@@ -411,11 +420,13 @@ export function useCytoscape(containerRef, options = {}) {
           firstLayoutRef.current = true;
           return;
         }
+        countRelayoutRef.current.markLaidOut();
         layout.run();
       });
       return;
     }
 
+    countRelayoutRef.current.markLaidOut();
     layout.run();
   }, []);
   runLayoutRef.current = runLayout;
@@ -621,6 +632,7 @@ export function useCytoscape(containerRef, options = {}) {
       }
       if (addedCount > 0) restoreDimmingState(cy);
     });
+    if (addedCount > 0) countRelayoutRef.current.schedule();
     return addedCount;
   }, []);
 
