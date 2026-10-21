@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed (2026-10-21): STUDIO-ONTOLOGY-GRAPH-LAYOUT-1
+
+- **No layout runs against a 0x0 container.** `useCytoscape.runLayout` defers itself while the container has no width or no height (also re-checked inside the first-layout animation frame) and the container ResizeObserver runs the deferred layout when the container is sized; the observer now tracks area (width AND height) where it tracked width only, so a container that gains height alone is no longer missed, and it no longer fits a 0x0 box. `useDripFeed`'s quiet-settle layout skips a hidden container (the same observer re-lays out when it is shown). New exports `containerHasArea(cy)` and `planContainerResize(...)`. Consumers pick this up at their next build: smart-memory-studio (`RunInspector`: `PipelineDag`, `GraphExplorer`), smart-memory-web (`Memories.jsx` `GraphExplorer`, `HopGraphPanel`) and smart-memory-insights (`Graph.jsx` `GraphExplorer`), all through the `file:` link, `main` is `src/index.js`, no package build. Tests: `tests/containerLayoutGate.test.js` (14 rows: `containerHasArea` shapes, `planContainerResize` transitions).
+
 ### Fixed (2026-10-21): DEPS-SEC-FLOOR-GUARD-CLASS-1
 
 - Test (security, DEPS-SEC-FLOOR-GUARD-CLASS-1): `tests/dependencyFloors.test.js` judges a declared range by the lowest version it admits, ordered by full semver precedence (a prerelease sorts below its release), instead of the first numeric triple after stripping the operator. `<6.4.3`, `<=6.4.3`, `^4.1.11-rc.0` and `^4.1.12 || 4.0.18` now fail a stable floor, range syntax the check cannot model fails closed, and installed versions use the same ordering. One row table covers the repros and each grammar form.

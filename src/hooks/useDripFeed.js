@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscapeConvert';
 import { coalesceGraphData } from '../core/coalesce';
-import { getFitElements, getFitPadding, STREAMING_LAYOUT } from '../internal/useCytoscape';
+import { containerHasArea, getFitElements, getFitPadding, STREAMING_LAYOUT } from '../internal/useCytoscape';
 
 const GLOW_DURATION = 2500;
 
@@ -218,6 +218,9 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
         }
         pendingNodesRef.current.clear();
       }
+      // No layout on a hidden (0x0) container: the container ResizeObserver in
+      // useCytoscape re-lays out the whole graph when it is sized again.
+      if (!containerHasArea(cy)) return;
       // Gentle full settle, then frame it once it's stable (fit AFTER the
       // settle, not racing it — avoids a mid-settle viewport jump).
       const layout = cy.layout({ ...STREAMING_LAYOUT, eles: cy.elements().not('[_isPulse]') });

@@ -56,6 +56,30 @@ export function getFitElements(cy) {
   return active.length > 0 ? active : cy.elements(':visible');
 }
 
+/**
+ * True when the cy container has a nonzero width AND height. A layout run against a 0x0
+ * container (hidden tab, panel not laid out yet) places and fits nodes against degenerate
+ * bounds, and nothing re-runs it when the size settles unless the caller arranges that.
+ */
+export function containerHasArea(cy) {
+  const el = cy && typeof cy.container === 'function' ? cy.container() : null;
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+/**
+ * What the container ResizeObserver does for one notification. A hidden-to-visible flip
+ * (area, not width alone: a container that gains height only is the same bug) re-runs the
+ * layout that was deferred while hidden, or the default instant layout when none was.
+ */
+export function planContainerResize({ hadArea, hasArea, hasPendingLayout, nodeCount, autoFit }) {
+  if (nodeCount === 0) return 'none';
+  if (!hadArea && hasArea) return hasPendingLayout ? 'run-pending-layout' : 'relayout';
+  if (hasArea && autoFit) return 'fit';
+  return 'none';
+}
+
 /** Padding proportional to the viewport's smaller dimension (3%, clamped 12–48px). */
 export function getFitPadding(cy) {
   return Math.round(Math.max(12, Math.min(48, Math.min(cy.width(), cy.height()) * 0.03)));
@@ -166,28 +190,38 @@ export function useCytoscape(containerRef, options = {}) {
     };
     cy.on('select unselect', 'node', syncSelection);
 
-    let prevWidth = 0;
+    let hadArea = false;
     const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      const newWidth = entry?.contentRect?.width || 0;
+      const rect = entries[0]?.contentRect;
+      const hasArea = (rect?.width || 0) > 0 && (rect?.height || 0) > 0;
       cy.resize();
-      if (cy.nodes().length > 0) {
-        if (prevWidth === 0 && newWidth > 0) {
-          // Container went from hidden (0px) to visible — layout was computed
-          // at zero dimensions, so positions are degenerate. Re-run layout
-          // instantly (no entrance animation — that's for first load only).
-          const layout = cy.layout({
-            name: 'cose-bilkent', quality: 'default', animate: false,
-            randomize: true, nodeDimensionsIncludeLabels: true,
-            fit: true, padding: 30, idealEdgeLength: 110,
-            nodeRepulsion: 10000, edgeElasticity: 0.12,
-          });
-          layout.run();
-        } else if (autoFitRef.current) {
-          cy.fit(getFitElements(cy), getFitPadding(cy));
-        }
+      const action = planContainerResize({
+        hadArea,
+        hasArea,
+        hasPendingLayout: pendingLayoutRef.current !== null,
+        nodeCount: cy.nodes().length,
+        autoFit: autoFitRef.current,
+      });
+      if (action === 'run-pending-layout') {
+        // runLayout was called while the container was hidden and deferred itself.
+        const pending = pendingLayoutRef.current;
+        pendingLayoutRef.current = null;
+        runLayoutRef.current?.(pending.layoutName, pending.options);
+      } else if (action === 'relayout') {
+        // Container went from hidden (0px) to visible — anything laid out before
+        // now has degenerate positions. Re-run layout instantly (no entrance
+        // animation — that's for first load only).
+        const layout = cy.layout({
+          name: 'cose-bilkent', quality: 'default', animate: false,
+          randomize: true, nodeDimensionsIncludeLabels: true,
+          fit: true, padding: 30, idealEdgeLength: 110,
+          nodeRepulsion: 10000, edgeElasticity: 0.12,
+        });
+        layout.run();
+      } else if (action === 'fit') {
+        cy.fit(getFitElements(cy), getFitPadding(cy));
       }
-      prevWidth = newWidth;
+      hadArea = hasArea;
     });
     resizeObserver.observe(container);
 
@@ -271,10 +305,17 @@ export function useCytoscape(containerRef, options = {}) {
 
   const firstLayoutRef = useRef(true);
   const runLayoutRef = useRef(null);
+  // A runLayout call made while the container had no area; the ResizeObserver runs it
+  // when the container is sized.
+  const pendingLayoutRef = useRef(null);
 
   const runLayout = useCallback((layoutName = 'cose-bilkent', options = {}) => {
     const cy = cyRef.current;
     if (!cy || cy.nodes().length === 0) return;
+    if (!containerHasArea(cy)) {
+      pendingLayoutRef.current = { layoutName, options };
+      return;
+    }
 
     const isFirstLayout = firstLayoutRef.current;
     const shouldAnimate = !isFirstLayout;
@@ -364,6 +405,12 @@ export function useCytoscape(containerRef, options = {}) {
     if (isFirstLayout) {
       requestAnimationFrame(() => {
         cy.resize();
+        if (!containerHasArea(cy)) {
+          // Hidden between the call and the frame: defer, and stay "first".
+          pendingLayoutRef.current = { layoutName, options };
+          firstLayoutRef.current = true;
+          return;
+        }
         layout.run();
       });
       return;
