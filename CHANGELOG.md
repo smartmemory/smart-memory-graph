@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added (2026-10-22): E2E-CLASS-SELECTORS-1
+
+- **Stable test ids on the explorer chrome.** Toolbar (`graph-toolbar`), Path button (`graph-path-button`, with `aria-pressed`), filter panel, canvas, operations bar, status dot and ops rate carry `data-testid`, so e2e no longer finds them by Tailwind classes.
+
 ### Fixed (2026-10-21): STUDIO-ONTOLOGY-GRAPH-FIRST-MOUNT-LAYOUT-1
 
 - **A layout that stops before it placed the nodes now runs again instead of leaving them stacked.** New internal `checkedLayout.js` (`runCheckedLayout`) waits out a hidden document, and on `layoutstop` re-runs the layout (up to 2 times, one WARNING each, a final WARNING when it gives up) when no node moved and 2 or more share a position. `onStop` runs once. `useCytoscape.runLayout` and the `useDripFeed` quiet-settle layout (cola, `maxSimulationTime` 1200 ms, nodes seeded on their parent) both go through it, so a first-load layout stopped by its timer before the first animation frame, or fired while the tab is hidden, no longer marks itself done unplaced. smart-memory-web's `HopGraphPanel` and smart-memory-studio pick this up through the `file:` link. Tests: `tests/checkedLayout.test.js` (9 rows: 5 outcomes, hidden document, 2 cancel/destroy, and a class guard that no `src` file except `checkedLayout.js` calls `cy.layout(`).

@@ -80,6 +80,7 @@ export default function OperationsBar({
 
   return (
     <div
+      data-testid="graph-operations-bar"
       className="bg-slate-800 border-t border-slate-700 flex px-3 gap-3 shrink-0 text-xs transition-all duration-200"
       style={{ height }}
     >
@@ -87,8 +88,8 @@ export default function OperationsBar({
       <div className="flex flex-col justify-center gap-1 shrink-0 py-1">
         {/* Status indicator */}
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${STATUS_COLORS[status] || STATUS_COLORS.disconnected}`} />
-          <span className="text-slate-400 tabular-nums w-16">
+          <div data-testid="graph-ops-status-dot" data-status={status} className={`w-2 h-2 rounded-full ${STATUS_COLORS[status] || STATUS_COLORS.disconnected}`} />
+          <span data-testid="graph-ops-rate" className="text-slate-400 tabular-nums w-16">
             {status === 'connected' ? `${opsPerSecond} ops/s` : status}
           </span>
         </div>

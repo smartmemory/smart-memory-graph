@@ -61,7 +61,7 @@ export default function Toolbar({
   }, [cy]);
 
   return (
-    <div ref={toolbarRef} className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2 shrink-0 z-40">
+    <div ref={toolbarRef} data-testid="graph-toolbar" className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2 shrink-0 z-40">
       {/* App title */}
       <div className="flex items-center gap-2 mr-4">
         <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs font-bold text-white">G</div>
@@ -134,6 +134,8 @@ export default function Toolbar({
       {/* Path finder */}
       <button
         onClick={onPathMode}
+        data-testid="graph-path-button"
+        aria-pressed={!!pathMode}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${
           pathMode ? 'bg-amber-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
         }`}

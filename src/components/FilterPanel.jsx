@@ -27,7 +27,7 @@ export default function FilterPanel({
   const counts = typeCounts || {};
 
   return (
-    <div className="w-56 bg-slate-800 border-r border-slate-700 shrink-0 flex flex-col">
+    <div data-testid="graph-filter-panel" className="w-56 bg-slate-800 border-r border-slate-700 shrink-0 flex flex-col">
       <div className="flex items-center justify-between p-3 border-b border-slate-700">
         <span className="text-sm font-medium text-slate-200">Filters</span>
         <button
