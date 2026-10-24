@@ -1,10 +1,12 @@
+import { modeOf, EXPORT_BACKGROUND } from './themeColors';
+
 export function exportPNG(cy, filename = 'graph.png') {
-  const png = cy.png({ output: 'blob', bg: '#0f172a', full: true, scale: 2 });
+  const png = cy.png({ output: 'blob', bg: EXPORT_BACKGROUND[modeOf(cy)], full: true, scale: 2 });
   downloadBlob(png, filename);
 }
 
 export function exportSVG(cy, filename = 'graph.svg') {
-  const svg = cy.svg({ full: true, bg: '#0f172a' });
+  const svg = cy.svg({ full: true, bg: EXPORT_BACKGROUND[modeOf(cy)] });
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   downloadBlob(blob, filename);
 }

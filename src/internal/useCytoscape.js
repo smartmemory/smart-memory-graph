@@ -4,6 +4,7 @@ import cola from 'cytoscape-cola';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import dagre from 'cytoscape-dagre';
 import { getCytoscapeStyles } from './cytoscapeStyles';
+import { resolveMode, readColorToken, MODE_SCRATCH_KEY } from '../core/themeColors';
 import { applyGraphMerge } from './graphMerge';
 import { containerHasArea } from './containerGate';
 import {
@@ -82,8 +83,27 @@ export function getFitPadding(cy) {
   return Math.round(Math.max(12, Math.min(48, Math.min(cy.width(), cy.height()) * 0.03)));
 }
 
+/**
+ * The theme handed to the style builder: the host's `mode` prop (an explicit `theme.mode` wins),
+ * plus, in light mode only, the host's `--ring` token as the selection border. No mode and no
+ * theme gives `null`-equivalent dark output, identical to before.
+ */
+export function effectiveTheme(theme, mode, container) {
+  const resolved = resolveMode(theme?.mode ?? mode);
+  if (resolved !== 'light') return { ...(theme || {}), mode: resolved };
+  const ring = readColorToken(container, '--ring') || undefined;
+  if (!ring && !warnedNoRing) {
+    warnedNoRing = true;
+    console.warn('[smart-memory-graph] light mode but --ring is not defined on the graph container: the selection border falls back to #0f172a. Load the design-system tokens on the host.');
+  }
+  return { ...(theme || {}), mode: resolved, ring };
+}
+let warnedNoRing = false;
+/** Test hook: the no-ring warning is once per page. */
+export function _resetNoRingWarn() { warnedNoRing = false; }
+
 export function useCytoscape(containerRef, options = {}) {
-  const { theme = null } = options;
+  const { theme = null, mode = null } = options;
   const cyRef = useRef(null);
   const [containerReady, setContainerReady] = useState(false);
   const [cyReady, setCyReady] = useState(false);
@@ -140,7 +160,7 @@ export function useCytoscape(containerRef, options = {}) {
 
     const cy = cytoscape({
       container,
-      style: getCytoscapeStyles(theme),
+      style: getCytoscapeStyles(effectiveTheme(theme, mode, container)),
       elements: [],
       layout: { name: 'preset' },
       minZoom: 0.1,
@@ -867,11 +887,29 @@ export function useCytoscape(containerRef, options = {}) {
   // The init effect only runs once (cyRef guard), so without this hook
   // a runtime theme switch (e.g. Obsidian light/dark toggle) would not
   // propagate to the canvas.
-  const themeKey = JSON.stringify(theme || null);
+  // `mode` (the host's resolved light/dark, UI-LIGHT-MODE-1) rides the same path: styles are
+  // rebuilt and applied in place, so a mode change never re-runs a layout or moves a node.
+  const themeKey = JSON.stringify([theme || null, mode || null]);
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || !cyReady) return;
-    cy.style().fromJson(getCytoscapeStyles(theme)).update();
+    const container = containerRef.current;
+    const apply = () => {
+      const eff = effectiveTheme(theme, mode, container);
+      cy.scratch(MODE_SCRATCH_KEY, resolveMode(eff.mode));
+      cy.style().fromJson(getCytoscapeStyles(eff)).update();
+      return eff.ring;
+    };
+    const ring = apply();
+    // The host flips its `.light`/`.dark` class and passes the new mode in the same commit, so the
+    // `--ring` read above can still see the old class. One frame later it cannot: re-apply if the
+    // token moved. Cheap, and skipped for dark (ring is a light-mode input only).
+    if (ring === undefined || typeof requestAnimationFrame !== 'function') return undefined;
+    const raf = requestAnimationFrame(() => {
+      if (cyRef.current !== cy || cy.destroyed()) return;
+      if (effectiveTheme(theme, mode, container).ring !== ring) apply();
+    });
+    return () => { if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf); };
   }, [themeKey, cyReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Memoize the return object so that only reactive state changes (ready, autoFit,

@@ -20,7 +20,7 @@ export default function ReplayButton({ onReplay, disabled, className = '', float
       <button
         onClick={handleClick}
         disabled={disabled}
-        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 px-3 py-1.5 rounded-lg text-xs border border-slate-700 transition-colors flex items-center gap-1.5"
+        className="bg-card dark:bg-slate-800 hover:bg-muted dark:hover:bg-slate-700 disabled:opacity-50 text-foreground dark:text-slate-300 px-3 py-1.5 rounded-lg text-xs border border-border dark:border-slate-700 transition-colors flex items-center gap-1.5"
         title="Replay last session"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useMemo } from 'react';
+import { tokenColor } from '../core/themeColors';
 
 const SPEEDS = [0.5, 1, 2];
 
@@ -77,8 +78,8 @@ export default function ReplayScrubBar({ clock, style }) {
         alignItems: 'center',
         gap: 12,
         padding: '6px 10px',
-        background: '#1f2937',
-        color: '#e5e7eb',
+        background: tokenColor('card', '#1f2937'),
+        color: tokenColor('foreground', '#e5e7eb'),
         borderRadius: 6,
         fontSize: 13,
         ...style,
@@ -90,8 +91,8 @@ export default function ReplayScrubBar({ clock, style }) {
         disabled={!isReady}
         aria-label={paused ? 'Play' : 'Pause'}
         style={{
-          background: '#374151',
-          color: '#e5e7eb',
+          background: tokenColor('muted', '#374151'),
+          color: tokenColor('foreground', '#e5e7eb'),
           border: 'none',
           padding: '4px 10px',
           borderRadius: 4,
@@ -125,8 +126,8 @@ export default function ReplayScrubBar({ clock, style }) {
             key={s}
             onClick={() => setSpeed(s)}
             style={{
-              background: speed === s ? '#0891b2' : '#374151',
-              color: '#e5e7eb',
+              background: speed === s ? tokenColor('primary', '#0891b2') : tokenColor('muted', '#374151'),
+              color: speed === s ? tokenColor('primary-foreground', '#e5e7eb') : tokenColor('foreground', '#e5e7eb'),
               border: 'none',
               padding: '4px 8px',
               borderRadius: 4,

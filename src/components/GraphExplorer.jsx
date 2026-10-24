@@ -57,6 +57,10 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  * @param {*} [props.refreshSignal] - Change it to refetch the graph in the background (no
  *   loading flash, the canvas is diff-merged in place). Hosts bump it on window focus, on a
  *   visible-tab interval and after their own writes (UI-REFRESH-1).
+ * @param {'dark'|'light'} [props.mode='dark'] - The host's resolved colour mode (the design-system
+ *   kit's `useColorMode()`). Drives the canvas label, outline, edge and selection colours; styles
+ *   are rebuilt in place when it changes (no re-layout). Default dark leaves existing consumers
+ *   unchanged until they opt in. An explicit `theme.mode` wins over this prop.
  * @param {Object} [props.theme] - Optional consumer-scoped canvas theme.
  *   When omitted, the default dark semantic palette is used (web/studio/insights).
  *   Applies to nodes/edges only — surrounding chrome stays under consumer CSS.
@@ -95,6 +99,7 @@ export default function GraphExplorer({
   className = '',
   onNodeOpen,
   theme = null,
+  mode = 'dark',
   refreshSignal,
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
@@ -179,7 +184,7 @@ export default function GraphExplorer({
 
   const containerRef = useRef(null);
   const rootRef = useRef(null);
-  const cytoscape = useCytoscape(containerRef, { theme });
+  const cytoscape = useCytoscape(containerRef, { theme, mode });
   const { urlState, saveToUrl, getShareableUrl } = useUrlState();
 
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
@@ -639,14 +644,14 @@ export default function GraphExplorer({
   // Error state
   if (error && nodes.length === 0) {
     return (
-      <div className={`flex items-center justify-center bg-slate-900 ${className || 'h-screen'}`}>
+      <div className={`flex items-center justify-center bg-background dark:bg-slate-900 ${className || 'h-screen'}`}>
         <div className="text-center max-w-md">
-          <div className="text-red-400 text-4xl mb-4">!</div>
-          <p className="text-red-300 font-medium mb-2">Failed to load graph</p>
-          <p className="text-slate-400 text-sm mb-4">{error}</p>
+          <div className="text-red-700 dark:text-red-400 text-4xl mb-4">!</div>
+          <p className="text-red-700 dark:text-red-300 font-medium mb-2">Failed to load graph</p>
+          <p className="text-muted-foreground dark:text-slate-400 text-sm mb-4">{error}</p>
           <button
             onClick={interaction.handleRefresh}
-            className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg transition-colors"
+            className="bg-muted dark:bg-slate-700 hover:bg-accent dark:hover:bg-slate-600 text-foreground dark:text-white px-4 py-2 rounded-lg transition-colors"
           >
             Retry
           </button>
@@ -657,12 +662,12 @@ export default function GraphExplorer({
 
   if (replayNotAvailable) {
     return (
-      <div className={`flex items-center justify-center bg-slate-900 ${className || 'h-screen'}`}>
+      <div className={`flex items-center justify-center bg-background dark:bg-slate-900 ${className || 'h-screen'}`}>
         <div className="text-center max-w-md">
-          <div className="text-slate-400 text-4xl mb-4">&#x231B;</div>
-          <p className="text-slate-200 font-medium mb-2">Recording not available</p>
-          <p className="text-slate-400 text-sm mb-4">
-            This replay link has expired. The stream window for run <code className="text-slate-300">{replayRunId}</code> is no longer available on the server, and no local recording was found.
+          <div className="text-muted-foreground dark:text-slate-400 text-4xl mb-4">&#x231B;</div>
+          <p className="text-foreground dark:text-slate-200 font-medium mb-2">Recording not available</p>
+          <p className="text-muted-foreground dark:text-slate-400 text-sm mb-4">
+            This replay link has expired. The stream window for run <code className="text-foreground dark:text-slate-300">{replayRunId}</code> is no longer available on the server, and no local recording was found.
           </p>
         </div>
       </div>
@@ -676,18 +681,18 @@ export default function GraphExplorer({
       tabIndex={0}
       onKeyDown={handleRootKeyDown}
       onMouseDown={handleRootMouseDown}
-      className={`flex min-w-0 flex-col bg-slate-900 overflow-hidden outline-none ${className || 'h-full w-full'}`}
+      className={`flex min-w-0 flex-col bg-background dark:bg-slate-900 overflow-hidden outline-none ${className || 'h-full w-full'}`}
     >
       {stream.error && (
-        <div role="alert" className="px-4 py-2 text-sm text-red-300 bg-red-950">
+        <div role="alert" className="px-4 py-2 text-sm text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-950">
           Event stream unavailable: {stream.error}
         </div>
       )}
       {loading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/80 pointer-events-none">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 dark:bg-slate-900/80 pointer-events-none">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
-            <p className="text-slate-400">Loading knowledge graph...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-300 dark:border-blue-500 mx-auto mb-4" />
+            <p className="text-muted-foreground dark:text-slate-400">Loading knowledge graph...</p>
           </div>
         </div>
       )}
@@ -773,9 +778,9 @@ export default function GraphExplorer({
 
       {/* Multi-hop replay indicator */}
       {multiHop.replayState !== 'idle' && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-900/90 border border-cyan-600 text-cyan-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-3">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-100 dark:bg-cyan-900/90 border border-cyan-300 dark:border-cyan-600 text-cyan-700 dark:text-cyan-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-3">
           {multiHop.replayState === 'playing' && (
-            <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+            <div className="w-3 h-3 border-2 border-cyan-300 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
           )}
           <div className="flex items-center gap-2">
             {/* One dot per FRAME, not per HOP_COLORS entry — a 6-hop replay cycles
@@ -803,14 +808,14 @@ export default function GraphExplorer({
               {multiHop.replayMode === 'retrieval' && hasHopGroups && (
                 <button
                   onClick={replayHopGroups}
-                  className="ml-2 text-xs text-cyan-400 hover:text-white underline"
+                  className="ml-2 text-xs text-cyan-700 dark:text-cyan-400 hover:text-foreground dark:hover:text-white underline"
                 >
                   Replay
                 </button>
               )}
               <button
                 onClick={multiHop.stopReplay}
-                className="ml-2 text-xs text-cyan-400 hover:text-white underline"
+                className="ml-2 text-xs text-cyan-700 dark:text-cyan-400 hover:text-foreground dark:hover:text-white underline"
               >
                 Reset
               </button>
@@ -820,21 +825,21 @@ export default function GraphExplorer({
       )}
 
       {interaction.timeTravelLoading && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-purple-900/90 border border-purple-600 text-purple-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-2">
-          <div className="w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-purple-100 dark:bg-purple-900/90 border border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-2">
+          <div className="w-3 h-3 border-2 border-purple-300 dark:border-purple-400 border-t-transparent rounded-full animate-spin" />
           Loading temporal snapshot...
         </div>
       )}
 
       {interaction.asOfTime && !interaction.timeTravelLoading && (
-        <div className="absolute top-16 right-4 bg-purple-900/80 border border-purple-600 text-purple-200 px-3 py-1.5 rounded-lg text-xs z-50">
+        <div className="absolute top-16 right-4 bg-purple-100 dark:bg-purple-900/80 border border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-200 px-3 py-1.5 rounded-lg text-xs z-50">
           Viewing: {new Date(interaction.asOfTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
         </div>
       )}
 
       {/* Pipeline stage indicator — live ingestion + replay */}
       {currentStage && (
-        <div className="absolute bottom-16 left-4 z-50 bg-slate-900/90 border border-yellow-700/60 text-yellow-300 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 pointer-events-none">
+        <div className="absolute bottom-16 left-4 z-50 bg-background/90 dark:bg-slate-900/90 border border-yellow-300 dark:border-yellow-700/60 text-yellow-700 dark:text-yellow-300 px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5 pointer-events-none">
           <span className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse flex-shrink-0" />
           {currentStage.name.replace(/_/g, ' ')}
           {currentStage.durationMs != null && (
@@ -845,7 +850,7 @@ export default function GraphExplorer({
 
       {/* Replay controls */}
       {dripFeed.isReplaying && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 bg-cyan-900/90 border border-cyan-700 text-cyan-200 px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 bg-cyan-100 dark:bg-cyan-900/90 border border-cyan-300 dark:border-cyan-700 text-cyan-700 dark:text-cyan-200 px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
           <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
           Replaying recording...
           <button
@@ -854,21 +859,21 @@ export default function GraphExplorer({
               dripFeed.dripTimersRef.current = [];
               dripFeed.setIsReplaying(false);
             }}
-            className="ml-2 text-cyan-400 hover:text-cyan-200"
+            className="ml-2 text-cyan-700 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-200"
           >
             Stop
           </button>
         </div>
       )}
       {!hideSelectionToolbar && cytoscape.selectedNodeIds.size > 0 && (
-        <div className="absolute bottom-16 right-4 z-50 flex items-center gap-2 bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 shadow-lg">
-          <span className="text-slate-300 text-xs">{cytoscape.selectedNodeIds.size} selected</span>
-          <div className="w-px h-4 bg-slate-600" />
+        <div className="absolute bottom-16 right-4 z-50 flex items-center gap-2 bg-card dark:bg-slate-800 border border-input dark:border-slate-600 rounded-lg px-3 py-1.5 shadow-lg">
+          <span className="text-foreground dark:text-slate-300 text-xs">{cytoscape.selectedNodeIds.size} selected</span>
+          <div className="w-px h-4 bg-accent dark:bg-slate-600" />
           <button
             type="button"
             onClick={() => cytoscape.setMoveMode(!cytoscape.moveMode)}
             className={`text-xs font-medium transition-colors ${
-              cytoscape.moveMode ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'
+              cytoscape.moveMode ? 'text-blue-700 dark:text-blue-400' : 'text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200'
             }`}
             title="Drag to move selected nodes as a group"
           >
@@ -877,7 +882,7 @@ export default function GraphExplorer({
           <button
             type="button"
             onClick={cytoscape.isolateSelected}
-            className="text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors"
+            className="text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 text-xs font-medium transition-colors"
             title="Show only selected nodes, hide everything else"
           >
             Isolate
@@ -885,7 +890,7 @@ export default function GraphExplorer({
           <button
             type="button"
             onClick={requestDelete}
-            className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+            className="text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs font-medium transition-colors"
           >
             Delete
           </button>
@@ -895,7 +900,7 @@ export default function GraphExplorer({
               cytoscape.setMoveMode(false);
               cytoscape.cy.current?.elements().unselect();
             }}
-            className="text-slate-500 hover:text-slate-300 text-xs transition-colors"
+            className="text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300 text-xs transition-colors"
           >
             ✕
           </button>
@@ -908,14 +913,14 @@ export default function GraphExplorer({
           aria-label="Confirm delete"
           data-testid="graph-delete-confirm-dialog"
           onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); closePendingDelete(); } }}
-          className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-slate-800 border border-red-700 text-slate-200 px-4 py-2 rounded-lg text-sm shadow-lg"
+          className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-card dark:bg-slate-800 border border-red-300 dark:border-red-700 text-foreground dark:text-slate-200 px-4 py-2 rounded-lg text-sm shadow-lg"
         >
           <span>{pendingDelete.message}</span>
           <button
             type="button"
             data-testid="graph-delete-confirm"
             onClick={confirmPendingDelete}
-            className="text-red-400 hover:text-red-300 font-medium"
+            className="text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium"
           >
             Delete
           </button>
@@ -924,29 +929,29 @@ export default function GraphExplorer({
             data-testid="graph-delete-cancel"
             autoFocus
             onClick={closePendingDelete}
-            className="text-slate-400 hover:text-slate-200"
+            className="text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200"
           >
             Cancel
           </button>
         </div>
       )}
       {deleteFailure && (
-        <div role="alert" data-testid="graph-delete-failure" className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-950 border border-red-700 text-red-200 px-4 py-2 rounded-lg text-sm shadow-lg">
+        <div role="alert" data-testid="graph-delete-failure" className="absolute bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm shadow-lg">
           <span>
             {deleteFailure.message
               || `Could not delete ${deleteFailure.failed} of ${deleteFailure.total} ${deleteFailure.total === 1 ? 'item' : 'items'}. ${deleteFailure.failed === 1 ? 'It is' : 'They are'} still in the graph.`}
           </span>
-          <button type="button" onClick={() => setDeleteFailure(null)} className="text-red-400 hover:text-red-200 underline">
+          <button type="button" onClick={() => setDeleteFailure(null)} className="text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-200 underline">
             Dismiss
           </button>
         </div>
       )}
       {cytoscape.isolated && (
-        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-indigo-900/90 border border-indigo-600 text-indigo-200 px-4 py-1.5 rounded-lg text-xs font-medium">
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-indigo-100 dark:bg-indigo-900/90 border border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-200 px-4 py-1.5 rounded-lg text-xs font-medium">
           Isolated view
           <button
             onClick={cytoscape.clearIsolation}
-            className="ml-1 text-indigo-400 hover:text-indigo-200 underline"
+            className="ml-1 text-indigo-700 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200 underline"
           >
             Show all
           </button>
@@ -974,23 +979,23 @@ export default function GraphExplorer({
       )}
 
       {interaction.pathMode && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-900/90 border border-amber-600 text-amber-200 px-4 py-2 rounded-lg text-sm z-50">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-100 dark:bg-amber-900/90 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-200 px-4 py-2 rounded-lg text-sm z-50">
           Click the START node
-          <button onClick={interaction.handlePathMode} className="ml-3 text-amber-400 hover:text-amber-300 underline">Cancel</button>
+          <button onClick={interaction.handlePathMode} className="ml-3 text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline">Cancel</button>
         </div>
       )}
 
       {cytoscape.selectionMode && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-blue-900/90 border border-blue-600 text-blue-200 px-4 py-2 rounded-lg text-sm z-50">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-blue-100 dark:bg-blue-900/90 border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-200 px-4 py-2 rounded-lg text-sm z-50">
           Selection mode — click or drag to select nodes, then Delete to remove
-          <button onClick={() => cytoscape.setSelectionMode(false)} className="ml-3 text-blue-400 hover:text-blue-300 underline">Exit</button>
+          <button onClick={() => cytoscape.setSelectionMode(false)} className="ml-3 text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline">Exit</button>
         </div>
       )}
 
       {interaction.pathResult?.error && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-900/90 border border-red-600 text-red-200 px-4 py-2 rounded-lg text-sm z-50">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-100 dark:bg-red-900/90 border border-red-300 dark:border-red-600 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm z-50">
           {interaction.pathResult.error}
-          <button onClick={() => interaction.setPathResult(null)} className="ml-3 text-red-400 hover:text-red-300 underline">Dismiss</button>
+          <button onClick={() => interaction.setPathResult(null)} className="ml-3 text-red-700 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline">Dismiss</button>
         </div>
       )}
     </div>

@@ -56,12 +56,12 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
   const hasMore = edges.length > edgesShown;
 
   return (
-    <div className="w-72 h-full bg-slate-800 border-l border-slate-700 overflow-y-auto shrink-0 flex flex-col shadow-2xl">
-      <div className="flex items-center justify-between p-3 border-b border-slate-700">
-        <span className="text-sm font-medium text-slate-200">Node Details</span>
+    <div className="w-72 h-full bg-card dark:bg-slate-800 border-l border-border dark:border-slate-700 overflow-y-auto shrink-0 flex flex-col shadow-2xl">
+      <div className="flex items-center justify-between p-3 border-b border-border dark:border-slate-700">
+        <span className="text-sm font-medium text-foreground dark:text-slate-200">Node Details</span>
         <button
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-300 transition-colors"
+          className="text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -80,7 +80,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
               <div className="relative">
                 <button
                   onClick={() => corrections.setTypeDropdownOpen(!corrections.typeDropdownOpen)}
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize cursor-pointer hover:ring-1 hover:ring-white/20 transition-all ${corrections.typeSaved ? 'ring-2 ring-green-500' : ''}`}
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize cursor-pointer hover:ring-1 hover:ring-border dark:hover:ring-white/20 transition-all ${corrections.typeSaved ? 'ring-2 ring-green-300 dark:ring-green-500' : ''}`}
                   style={{ backgroundColor: color + '20', color }}
                   title="Click to change entity type"
                 >
@@ -92,27 +92,27 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
 
                 {/* Type dropdown */}
                 {corrections.typeDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 z-50 w-40 bg-slate-900 border border-slate-600 rounded-lg shadow-xl overflow-hidden">
+                  <div className="absolute top-full left-0 mt-1 z-50 w-40 bg-background dark:bg-slate-900 border border-input dark:border-slate-600 rounded-lg shadow-xl overflow-hidden">
                     <div className="max-h-48 overflow-y-auto">
                       {ENTITY_TYPES.map((t) => (
                         <button
                           key={t}
                           onClick={() => corrections.handleTypeChange(t)}
-                          className={`w-full text-left px-3 py-1.5 text-xs capitalize hover:bg-slate-700 transition-colors ${t === node.type ? 'text-blue-400 font-medium' : 'text-slate-300'}`}
+                          className={`w-full text-left px-3 py-1.5 text-xs capitalize hover:bg-muted dark:hover:bg-slate-700 transition-colors ${t === node.type ? 'text-blue-700 dark:text-blue-400 font-medium' : 'text-foreground dark:text-slate-300'}`}
                         >
                           {t}
                         </button>
                       ))}
                     </div>
                     {/* Custom type input */}
-                    <div className="border-t border-slate-700 p-2">
+                    <div className="border-t border-border dark:border-slate-700 p-2">
                       <input
                         type="text"
                         value={corrections.customType}
                         onChange={(e) => corrections.setCustomType(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && corrections.customType.trim()) corrections.handleTypeChange(corrections.customType.trim().toLowerCase()); }}
                         placeholder="Custom type..."
-                        className="w-full text-xs px-2 py-1 bg-slate-800 border border-slate-600 rounded text-slate-300 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                        className="w-full text-xs px-2 py-1 bg-card dark:bg-slate-800 border border-input dark:border-slate-600 rounded text-foreground dark:text-slate-300 placeholder-muted-foreground dark:placeholder-slate-500 focus:outline-none focus:border-blue-300 dark:focus:border-blue-500"
                       />
                     </div>
                   </div>
@@ -128,7 +128,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             )}
 
             {node.category && node.category !== node.type && (
-              <span className="text-xs text-slate-500">({node.category})</span>
+              <span className="text-xs text-muted-foreground dark:text-slate-500">({node.category})</span>
             )}
           </div>
 
@@ -141,11 +141,11 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
               onChange={(e) => corrections.setLabelValue(e.target.value)}
               onBlur={corrections.handleLabelSave}
               onKeyDown={(e) => { if (e.key === 'Enter') corrections.handleLabelSave(); if (e.key === 'Escape') corrections.setEditingLabel(false); }}
-              className="text-sm font-medium text-slate-100 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 w-full focus:outline-none focus:border-blue-500"
+              className="text-sm font-medium text-foreground dark:text-slate-100 bg-background dark:bg-slate-900 border border-input dark:border-slate-600 rounded px-1.5 py-0.5 w-full focus:outline-none focus:border-blue-300 dark:focus:border-blue-500"
             />
           ) : (
             <h2
-              className={`text-sm font-medium text-slate-100 break-words ${isEntity ? 'cursor-pointer hover:bg-slate-700/50 rounded px-1 -mx-1 transition-colors' : ''} ${corrections.labelSaved ? 'ring-1 ring-green-500 rounded' : ''}`}
+              className={`text-sm font-medium text-foreground dark:text-slate-100 break-words ${isEntity ? 'cursor-pointer hover:bg-muted/50 dark:hover:bg-slate-700/50 rounded px-1 -mx-1 transition-colors' : ''} ${corrections.labelSaved ? 'ring-1 ring-green-300 dark:ring-green-500 rounded' : ''}`}
               onClick={() => {
                 if (isEntity) {
                   corrections.setLabelValue(node.label);
@@ -165,14 +165,14 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             {corrections.grounding.grounded ? (
               <div className="flex items-center gap-1.5 text-xs">
                 <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                <span className="text-green-400 font-medium">Grounded</span>
+                <span className="text-green-700 dark:text-green-400 font-medium">Grounded</span>
                 {corrections.grounding.wikipedia?.url && (
                   <div className="flex items-center gap-1 ml-auto">
                     <a
                       href={corrections.grounding.wikipedia.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 transition-colors"
+                      className="text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       title={corrections.grounding.wikipedia.title || 'Wikipedia'}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -181,7 +181,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                     </a>
                     <button
                       onClick={corrections.handleUnground}
-                      className="text-red-400/60 hover:text-red-400 transition-colors"
+                      className="text-red-700 dark:text-red-400/60 hover:text-red-700 dark:hover:text-red-400 transition-colors"
                       title="Remove grounding"
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -195,7 +195,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
               <button
                 onClick={corrections.handleGround}
                 disabled={corrections.wikiLoading}
-                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-purple-600/20 text-purple-400 border border-purple-600/30 rounded hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-purple-600/20 text-purple-700 dark:text-purple-400 border border-purple-300 dark:border-purple-600/30 rounded hover:bg-purple-600/30 disabled:opacity-40 transition-colors"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -221,11 +221,11 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           <button
             onClick={() => onExpand(node.id)}
             disabled={expanding}
-            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-blue-600/20 text-blue-400 border border-blue-600/30 rounded-lg hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-blue-600/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-600/30 rounded-lg hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {expanding ? (
               <>
-                <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3 h-3 border-2 border-blue-300 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
                 Expanding...
               </>
             ) : (
@@ -244,11 +244,11 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           <button
             onClick={() => onHopReplay(node.id)}
             disabled={hopReplayState === 'playing'}
-            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-cyan-600/20 text-cyan-400 border border-cyan-600/30 rounded-lg hover:bg-cyan-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-cyan-600/20 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-600/30 rounded-lg hover:bg-cyan-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {hopReplayState === 'playing' ? (
               <>
-                <div className="w-3 h-3 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-3 h-3 border-2 border-cyan-300 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
                 Replaying hops...
               </>
             ) : (
@@ -266,13 +266,13 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         {node.content && (
           <section>
             <div className="flex items-center gap-1.5 mb-1">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Content</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider">Content</h3>
               {corrections.grounding?.grounded && corrections.grounding.wikipedia?.url && (
                 <a
                   href={corrections.grounding.wikipedia.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 transition-colors ml-auto"
+                  className="text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors ml-auto"
                   title={`Wikipedia: ${corrections.grounding.wikipedia.title || ''}`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -281,7 +281,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                 </a>
               )}
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-slate-900/50 rounded p-2">
+            <p className="text-xs text-foreground dark:text-slate-300 leading-relaxed whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-background/50 dark:bg-slate-900/50 rounded p-2">
               {node.content}
             </p>
           </section>
@@ -300,7 +300,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         {/* Connected Edges */}
         {edges.length > 0 && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">
+            <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider mb-1">
               Connections ({edges.length})
             </h3>
             <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -313,11 +313,11 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                 return (
                   <div
                     key={edge.id}
-                    className="flex items-center gap-1.5 text-xs py-1 px-2 bg-slate-900/50 rounded"
+                    className="flex items-center gap-1.5 text-xs py-1 px-2 bg-background/50 dark:bg-slate-900/50 rounded"
                   >
-                    <span className="text-slate-500">{direction}</span>
-                    <span className="text-blue-400 font-medium truncate">{edge.label}</span>
-                    <span className="text-slate-500 truncate ml-auto" title={otherId}>
+                    <span className="text-muted-foreground dark:text-slate-500">{direction}</span>
+                    <span className="text-blue-700 dark:text-blue-400 font-medium truncate">{edge.label}</span>
+                    <span className="text-muted-foreground dark:text-slate-500 truncate ml-auto" title={otherId}>
                       {edge._otherLabel || (otherId.length > 16 ? otherId.substring(0, 16) + '...' : otherId)}
                     </span>
                   </div>
@@ -326,7 +326,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
               {hasMore && (
                 <button
                   onClick={() => setEdgesShown((prev) => prev + EDGES_PAGE_SIZE)}
-                  className="w-full text-center text-xs text-blue-400 hover:text-blue-300 py-1 transition-colors"
+                  className="w-full text-center text-xs text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 py-1 transition-colors"
                 >
                   Show more ({edges.length - edgesShown} remaining)
                 </button>
@@ -337,16 +337,16 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
 
         {/* ID */}
         <section>
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">ID</h3>
-          <p className="text-xs text-slate-500 font-mono break-all select-all">{node.id}</p>
+          <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider mb-1">ID</h3>
+          <p className="text-xs text-muted-foreground dark:text-slate-500 font-mono break-all select-all">{node.id}</p>
         </section>
 
         {/* Confidence */}
         {node.confidence != null && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Confidence</h3>
+            <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider mb-1">Confidence</h3>
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+              <div className="flex-1 h-1.5 bg-muted dark:bg-slate-700 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
@@ -355,7 +355,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                   }}
                 />
               </div>
-              <span className="text-xs text-slate-400">{(node.confidence * 100).toFixed(0)}%</span>
+              <span className="text-xs text-muted-foreground dark:text-slate-400">{(node.confidence * 100).toFixed(0)}%</span>
             </div>
           </section>
         )}
@@ -365,22 +365,22 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             (the field is absent, not unset). Hide the section for entities entirely. */}
         {node.origin && !isEntity && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Origin</h3>
+            <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider mb-1">Origin</h3>
             <div className="flex items-center gap-2">
               {(() => {
                 const borderColor = getOriginBorderColor(node.origin);
                 if (node.origin === 'unknown') {
-                  return <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0 border border-dashed border-red-500" />;
+                  return <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0 border border-dashed border-red-300 dark:border-red-500" />;
                 }
                 return borderColor
                   ? <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: borderColor }} />
                   : null;
               })()}
-              <span className={`text-xs font-mono ${node.origin === 'unknown' ? 'text-red-400' : 'text-slate-300'}`}>
+              <span className={`text-xs font-mono ${node.origin === 'unknown' ? 'text-red-700 dark:text-red-400' : 'text-foreground dark:text-slate-300'}`}>
                 {node.origin}
               </span>
             </div>
-            <div className={`text-[10px] mt-0.5 ${node.origin === 'unknown' ? 'text-red-500/70' : 'text-slate-500'}`}>
+            <div className={`text-[10px] mt-0.5 ${node.origin === 'unknown' ? 'text-red-700 dark:text-red-500/70' : 'text-muted-foreground dark:text-slate-500'}`}>
               {node.origin === 'unknown'
                 ? 'Untagged write path'
                 : getTierLabel(getOriginTier(node.origin))}
@@ -391,8 +391,8 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         {/* Timestamps */}
         {(created || updated) && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Timestamps</h3>
-            <div className="space-y-1 text-xs text-slate-400">
+            <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider mb-1">Timestamps</h3>
+            <div className="space-y-1 text-xs text-muted-foreground dark:text-slate-400">
               {created && <p>Created: {created}</p>}
               {updated && <p>Updated: {updated}</p>}
             </div>
@@ -402,8 +402,8 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         {/* Metadata */}
         {node.metadata && Object.keys(node.metadata).length > 0 && (
           <section>
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Metadata</h3>
-            <div className="bg-slate-900/50 rounded p-2 text-xs text-slate-300 font-mono overflow-x-auto max-h-48 overflow-y-auto">
+            <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider mb-1">Metadata</h3>
+            <div className="bg-background/50 dark:bg-slate-900/50 rounded p-2 text-xs text-foreground dark:text-slate-300 font-mono overflow-x-auto max-h-48 overflow-y-auto">
               <pre>{JSON.stringify(node.metadata, null, 2)}</pre>
             </div>
           </section>
@@ -412,10 +412,10 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
 
       {/* Footer — destructive actions */}
       {onDelete && (
-        <div className="border-t border-slate-700 p-3 bg-slate-800 shrink-0">
+        <div className="border-t border-border dark:border-slate-700 p-3 bg-card dark:bg-slate-800 shrink-0">
           {confirmDelete ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-300 flex-1">Delete this node?</span>
+              <span className="text-xs text-foreground dark:text-slate-300 flex-1">Delete this node?</span>
               <button
                 type="button"
                 disabled={deleting}
@@ -431,7 +431,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                 type="button"
                 disabled={deleting}
                 onClick={() => setConfirmDelete(false)}
-                className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                className="px-2 py-1 text-xs text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 transition-colors"
               >
                 Cancel
               </button>
@@ -440,7 +440,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="w-full px-3 py-1.5 text-xs font-medium text-red-400 hover:text-white hover:bg-red-600/80 border border-red-600/40 hover:border-red-500 rounded transition-colors"
+              className="w-full px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:text-foreground dark:hover:text-white hover:bg-red-600/80 border border-red-300 dark:border-red-600/40 hover:border-red-300 dark:hover:border-red-500 rounded transition-colors"
               title="Delete this node from the graph"
             >
               Delete Node

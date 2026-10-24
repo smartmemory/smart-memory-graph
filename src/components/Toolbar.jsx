@@ -61,19 +61,19 @@ export default function Toolbar({
   }, [cy]);
 
   return (
-    <div ref={toolbarRef} data-testid="graph-toolbar" className="h-12 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2 shrink-0 z-40">
+    <div ref={toolbarRef} data-testid="graph-toolbar" className="h-12 bg-card dark:bg-slate-800 border-b border-border dark:border-slate-700 flex items-center px-4 gap-2 shrink-0 z-40">
       {/* App title */}
       <div className="flex items-center gap-2 mr-4">
         <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs font-bold text-white">G</div>
-        <span className="text-slate-200 font-medium text-sm hidden sm:inline">Graph Viewer</span>
+        <span className="text-foreground dark:text-slate-200 font-medium text-sm hidden sm:inline">Graph Viewer</span>
       </div>
 
-      <div className="w-px h-6 bg-slate-700" />
+      <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
       {/* Filter toggle */}
       <button
         onClick={onToggleFilters}
-        className="px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors"
+        className="px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors"
         title="Toggle filters"
       >
         Filters
@@ -83,19 +83,19 @@ export default function Toolbar({
       <div className="relative">
         <button
           onClick={() => { setLayoutOpen(!layoutOpen); setExportOpen(false); }}
-          className="px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors flex items-center gap-1"
+          className="px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors flex items-center gap-1"
         >
           Layout
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
         </button>
         {layoutOpen && (
-          <div className="absolute top-full left-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-xl py-1 min-w-[160px] z-50">
+          <div className="absolute top-full left-0 mt-1 bg-muted dark:bg-slate-700 border border-input dark:border-slate-600 rounded-lg shadow-xl py-1 min-w-[160px] z-50">
             {LAYOUT_OPTIONS.map((l) => (
               <button
                 key={l.id}
                 onClick={() => { onLayoutChange(l.id); setLayoutOpen(false); }}
                 className={`block w-full text-left px-3 py-1.5 text-sm transition-colors ${
-                  layout === l.id ? 'text-blue-400 bg-slate-600' : 'text-slate-300 hover:text-white hover:bg-slate-600'
+                  layout === l.id ? 'text-blue-700 dark:text-blue-400 bg-accent dark:bg-slate-600' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-slate-600'
                 }`}
               >
                 {l.label}
@@ -105,17 +105,17 @@ export default function Toolbar({
         )}
       </div>
 
-      <div className="w-px h-6 bg-slate-700" />
+      <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
       {/* Zoom controls */}
       <div className="flex items-center gap-1">
-        <button onClick={onZoomOut} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom out">
+        <button onClick={onZoomOut} className="p-1.5 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors" title="Zoom out">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
         </button>
-        <button onClick={onFitToScreen} className="px-2 py-1 text-xs text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Fit to screen">
+        <button onClick={onFitToScreen} className="px-2 py-1 text-xs text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors" title="Fit to screen">
           Fit
         </button>
-        <button onClick={onZoomIn} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors" title="Zoom in">
+        <button onClick={onZoomIn} className="p-1.5 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors" title="Zoom in">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
         </button>
         <label className="flex items-center gap-1 ml-1 cursor-pointer" title="Auto-fit graph to viewport on resize">
@@ -123,13 +123,13 @@ export default function Toolbar({
             type="checkbox"
             checked={autoFit}
             onChange={(e) => onAutoFitChange?.(e.target.checked)}
-            className="w-3.5 h-3.5 rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+            className="w-3.5 h-3.5 rounded border-input dark:border-slate-500 bg-muted dark:bg-slate-700 text-blue-700 dark:text-blue-500 focus:ring-blue-300 dark:focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
           />
-          <span className="text-xs text-slate-400 select-none">Auto</span>
+          <span className="text-xs text-muted-foreground dark:text-slate-400 select-none">Auto</span>
         </label>
       </div>
 
-      <div className="w-px h-6 bg-slate-700" />
+      <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
       {/* Path finder */}
       <button
@@ -137,7 +137,7 @@ export default function Toolbar({
         data-testid="graph-path-button"
         aria-pressed={!!pathMode}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${
-          pathMode ? 'bg-amber-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          pathMode ? 'bg-amber-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
         }`}
         title="Find shortest path between two nodes"
       >
@@ -148,30 +148,30 @@ export default function Toolbar({
       <div className="relative">
         <button
           onClick={() => { setExportOpen(!exportOpen); setLayoutOpen(false); }}
-          className="px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors flex items-center gap-1"
+          className="px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors flex items-center gap-1"
         >
           Export
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
         </button>
         {exportOpen && (
-          <div className="absolute top-full left-0 mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-xl py-1 min-w-[120px] z-50">
-            <button onClick={() => handleExport('png')} className="block w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-600 transition-colors">
+          <div className="absolute top-full left-0 mt-1 bg-muted dark:bg-slate-700 border border-input dark:border-slate-600 rounded-lg shadow-xl py-1 min-w-[120px] z-50">
+            <button onClick={() => handleExport('png')} className="block w-full text-left px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-slate-600 transition-colors">
               PNG (2x)
             </button>
-            <button onClick={() => handleExport('svg')} className="block w-full text-left px-3 py-1.5 text-sm text-slate-300 hover:text-white hover:bg-slate-600 transition-colors">
+            <button onClick={() => handleExport('svg')} className="block w-full text-left px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-slate-600 transition-colors">
               SVG
             </button>
           </div>
         )}
       </div>
 
-      <div className="w-px h-6 bg-slate-700" />
+      <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
       {/* Time Travel */}
       <button
         onClick={onToggleTimeTravelSlider}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${
-          timeTravelActive ? 'bg-purple-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          timeTravelActive ? 'bg-purple-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
         }`}
         title="Time travel — view graph at a past point in time"
       >
@@ -186,7 +186,7 @@ export default function Toolbar({
         <button
           onClick={() => onToggleContradictionOverlay(!contradictionOverlay)}
           className={`px-3 py-1.5 text-sm rounded transition-colors ${
-            contradictionOverlay ? 'bg-red-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+            contradictionOverlay ? 'bg-red-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
           }`}
           title="Highlight conflicting decisions on the canvas"
           data-testid="toolbar-contradiction-overlay"
@@ -207,7 +207,7 @@ export default function Toolbar({
           }
         }}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${
-          linkCopied ? 'bg-green-600 text-white' : 'text-slate-300 hover:text-white hover:bg-slate-700'
+          linkCopied ? 'bg-green-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
         }`}
         title="Copy shareable link to clipboard"
       >
@@ -221,7 +221,7 @@ export default function Toolbar({
       <div className="flex-1" />
 
       {/* Stats */}
-      <div className="flex items-center gap-3 text-xs text-slate-500">
+      <div className="flex items-center gap-3 text-xs text-muted-foreground dark:text-slate-500">
         <span>{stats.nodes} nodes</span>
         <span>{stats.edges} edges</span>
       </div>
@@ -235,14 +235,14 @@ export default function Toolbar({
             onChange={onToggleOriginLegend}
             className="accent-blue-500 w-3 h-3"
           />
-          <span className="text-xs text-slate-400">Legend</span>
+          <span className="text-xs text-muted-foreground dark:text-slate-400">Legend</span>
         </label>
       )}
 
       {/* Refresh */}
       <button
         onClick={onRefresh}
-        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+        className="p-1.5 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors"
         title="Refresh graph"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
@@ -251,7 +251,7 @@ export default function Toolbar({
       {/* Fullscreen */}
       <button
         onClick={onToggleFullscreen}
-        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+        className="p-1.5 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors"
         title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Enter fullscreen'}
       >
         {isFullscreen ? (

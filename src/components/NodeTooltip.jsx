@@ -7,14 +7,14 @@ export default function NodeTooltip({ node, position }) {
 
   return (
     <div
-      className="absolute z-50 pointer-events-none bg-slate-800 border border-slate-600 rounded-lg shadow-xl px-3 py-2 max-w-[240px]"
+      className="absolute z-50 pointer-events-none bg-card dark:bg-slate-800 border border-input dark:border-slate-600 rounded-lg shadow-xl px-3 py-2 max-w-[240px]"
       style={{ left: position.x + 12, top: position.y - 8 }}
     >
       <div className="flex items-center gap-2 mb-1">
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-        <span className="text-xs font-medium text-slate-100 truncate">{node.label}</span>
+        <span className="text-xs font-medium text-foreground dark:text-slate-100 truncate">{node.label}</span>
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-slate-400">
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground dark:text-slate-400">
         <span className="capitalize" style={{ color }}>{node.type}</span>
         {node.confidence != null && (
           <>
@@ -24,7 +24,7 @@ export default function NodeTooltip({ node, position }) {
         )}
       </div>
       {node.content && (
-        <p className="text-[10px] text-slate-500 mt-1 line-clamp-2">{node.content}</p>
+        <p className="text-[10px] text-muted-foreground dark:text-slate-500 mt-1 line-clamp-2">{node.content}</p>
       )}
     </div>
   );

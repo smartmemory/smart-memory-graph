@@ -17,6 +17,7 @@ import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
 import { usePipelineDag } from '../hooks/usePipelineDag';
 import { UI_STATES } from '../core/pipelineDagState';
+import { tokenColor } from '../core/themeColors';
 
 let _dagreRegistered = false;
 function ensureDagre() {
@@ -308,7 +309,7 @@ export default function PipelineDag({
       style={{ width: '100%', height: '100%', minHeight: 200, ...style }}
     >
       {error && (
-        <div role="alert" style={{ color: '#f87171', padding: 8, fontSize: 12 }}>
+        <div role="alert" style={{ color: tokenColor('danger', '#f87171'), padding: 8, fontSize: 12 }}>
           Pipeline DAG stream error: {String(error?.message || error)}
         </div>
       )}

@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 
 const CATEGORY_ICONS = {
-  node_added: { icon: '\u25CF', color: 'text-green-400' },    // filled circle
-  edge_added: { icon: '\u2192', color: 'text-blue-400' },     // right arrow
-  node_removed: { icon: '\u25CB', color: 'text-red-400' },    // empty circle
-  pipeline_stage: { icon: '\u25D0', color: 'text-yellow-400' }, // half circle
-  search_highlight: { icon: '\uD83D\uDD0D', color: 'text-purple-400' }, // magnifying glass
-  ingest_started: { icon: '\u2295', color: 'text-slate-400' }, // circled plus
-  graph_cleared: { icon: '\u2716', color: 'text-red-400' },   // heavy X
+  node_added: { icon: '\u25CF', color: 'text-green-700 dark:text-green-400' },    // filled circle
+  edge_added: { icon: '\u2192', color: 'text-blue-700 dark:text-blue-400' },     // right arrow
+  node_removed: { icon: '\u25CB', color: 'text-red-700 dark:text-red-400' },    // empty circle
+  pipeline_stage: { icon: '\u25D0', color: 'text-yellow-700 dark:text-yellow-400' }, // half circle
+  search_highlight: { icon: '\uD83D\uDD0D', color: 'text-purple-700 dark:text-purple-400' }, // magnifying glass
+  ingest_started: { icon: '\u2295', color: 'text-muted-foreground dark:text-slate-400' }, // circled plus
+  graph_cleared: { icon: '\u2716', color: 'text-red-700 dark:text-red-400' },   // heavy X
 };
 
 const STATUS_COLORS = {
@@ -81,7 +81,7 @@ export default function OperationsBar({
   return (
     <div
       data-testid="graph-operations-bar"
-      className="bg-slate-800 border-t border-slate-700 flex px-3 gap-3 shrink-0 text-xs transition-all duration-200"
+      className="bg-card dark:bg-slate-800 border-t border-border dark:border-slate-700 flex px-3 gap-3 shrink-0 text-xs transition-all duration-200"
       style={{ height }}
     >
       {/* Left column: status + controls (vertically centered) */}
@@ -89,7 +89,7 @@ export default function OperationsBar({
         {/* Status indicator */}
         <div className="flex items-center gap-2">
           <div data-testid="graph-ops-status-dot" data-status={status} className={`w-2 h-2 rounded-full ${STATUS_COLORS[status] || STATUS_COLORS.disconnected}`} />
-          <span data-testid="graph-ops-rate" className="text-slate-400 tabular-nums w-16">
+          <span data-testid="graph-ops-rate" className="text-muted-foreground dark:text-slate-400 tabular-nums w-16">
             {status === 'connected' ? `${opsPerSecond} ops/s` : status}
           </span>
         </div>
@@ -98,14 +98,14 @@ export default function OperationsBar({
         <div className="flex items-center gap-1">
           <button
             onClick={isPaused ? onResume : onPause}
-            className="text-slate-400 hover:text-slate-200 transition-colors px-1 py-0.5 rounded hover:bg-slate-700"
+            className="text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 transition-colors px-1 py-0.5 rounded hover:bg-muted dark:hover:bg-slate-700"
             title={isPaused ? 'Resume live feed' : 'Pause live feed'}
           >
             {isPaused ? '\u25B6' : '\u23F8'}
           </button>
           <button
             onClick={toggleExpand}
-            className="text-slate-400 hover:text-slate-200 transition-colors px-1 py-0.5 rounded hover:bg-slate-700"
+            className="text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-slate-200 transition-colors px-1 py-0.5 rounded hover:bg-muted dark:hover:bg-slate-700"
             title={isExpanded ? `Showing ${expandedRows} rows (click to ${expandedRows >= MAX_ROWS ? 'collapse' : 'expand'})` : 'Expand event bar'}
           >
             {expandedRows >= MAX_ROWS ? '\u25BC' : '\u25B2'}
@@ -116,7 +116,7 @@ export default function OperationsBar({
       {/* Speed control */}
       {dripInterval != null && (
         <div className="flex flex-col justify-center gap-0.5 shrink-0 py-1">
-          <span className="text-slate-500 text-[10px] leading-none">Speed</span>
+          <span className="text-muted-foreground dark:text-slate-500 text-[10px] leading-none">Speed</span>
           <div className="flex items-center gap-1">
             <input
               type="range"
@@ -128,13 +128,13 @@ export default function OperationsBar({
               className="w-16 h-1 accent-cyan-500 cursor-pointer"
               title={`${dripInterval}ms per element`}
             />
-            <span className="text-slate-400 tabular-nums w-10 text-[10px]">{dripInterval}ms</span>
+            <span className="text-muted-foreground dark:text-slate-400 tabular-nums w-10 text-[10px]">{dripInterval}ms</span>
           </div>
         </div>
       )}
 
       {/* Divider */}
-      <div className="w-px bg-slate-700 shrink-0 my-1" />
+      <div className="w-px bg-muted dark:bg-slate-700 shrink-0 my-1" />
 
       {/* Event items — single-row horizontal scroll OR multi-row wrap */}
       <div
@@ -146,10 +146,10 @@ export default function OperationsBar({
         }
       >
         {operations.length === 0 && status === 'connected' && (
-          <span className="text-slate-500 italic">Waiting for events...</span>
+          <span className="text-muted-foreground dark:text-slate-500 italic">Waiting for events...</span>
         )}
         {operations.length === 0 && status !== 'connected' && (
-          <span className="text-slate-500 italic">
+          <span className="text-muted-foreground dark:text-slate-500 italic">
             {status === 'connecting' ? 'Connecting...' : 'Not connected to event stream'}
           </span>
         )}
@@ -160,14 +160,14 @@ export default function OperationsBar({
             <button
               key={op.id}
               onClick={() => onOperationClick?.(op)}
-              className={`flex items-center gap-1.5 hover:bg-slate-700/50 rounded px-1.5 py-0.5 transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 hover:bg-muted/50 dark:hover:bg-slate-700/50 rounded px-1.5 py-0.5 transition-colors cursor-pointer ${
                 isExpanded ? '' : 'shrink-0'
               } ${isNew ? 'animate-fade-in' : ''}`}
               title={`${op.label}\n${formatTime(op.timestamp)}\nTrace: ${op.traceId || 'none'}`}
             >
               <span className={config.color}>{config.icon}</span>
-              <span className={`text-slate-300 truncate ${isExpanded ? 'max-w-36' : 'max-w-48'}`}>{op.label}</span>
-              <span className="text-slate-500">{formatTime(op.timestamp)}</span>
+              <span className={`text-foreground dark:text-slate-300 truncate ${isExpanded ? 'max-w-36' : 'max-w-48'}`}>{op.label}</span>
+              <span className="text-muted-foreground dark:text-slate-500">{formatTime(op.timestamp)}</span>
             </button>
           );
         })}
@@ -175,7 +175,7 @@ export default function OperationsBar({
 
       {replayControl ? (
         <>
-          <div className="w-px bg-slate-700 shrink-0 my-1" />
+          <div className="w-px bg-muted dark:bg-slate-700 shrink-0 my-1" />
           <div className="flex items-center shrink-0 py-1">
             {replayControl}
           </div>

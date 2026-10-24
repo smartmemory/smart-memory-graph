@@ -1,4 +1,5 @@
 import { MEMORY_COLORS, ENTITY_COLORS, SPECIAL_COLORS, ORIGIN_BORDER_COLORS, ANNOTATION_COLORS, ANNOTATION_BORDERS, getNodeColor, desaturateColor } from '../core/graphColors';
+import { resolveMode } from '../core/themeColors';
 import {
   DECISION_STATUSES,
   DECISION_EDGE_STYLES,
@@ -24,6 +25,9 @@ function entityNodeSize(ele) {
  * @param {'dark'|'light'} [theme.mode='dark'] - Light/dark mode for label,
  *   outline, and selection-border defaults. Ignored if `palette.*` overrides
  *   are provided. Default 'dark' preserves web/studio/insights output.
+ * @param {string} [theme.ring] - Light-mode selection border (a resolved `--ring` token, see
+ *   `readColorToken`). Used only when `mode` is 'light' and `palette.selectionBorder` is unset;
+ *   dark keeps its fixed default so dark output is unchanged.
  * @param {Object} [theme.palette] - Explicit color overrides. Any field set
  *   here wins over the mode default and over the per-type semantic palette.
  *   Use this to adopt a host application's theme variables verbatim
@@ -37,20 +41,26 @@ function entityNodeSize(ele) {
  * @param {string} [theme.palette.selectionBorder] - Selected-element border.
  */
 export function getCytoscapeStyles(theme = null) {
-  const mode = theme?.mode === 'light' ? 'light' : 'dark';
+  const mode = resolveMode(theme?.mode);
   const palette = theme?.palette || {};
 
   // Mode-aware fallbacks (used only when palette.* is not provided).
-  const labelColor = palette.label || (mode === 'light' ? '#1e293b' : '#cbd5e1');
+  const labelColor = palette.label || (mode === 'light' ? '#0f172a' : '#cbd5e1');
   const labelOutline = palette.labelOutline || (mode === 'light' ? '#f8fafc' : '#0f172a');
-  const selectionBorder = palette.selectionBorder || (mode === 'light' ? '#0f172a' : '#f8fafc');
+  const selectionBorder = palette.selectionBorder || (mode === 'light' ? (theme?.ring || '#0f172a') : '#f8fafc');
   const edgeBaseColor = palette.edge || (mode === 'light' ? '#94a3b8' : '#475569');
+  // Edge LABEL text: the 8px type name needs 4.5:1, and the light line colour (#94a3b8, 2.6:1 on
+  // white) does not. Slate-600 is both modes' value (dark already used it), so dark is unchanged.
+  const edgeLabelBase = palette.edge || '#475569';
   const edgeLabelHover = palette.edge || (mode === 'light' ? '#334155' : '#64748b');
   const defaultNodeFill = palette.node || '#94a3b8';
 
   // When a flat node color is provided, it replaces the per-type semantic
   // palette. `nodeFillFor()` is the single resolution point.
   const nodeFillFor = (typeColor) => palette.node || typeColor;
+
+  // LOD cluster label sits on the bare canvas: slate-400 is fine on dark, 2.6:1 on white.
+  const clusterLabelColor = (mode === 'light' ? '#475569' : '#94a3b8');
 
   const styles = [
     // Base node style
@@ -174,7 +184,7 @@ export function getCytoscapeStyles(theme = null) {
           return t === 'RELATED_ENTITY' ? '' : t;
         },
         'font-size': '8px',
-        color: edgeBaseColor,
+        color: edgeLabelBase,
         'text-outline-width': 1,
         'text-outline-color': labelOutline,
         'text-rotation': 'autorotate',
@@ -390,7 +400,7 @@ export function getCytoscapeStyles(theme = null) {
       'text-halign': 'center',
       'font-size': '11px',
       'font-weight': 'bold',
-      color: '#94a3b8',
+      color: clusterLabelColor,
       'padding': '12px',
     },
   });
@@ -486,3 +496,6 @@ export function getCytoscapeStyles(theme = null) {
 
   return styles;
 }
+
+/** Spec name (UI-LIGHT-MODE-1 LM-1): `buildStyles({ mode })`. Same function, same `theme` shape. */
+export const buildStyles = getCytoscapeStyles;

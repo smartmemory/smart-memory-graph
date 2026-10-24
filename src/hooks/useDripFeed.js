@@ -3,6 +3,7 @@ import { graphNodeToCyElement, graphEdgeToCyElement } from '../internal/cytoscap
 import { coalesceGraphData } from '../core/coalesce';
 import { containerHasArea, getFitElements, getFitPadding, STREAMING_LAYOUT } from '../internal/useCytoscape';
 import { runCheckedLayout } from '../internal/checkedLayout';
+import { PULSE_COLOR, modeOf } from '../core/themeColors';
 
 const GLOW_DURATION = 2500;
 
@@ -158,7 +159,7 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
       'line-dash-pattern': [10, 9999], // single dot, gap larger than any edge
       'line-dash-offset': 0,
       'line-cap': 'round',             // circular orb
-      'line-color': '#a5f3fc',         // sky-200 — soft glow
+      'line-color': PULSE_COLOR[modeOf(cy)], // dark: sky-200 soft glow; light: cyan-600 (sky-200 vanishes on white)
       width: 7,
       opacity: 0.85,
       'target-arrow-shape': 'none',

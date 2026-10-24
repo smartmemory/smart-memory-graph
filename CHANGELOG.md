@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added (2026-10-24): UI-LIGHT-MODE-LM1-1
+
+- **The graph follows the host's light/dark mode.** `GraphExplorer` takes `mode` (`'light'|'dark'`, default `'dark'`) and passes it to the style builder (`buildStyles`, alias of `getCytoscapeStyles`). Styles are re-applied in place on a change, with no relayout and no node moved. Light defaults: labels `#0f172a`, edges `#94a3b8`, selection border = the host's `--ring` (warns once and uses `#0f172a` when `--ring` is undefined). Memory and entity hues are unchanged. Edge labels use `#475569` and cluster labels `#475569` in light so they hold 4.5:1.
+- **`graph.css` and the inline-style panels use design-system tokens** (`hsl(var(--token, <exact dark value>))`), so a standalone render is pixel-identical in dark and a host with the tokens loaded follows its theme. PNG/SVG export background and the drip-feed pulse follow the mode.
+- **Tailwind chrome is paired** as `<light token class> dark:<original literal>`; dark output is unchanged. Needs the kit preset's `dark:` variant on the consumer.
+- New `src/core/themeColors.js` helpers, plus `tests/lightMode.test.js` and `tests/lightModeExplorer.test.js` (light/dark diff probe, contrast rows, census and Tailwind class guard).
+
 ### Added (2026-10-22): E2E-CLASS-SELECTORS-1
 
 - **Stable test ids on the explorer chrome.** Toolbar (`graph-toolbar`), Path button (`graph-path-button`, with `aria-pressed`), filter panel, canvas, operations bar, status dot and ops rate carry `data-testid`, so e2e no longer finds them by Tailwind classes.

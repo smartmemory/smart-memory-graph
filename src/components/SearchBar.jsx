@@ -99,20 +99,20 @@ export default function SearchBar({ nodes, onSearch, onNodeSelect }) {
     <div className="w-full">
       {/* Results dropdown (above the search bar) */}
       {isFocused && results.length > 0 && (
-        <div className="mb-2 bg-slate-900 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+        <div className="mb-2 bg-background dark:bg-slate-900 border border-input dark:border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
           {results.map((r) => (
             <button
               key={r.id}
               onClick={() => handleSelect(r.id)}
-              className="block w-full text-left px-3 py-2 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-b-0"
+              className="block w-full text-left px-3 py-2 hover:bg-muted dark:hover:bg-slate-700 transition-colors border-b border-border/50 dark:border-slate-700/50 last:border-b-0"
             >
               <div className="flex items-center gap-2">
                 <div
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: getNodeColor(r.type, r.category) }}
                 />
-                <span className="text-sm text-slate-200 truncate">{r.label}</span>
-                <span className="text-xs text-slate-500 capitalize shrink-0">{r.type}</span>
+                <span className="text-sm text-foreground dark:text-slate-200 truncate">{r.label}</span>
+                <span className="text-xs text-muted-foreground dark:text-slate-500 capitalize shrink-0">{r.type}</span>
               </div>
             </button>
           ))}
@@ -122,7 +122,7 @@ export default function SearchBar({ nodes, onSearch, onNodeSelect }) {
       {/* Search input */}
       <div className="relative">
         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-          <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-muted-foreground dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
         </div>
@@ -134,18 +134,18 @@ export default function SearchBar({ nodes, onSearch, onNodeSelect }) {
           onFocus={() => setIsFocused(true)}
           onBlur={() => setTimeout(() => setIsFocused(false), 200)}
           placeholder="Search nodes... (Cmd+K)"
-          className="w-full bg-slate-900 border border-slate-600 rounded-lg pl-10 pr-16 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full bg-background dark:bg-slate-900 border border-input dark:border-slate-600 rounded-lg pl-10 pr-16 py-2.5 text-sm text-foreground dark:text-slate-100 placeholder-muted-foreground dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:border-transparent"
         />
         <div className="absolute inset-y-0 right-2 flex items-center gap-1">
           {query && (
-            <button onClick={handleClear} className="p-1 text-slate-500 hover:text-slate-300 transition-colors">
+            <button onClick={handleClear} className="p-1 text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300 transition-colors">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           )}
           {!query && (
-            <kbd className="text-[10px] text-slate-500 bg-slate-700 rounded px-1.5 py-0.5 border border-slate-600">
+            <kbd className="text-[10px] text-muted-foreground dark:text-slate-500 bg-muted dark:bg-slate-700 rounded px-1.5 py-0.5 border border-input dark:border-slate-600">
               {navigator.platform?.includes('Mac') ? 'Cmd' : 'Ctrl'}+K
             </kbd>
           )}
@@ -154,7 +154,7 @@ export default function SearchBar({ nodes, onSearch, onNodeSelect }) {
 
       {/* Result count */}
       {query && (
-        <div className="mt-1 text-xs text-slate-500">
+        <div className="mt-1 text-xs text-muted-foreground dark:text-slate-500">
           {results.length} {results.length === 1 ? 'match' : 'matches'}
         </div>
       )}

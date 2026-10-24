@@ -8,6 +8,7 @@
  */
 
 import { useMemo } from 'react';
+import { tokenColor } from '../core/themeColors';
 
 /**
  * @param {Object} props
@@ -43,8 +44,8 @@ export default function RunLogPanel({
     <div
       data-testid="run-log-panel"
       style={{
-        background: '#0f172a',
-        color: '#e5e7eb',
+        background: tokenColor('background', '#0f172a'),
+        color: tokenColor('foreground', '#e5e7eb'),
         borderRadius: 6,
         padding: '6px 10px',
         fontFamily: 'ui-monospace, SFMono-Regular, monospace',
@@ -54,7 +55,7 @@ export default function RunLogPanel({
     >
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
         <span style={{ fontWeight: 600 }}>Log</span>
-        <span style={{ marginLeft: 8, color: '#94a3b8' }}>
+        <span style={{ marginLeft: 8, color: tokenColor('muted-foreground', '#94a3b8') }}>
           {stageFilter ? `(${rows.length} events for ${stageFilter})` : `(${rows.length} events)`}
         </span>
         {stageFilter && onClearFilter && (
@@ -63,8 +64,8 @@ export default function RunLogPanel({
             onClick={onClearFilter}
             style={{
               marginLeft: 'auto',
-              background: '#374151',
-              color: '#e5e7eb',
+              background: tokenColor('muted', '#374151'),
+              color: tokenColor('foreground', '#e5e7eb'),
               border: 'none',
               borderRadius: 4,
               padding: '2px 8px',
@@ -78,7 +79,7 @@ export default function RunLogPanel({
       </div>
       <div style={{ maxHeight: 200, overflowY: 'auto' }}>
         {rows.length === 0 && (
-          <div style={{ color: '#64748b', padding: 4 }}>
+          <div style={{ color: tokenColor('muted-foreground', '#64748b'), padding: 4 }}>
             No events {stageFilter ? `for ${stageFilter}` : 'yet'}.
           </div>
         )}
@@ -90,16 +91,19 @@ export default function RunLogPanel({
   );
 }
 
+// Status text sits on the panel surface, so it takes the kit's status tokens (they hold 4.5:1 in
+// both modes); the fallbacks are the original dark-surface colours. started and progress share
+// --info: each row prints its status word, so the cyan-400 / cyan-600 split carried nothing.
 const STATUS_COLOR = {
-  started: '#22d3ee',
-  progress: '#0891b2',
-  ok: '#10b981',
-  warn: '#f59e0b',
-  error: '#ef4444',
+  started: tokenColor('info', '#22d3ee'),
+  progress: tokenColor('info', '#0891b2'),
+  ok: tokenColor('success', '#10b981'),
+  warn: tokenColor('warning', '#f59e0b'),
+  error: tokenColor('danger', '#ef4444'),
 };
 
 function RunLogRow({ stage, ev }) {
-  const color = STATUS_COLOR[ev.status] || '#9ca3af';
+  const color = STATUS_COLOR[ev.status] || tokenColor('muted-foreground', '#9ca3af');
   // Non-pipeline.stage kinds (studio.job, evolver.result, …) get a tag so
   // interleaved wrapper-job rows are distinguishable from core stage rows.
   const kindTag = ev.kind && ev.kind !== 'pipeline.stage' ? ` [${ev.kind}]` : '';
@@ -118,11 +122,11 @@ function RunLogRow({ stage, ev }) {
       : '';
   return (
     <div style={{ padding: '1px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-      <span style={{ color: '#64748b' }}>#{ev.seq}</span>{' '}
+      <span style={{ color: tokenColor('muted-foreground', '#64748b') }}>#{ev.seq}</span>{' '}
       <span style={{ color }}>{ev.status}</span>{' '}
-      <span style={{ color: '#cbd5e1' }}>{stage}</span>
-      <span style={{ color: '#64748b' }}>{kindTag}</span>
-      <span style={{ color: '#94a3b8' }}>{reason}{dur}{drip}{message}</span>
+      <span style={{ color: tokenColor('secondary-foreground', '#cbd5e1') }}>{stage}</span>
+      <span style={{ color: tokenColor('muted-foreground', '#64748b') }}>{kindTag}</span>
+      <span style={{ color: tokenColor('muted-foreground', '#94a3b8') }}>{reason}{dur}{drip}{message}</span>
     </div>
   );
 }

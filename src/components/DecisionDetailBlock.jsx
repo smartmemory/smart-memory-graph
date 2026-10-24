@@ -98,10 +98,10 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
   return (
     <section
       data-testid="decision-detail-block"
-      className="space-y-2 border-t border-slate-700 pt-3 mt-1"
+      className="space-y-2 border-t border-border dark:border-slate-700 pt-3 mt-1"
     >
       <div className="flex items-center gap-2">
-        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Decision</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider">Decision</h3>
         <span
           data-testid="decision-status-badge"
           className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
@@ -114,27 +114,27 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           {status.label}
         </span>
         {isUnknownStatus && (
-          <span className="text-[10px] text-red-400" title="Decision producer did not set status">
+          <span className="text-[10px] text-red-700 dark:text-red-400" title="Decision producer did not set status">
             (untagged)
           </span>
         )}
       </div>
 
       {node.decision_type && DECISION_TYPES.includes(node.decision_type) && (
-        <div className="text-xs text-slate-300">
-          <span className="text-slate-500">Type:</span>{' '}
+        <div className="text-xs text-foreground dark:text-slate-300">
+          <span className="text-muted-foreground dark:text-slate-500">Type:</span>{' '}
           <span className="capitalize">{node.decision_type}</span>
         </div>
       )}
 
       {(node.reinforcement_count != null || node.contradiction_count != null) && (
-        <div className="flex gap-3 text-xs text-slate-400">
+        <div className="flex gap-3 text-xs text-muted-foreground dark:text-slate-400">
           <span>
-            <span className="text-emerald-400">+</span>
+            <span className="text-emerald-700 dark:text-emerald-400">+</span>
             {node.reinforcement_count ?? 0} reinforced
           </span>
           <span>
-            <span className="text-red-400">-</span>
+            <span className="text-red-700 dark:text-red-400">-</span>
             {node.contradiction_count ?? 0} contradicted
           </span>
         </div>
@@ -144,13 +144,13 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
       <div data-testid="decision-chain-block" className="space-y-1">
         {supersedes.length > 0 && (
           <div className="text-xs">
-            <span className="text-slate-500">Supersedes:</span>
+            <span className="text-muted-foreground dark:text-slate-500">Supersedes:</span>
             <ul className="ml-3 mt-0.5 space-y-0.5">
               {supersedes.map((id) => (
                 <li key={id}>
                   <button
                     onClick={() => onSelectId && onSelectId(id)}
-                    className="text-amber-400 hover:text-amber-300 underline truncate font-mono text-[11px]"
+                    className="text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline truncate font-mono text-[11px]"
                     title={id}
                   >
                     {id}
@@ -162,10 +162,10 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
         )}
         {supersededBy && (
           <div className="text-xs">
-            <span className="text-slate-500">Superseded by:</span>{' '}
+            <span className="text-muted-foreground dark:text-slate-500">Superseded by:</span>{' '}
             <button
               onClick={() => onSelectId && onSelectId(supersededBy)}
-              className="text-amber-400 hover:text-amber-300 underline font-mono text-[11px]"
+              className="text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline font-mono text-[11px]"
               title={supersededBy}
             >
               {supersededBy}
@@ -176,13 +176,13 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           <div className="flex gap-2 mt-1">
             <button
               onClick={handleHighlightChain}
-              className="text-[11px] px-2 py-0.5 rounded bg-amber-600/20 text-amber-300 border border-amber-600/40 hover:bg-amber-600/30"
+              className="text-[11px] px-2 py-0.5 rounded bg-amber-600/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600/40 hover:bg-amber-600/30"
             >
               Highlight chain
             </button>
             <button
               onClick={handleClearChain}
-              className="text-[11px] px-2 py-0.5 rounded bg-slate-700/40 text-slate-300 border border-slate-600/40 hover:bg-slate-700/60"
+              className="text-[11px] px-2 py-0.5 rounded bg-muted/40 dark:bg-slate-700/40 text-foreground dark:text-slate-300 border border-input/40 dark:border-slate-600/40 hover:bg-muted/60 dark:hover:bg-slate-700/60"
             >
               Clear
             </button>
@@ -196,14 +196,14 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           <button
             onClick={handleLoadConflicts}
             disabled={conflictLoading || !adapter}
-            className="text-[11px] px-2 py-0.5 rounded bg-red-600/20 text-red-300 border border-red-600/40 hover:bg-red-600/30 disabled:opacity-40"
+            className="text-[11px] px-2 py-0.5 rounded bg-red-600/20 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600/40 hover:bg-red-600/30 disabled:opacity-40"
           >
             {conflictLoading ? 'Checking…' : 'Find conflicts'}
           </button>
         ) : (
           <div data-testid="decision-conflicts">
-            <div className="text-xs text-slate-400">
-              Conflicts: <span className="text-red-300">{conflicts.length}</span>
+            <div className="text-xs text-muted-foreground dark:text-slate-400">
+              Conflicts: <span className="text-red-700 dark:text-red-300">{conflicts.length}</span>
             </div>
             {conflicts.length > 0 && (
               <ul className="ml-3 mt-0.5 space-y-0.5">
@@ -211,13 +211,13 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
                   <li key={c.decision_id || c.id}>
                     <button
                       onClick={() => onSelectId && onSelectId(c.decision_id || c.id)}
-                      className="text-red-300 hover:text-red-200 underline truncate font-mono text-[11px]"
+                      className="text-red-700 dark:text-red-300 hover:text-red-700 dark:hover:text-red-200 underline truncate font-mono text-[11px]"
                       title={c.decision_id || c.id}
                     >
                       {(c.decision_id || c.id || '').toString().slice(0, 24)}…
                     </button>
                     {c.content && (
-                      <span className="ml-1 text-slate-400 text-[11px]">{c.content.slice(0, 60)}</span>
+                      <span className="ml-1 text-muted-foreground dark:text-slate-400 text-[11px]">{c.content.slice(0, 60)}</span>
                     )}
                   </li>
                 ))}
@@ -226,7 +226,7 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           </div>
         )}
         {conflictError && (
-          <div className="text-[11px] text-red-400">{conflictError}</div>
+          <div className="text-[11px] text-red-700 dark:text-red-400">{conflictError}</div>
         )}
       </div>
 
@@ -236,15 +236,15 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           <button
             onClick={handleLoadProvenance}
             disabled={provenanceLoading || !adapter}
-            className="text-[11px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-300 border border-blue-600/40 hover:bg-blue-600/30 disabled:opacity-40"
+            className="text-[11px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600/40 hover:bg-blue-600/30 disabled:opacity-40"
           >
             {provenanceLoading ? 'Loading…' : 'Load provenance'}
           </button>
         ) : provenance._error ? (
-          <div className="text-[11px] text-red-400">{provenance._error}</div>
+          <div className="text-[11px] text-red-700 dark:text-red-400">{provenance._error}</div>
         ) : (
-          <div data-testid="decision-provenance" className="text-xs text-slate-300 space-y-0.5">
-            <div className="text-slate-500">Provenance</div>
+          <div data-testid="decision-provenance" className="text-xs text-foreground dark:text-slate-300 space-y-0.5">
+            <div className="text-muted-foreground dark:text-slate-500">Provenance</div>
             {provenance.evidence?.length > 0 && (
               <div className="text-[11px]">Evidence: {provenance.evidence.length} items</div>
             )}

@@ -1,4 +1,5 @@
 import { getNodeColor } from '../core/graphColors';
+import { tokenColor } from '../core/themeColors';
 
 export default function FilterPanel({
   filters,
@@ -27,12 +28,12 @@ export default function FilterPanel({
   const counts = typeCounts || {};
 
   return (
-    <div data-testid="graph-filter-panel" className="w-56 bg-slate-800 border-r border-slate-700 shrink-0 flex flex-col">
-      <div className="flex items-center justify-between p-3 border-b border-slate-700">
-        <span className="text-sm font-medium text-slate-200">Filters</span>
+    <div data-testid="graph-filter-panel" className="w-56 bg-card dark:bg-slate-800 border-r border-border dark:border-slate-700 shrink-0 flex flex-col">
+      <div className="flex items-center justify-between p-3 border-b border-border dark:border-slate-700">
+        <span className="text-sm font-medium text-foreground dark:text-slate-200">Filters</span>
         <button
           onClick={onClose}
-          className="text-slate-500 hover:text-slate-300 transition-colors"
+          className="text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -51,11 +52,11 @@ export default function FilterPanel({
         {availableTypes.memoryTypes.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Memory Types</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider">Memory Types</h3>
               <div className="flex gap-1">
-                <button onClick={selectAllMemoryTypes} className="text-[10px] text-slate-500 hover:text-slate-300">All</button>
-                <span className="text-slate-600">|</span>
-                <button onClick={deselectAllMemoryTypes} className="text-[10px] text-slate-500 hover:text-slate-300">None</button>
+                <button onClick={selectAllMemoryTypes} className="text-[10px] text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300">All</button>
+                <span className="text-muted-foreground dark:text-slate-600">|</span>
+                <button onClick={deselectAllMemoryTypes} className="text-[10px] text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300">None</button>
               </div>
             </div>
             <div className="space-y-1">
@@ -77,11 +78,11 @@ export default function FilterPanel({
         {availableTypes.entityTypes.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Entity Types</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider">Entity Types</h3>
               <div className="flex gap-1">
-                <button onClick={selectAllEntityTypes} className="text-[10px] text-slate-500 hover:text-slate-300">All</button>
-                <span className="text-slate-600">|</span>
-                <button onClick={deselectAllEntityTypes} className="text-[10px] text-slate-500 hover:text-slate-300">None</button>
+                <button onClick={selectAllEntityTypes} className="text-[10px] text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300">All</button>
+                <span className="text-muted-foreground dark:text-slate-600">|</span>
+                <button onClick={deselectAllEntityTypes} className="text-[10px] text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300">None</button>
               </div>
             </div>
             <div className="space-y-1">
@@ -103,11 +104,11 @@ export default function FilterPanel({
         {availableTypes.relationTypes.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Relations</h3>
+              <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider">Relations</h3>
               <div className="flex gap-1">
-                <button onClick={selectAllRelationTypes} className="text-[10px] text-slate-500 hover:text-slate-300">All</button>
-                <span className="text-slate-600">|</span>
-                <button onClick={deselectAllRelationTypes} className="text-[10px] text-slate-500 hover:text-slate-300">None</button>
+                <button onClick={selectAllRelationTypes} className="text-[10px] text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300">All</button>
+                <span className="text-muted-foreground dark:text-slate-600">|</span>
+                <button onClick={deselectAllRelationTypes} className="text-[10px] text-muted-foreground dark:text-slate-500 hover:text-foreground dark:hover:text-slate-300">None</button>
               </div>
             </div>
             <div className="space-y-1">
@@ -115,14 +116,14 @@ export default function FilterPanel({
                 <TypeCheckbox
                   key={type}
                   type={type}
-                  color="#64748b"
+                  color={tokenColor('muted-foreground', '#64748b')}
                   checked={activeEdgeTypes.has(type)}
                   onChange={() => toggleRelationType(type)}
                   count={counts[type]}
                 />
               ))}
             </div>
-            <label className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-700/50 py-0.5 px-1 rounded hover:bg-slate-700/50 cursor-pointer transition-colors">
+            <label className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50 dark:border-slate-700/50 py-0.5 px-1 rounded hover:bg-muted/50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
               <input
                 type="checkbox"
                 checked={cascadeEdgeFilter}
@@ -131,24 +132,24 @@ export default function FilterPanel({
               />
               <div
                 className={`w-3 h-3 rounded-sm border flex items-center justify-center transition-colors ${
-                  cascadeEdgeFilter ? 'border-transparent bg-blue-500' : 'border-slate-500 bg-transparent'
+                  cascadeEdgeFilter ? 'border-transparent bg-blue-500' : 'border-input dark:border-slate-500 bg-transparent'
                 }`}
               >
                 {cascadeEdgeFilter && (
-                  <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+                  <svg className="w-2 h-2 text-foreground dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 )}
               </div>
-              <span className="text-[10px] text-slate-400">Hide orphaned nodes</span>
+              <span className="text-[10px] text-muted-foreground dark:text-slate-400">Hide orphaned nodes</span>
             </label>
           </section>
         )}
       </div>
 
-      <div className="border-t border-slate-700 p-2 bg-slate-800/95">
-        <p className="text-[11px] text-slate-500 text-center select-none">
-          Press <span className="text-slate-300">?</span> for shortcuts
+      <div className="border-t border-border dark:border-slate-700 p-2 bg-card/95 dark:bg-slate-800/95">
+        <p className="text-[11px] text-muted-foreground dark:text-slate-500 text-center select-none">
+          Press <span className="text-foreground dark:text-slate-300">?</span> for shortcuts
         </p>
       </div>
     </div>
@@ -157,7 +158,7 @@ export default function FilterPanel({
 
 function TypeCheckbox({ type, color, checked, onChange, count }) {
   return (
-    <label className="flex items-center gap-2 py-0.5 px-1 rounded hover:bg-slate-700/50 cursor-pointer transition-colors">
+    <label className="flex items-center gap-2 py-0.5 px-1 rounded hover:bg-muted/50 dark:hover:bg-slate-700/50 cursor-pointer transition-colors">
       <input
         type="checkbox"
         checked={checked}
@@ -166,18 +167,18 @@ function TypeCheckbox({ type, color, checked, onChange, count }) {
       />
       <div
         className={`w-3 h-3 rounded-sm border flex items-center justify-center transition-colors ${
-          checked ? 'border-transparent' : 'border-slate-500 bg-transparent'
+          checked ? 'border-transparent' : 'border-input dark:border-slate-500 bg-transparent'
         }`}
         style={{ backgroundColor: checked ? color : undefined }}
       >
         {checked && (
-          <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
+          <svg className="w-2 h-2 text-foreground dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={4}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         )}
       </div>
-      <span className="text-xs text-slate-300 capitalize flex-1">{type.replace(/_/g, ' ')}</span>
-      {count != null && <span className="text-[10px] text-slate-500 tabular-nums">{count}</span>}
+      <span className="text-xs text-foreground dark:text-slate-300 capitalize flex-1">{type.replace(/_/g, ' ')}</span>
+      {count != null && <span className="text-[10px] text-muted-foreground dark:text-slate-500 tabular-nums">{count}</span>}
     </label>
   );
 }
