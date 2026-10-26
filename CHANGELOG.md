@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- REL-CALLERS-ORIGIN-TAGS-1 (2026-10-26): `contracts/origin-contract.json` registers `mcp:memory_save`, `mcp:memory_save_document` and `mcp:memory_save_conversation` at tier 2 (exact keys, as `getOriginTier` looks them up). The legacy `mcp:memory_add` row stays. `mcp:memory_ingest` is not added: this file never carried it and has no comment saying it should. Test: `tests/originTiers.test.js`.
+
 ### Added (2026-10-24): UI-LIGHT-MODE-LM1-1
 
 - **The graph follows the host's light/dark mode.** `GraphExplorer` takes `mode` (`'light'|'dark'`, default `'dark'`) and passes it to the style builder (`buildStyles`, alias of `getCytoscapeStyles`). Styles are re-applied in place on a change, with no relayout and no node moved. Light defaults: labels `#0f172a`, edges `#94a3b8`, selection border = the host's `--ring` (warns once and uses `#0f172a` when `--ring` is undefined). Memory and entity hues are unchanged. Edge labels use `#475569` and cluster labels `#475569` in light so they hold 4.5:1.
