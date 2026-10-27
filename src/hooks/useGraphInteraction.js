@@ -133,7 +133,9 @@ export function useGraphInteraction({
         });
       }
 
-      cytoscape.addElements(newCyElements);
+      // The radial placement below is the layout for an expand: opt out of the count re-layout,
+      // which would re-run the whole layout ~250 ms later and replace it.
+      cytoscape.addElements(newCyElements, { relayout: false });
 
       // Position new nodes radially
       const cy = cytoscape.cy.current;

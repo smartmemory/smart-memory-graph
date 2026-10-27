@@ -10,6 +10,7 @@ import { containerHasArea } from './containerGate';
 import {
   createCountRelayout,
   countRelayoutRequest,
+  shouldScheduleAfterAdd,
   revealRelayoutRequest,
 } from './countRelayout';
 import { runCheckedLayout } from './checkedLayout';
@@ -642,7 +643,7 @@ export function useCytoscape(containerRef, options = {}) {
     });
   }, []);
 
-  const addElements = useCallback((newElements) => {
+  const addElements = useCallback((newElements, addOptions) => {
     const cy = cyRef.current;
     if (!cy) return 0;
     let addedCount = 0;
@@ -656,7 +657,7 @@ export function useCytoscape(containerRef, options = {}) {
       }
       if (addedCount > 0) restoreDimmingState(cy);
     });
-    if (addedCount > 0) countRelayoutRef.current.schedule();
+    if (shouldScheduleAfterAdd(addedCount, addOptions)) countRelayoutRef.current.schedule();
     return addedCount;
   }, []);
 

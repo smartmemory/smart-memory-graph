@@ -38,6 +38,15 @@ export function countRelayoutRequest(lastLayoutName, autoFit) {
 }
 
 /**
+ * Whether an add path should schedule the count re-layout. `relayout: false` is the caller's
+ * opt-out for an add that places its own nodes (neighbour expand seeds them radially around the
+ * origin and expects the rest of the graph to stay put).
+ */
+export function shouldScheduleAfterAdd(addedCount, { relayout = true } = {}) {
+  return addedCount > 0 && relayout !== false;
+}
+
+/**
  * Request for the hidden-to-visible re-layout: the layout the user chose, not a hard-coded one,
  * instantly (no entrance animation) and from a fresh arrangement, since the old positions came
  * from a degenerate container.

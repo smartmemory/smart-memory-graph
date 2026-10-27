@@ -6,6 +6,7 @@ import {
   createCountRelayout,
   graphCounts,
   revealRelayoutRequest,
+  shouldScheduleAfterAdd,
 } from '../src/internal/countRelayout.js';
 
 // GRAPH-PKG-RELAYOUT-1: a graph that gains or loses nodes or edges after its first layout is
@@ -175,5 +176,25 @@ describe('re-layout requests carry the user layout for every layout name', () =>
   it('falls back to cose-bilkent when no layout has run yet', () => {
     expect(countRelayoutRequest(null, true).layoutName).toBe('cose-bilkent');
     expect(revealRelayoutRequest(undefined).layoutName).toBe('cose-bilkent');
+  });
+});
+
+// GRAPH-EXPAND-RADIAL-VS-RELAYOUT-1: neighbour expand places its nodes radially, so its add opts
+// out of the count re-layout that would replace that placement 250 ms later.
+describe('add paths and the re-layout opt-out', () => {
+  const rows = [
+    ['refresh/stream add, default', 3, undefined, true],
+    ['add with relayout true', 3, { relayout: true }, true],
+    ['expand add, relayout false', 3, { relayout: false }, false],
+    ['nothing added', 0, undefined, false],
+  ];
+  it.each(rows)('%s', (_name, added, opts, expected) => {
+    expect(shouldScheduleAfterAdd(added, opts)).toBe(expected);
+  });
+
+  it('the expand call site passes the opt-out', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync(new URL('../src/hooks/useGraphInteraction.js', import.meta.url), 'utf8');
+    expect(src).toMatch(/cytoscape\.addElements\(newCyElements, \{ relayout: false \}\)/);
   });
 });
