@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+
+Version bump to 2.0.1, every SmartMemory repo reads the same version (REL-2.0-VERSION-BUMP-2.0.1-1).
+
 ## Unreleased
 
 - REL-CALLERS-ORIGIN-TAGS-1 (2026-10-26): `contracts/origin-contract.json` registers `mcp:memory_save`, `mcp:memory_save_document` and `mcp:memory_save_conversation` at tier 2 (exact keys, as `getOriginTier` looks them up). The legacy `mcp:memory_add` row stays. `mcp:memory_ingest` is not added: this file never carried it and has no comment saying it should. Test: `tests/originTiers.test.js`.
