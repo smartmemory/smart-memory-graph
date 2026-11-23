@@ -173,7 +173,7 @@ export default function GraphExplorer({
     internalData.error, internalData.stats, internalData.refresh, internalData.incrementStats,
   ]);
 
-  const filters = useGraphFilters(nodes, edges);
+  const filters = useGraphFilters(nodes, edges, workspaceId);
 
   const typeCounts = useMemo(() => {
     const counts = {};
