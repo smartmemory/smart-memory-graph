@@ -71,7 +71,7 @@ const q = (sel) => document.querySelector(sel);
 
 async function render(props = {}) {
   await act(async () => {
-    reactRoot.render(createElement(GraphExplorer, { adapter, data: DATA, ...props }));
+    reactRoot.render(createElement(GraphExplorer, { adapter, data: DATA, enableEntityEditing: true, ...props }));
   });
   await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
 }

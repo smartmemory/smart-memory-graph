@@ -28,6 +28,7 @@ export default function Toolbar({
   onToggleContradictionOverlay,
   originLegendVisible = false,
   onToggleOriginLegend,
+  svgExportEnabled = false,
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
@@ -56,9 +57,9 @@ export default function Toolbar({
     const cyInstance = cy?.current;
     if (!cyInstance) return;
     if (format === 'png') exportPNG(cyInstance);
-    if (format === 'svg') exportSVG(cyInstance);
+    if (format === 'svg' && svgExportEnabled) exportSVG(cyInstance);
     setExportOpen(false);
-  }, [cy]);
+  }, [cy, svgExportEnabled]);
 
   return (
     <div ref={toolbarRef} data-testid="graph-toolbar" className="h-12 bg-card dark:bg-slate-800 border-b border-border dark:border-slate-700 flex items-center px-4 gap-2 shrink-0 z-40">
@@ -158,9 +159,12 @@ export default function Toolbar({
             <button onClick={() => handleExport('png')} className="block w-full text-left px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-slate-600 transition-colors">
               PNG (2x)
             </button>
-            <button onClick={() => handleExport('svg')} className="block w-full text-left px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-slate-600 transition-colors">
-              SVG
-            </button>
+            {/* SVG needs the cytoscape-svg plugin, which is not installed: hidden until it is (enableSvgExport) */}
+            {svgExportEnabled && (
+              <button onClick={() => handleExport('svg')} className="block w-full text-left px-3 py-1.5 text-sm text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-slate-600 transition-colors">
+                SVG
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -202,10 +206,13 @@ export default function Toolbar({
       <button
         onClick={() => {
           if (onCopyLink) {
-            onCopyLink();
-            setLinkCopied(true);
-            if (linkTimerRef.current) clearTimeout(linkTimerRef.current);
-            linkTimerRef.current = setTimeout(() => setLinkCopied(false), 2000);
+            // "Copied!" only when the clipboard write really succeeded (handleCopyLink resolves false otherwise).
+            Promise.resolve(onCopyLink()).then((ok) => {
+              if (ok === false) return;
+              setLinkCopied(true);
+              if (linkTimerRef.current) clearTimeout(linkTimerRef.current);
+              linkTimerRef.current = setTimeout(() => setLinkCopied(false), 2000);
+            });
           }
         }}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${

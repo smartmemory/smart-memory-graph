@@ -42,6 +42,13 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  *   Hidden by default until time travel is fully built.
  * @param {boolean} [props.showPlaybackBar=false] - Show the bottom live-feed bar (status, pause, speed, ticker, Replay).
  *   Hidden by default. The detail panel's "Replay hops" does not use this bar.
+ * @param {boolean} [props.enableEntityEditing=false] - Detail panel: change entity type, rename, remove grounding.
+ *   Hidden by default (the local Lite server has no write routes for them).
+ * @param {boolean} [props.enableGrounding=false] - Detail panel "Ground" (Wikipedia picker). Hidden by default:
+ *   Accept does not save anywhere yet.
+ * @param {boolean} [props.enableDecisionTools=false] - Decision block "Find conflicts" and "Load provenance".
+ *   Hidden by default (the local Lite server has no routes for them).
+ * @param {boolean} [props.enableSvgExport=false] - Export > SVG. Hidden by default: needs the cytoscape-svg plugin.
  * @param {string} [props.replayRunId] - When set, replays a specific run (passes runId+fromSeq:0)
  * @param {Object} [props.clock] - Optional shared replay clock from useReplayClock().
  *   When provided, GraphExplorer consumes events released by the clock instead
@@ -102,6 +109,10 @@ export default function GraphExplorer({
   hideSelectionToolbar = false,
   enableTimeTravel = false,
   showPlaybackBar = false,
+  enableEntityEditing = false,
+  enableGrounding = false,
+  enableDecisionTools = false,
+  enableSvgExport = false,
   className = '',
   onNodeOpen,
   theme = null,
@@ -637,6 +648,17 @@ export default function GraphExplorer({
     }, 50);
   }, [cytoscape, nodes, edges, stream, interaction, dripFeed]);
 
+  // Decision chain highlight (stable identity: DecisionDetailBlock clears it in an effect keyed on this function).
+  const { highlightElements: cyHighlight, clearHighlights: cyClearHighlights } = cytoscape;
+  const handleDecisionChainHighlight = useCallback((ids) => {
+    if (ids && ids.length) cyHighlight(ids);
+    else cyClearHighlights();
+  }, [cyHighlight, cyClearHighlights]);
+
+  // The origin legend only means something when nodes carry an origin; Lite nodes have none.
+  const legendAvailable = showOriginLegend !== false
+    && nodes.some((n) => n.origin && n.origin !== 'unknown');
+
   const handleSearchNodeSelect = useCallback((id) => {
     const cy = cytoscape.cy.current;
     if (cy) {
@@ -726,8 +748,9 @@ export default function GraphExplorer({
         isFullscreen={isFullscreen}
         onToggleFullscreen={handleToggleFullscreen}
         rightActions={toolbarRightActions}
-        originLegendVisible={showOriginLegend !== false && originLegendOpen}
-        onToggleOriginLegend={showOriginLegend !== false ? () => setOriginLegendOpen(p => !p) : undefined}
+        originLegendVisible={legendAvailable && originLegendOpen}
+        onToggleOriginLegend={legendAvailable ? () => setOriginLegendOpen(p => !p) : undefined}
+        svgExportEnabled={enableSvgExport}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -749,7 +772,7 @@ export default function GraphExplorer({
         <CytoscapeCanvas
           setContainerRef={cytoscape.setContainerRef}
         >
-          <OriginLegend visible={showOriginLegend !== false && originLegendOpen} />
+          <OriginLegend visible={legendAvailable && originLegendOpen} />
         </CytoscapeCanvas>
 
         {/* Detail panel — absolute overlay */}
@@ -766,6 +789,11 @@ export default function GraphExplorer({
               onNodeUpdate={interaction.handleNodeUpdate}
               onDelete={handleDeleteNode}
               adapter={adapter}
+              onDecisionChainHighlight={handleDecisionChainHighlight}
+              onSelectId={handleSearchNodeSelect}
+              enableEntityEditing={enableEntityEditing}
+              enableGrounding={enableGrounding}
+              enableDecisionTools={enableDecisionTools}
             />
           </div>
         )}
@@ -856,7 +884,7 @@ export default function GraphExplorer({
       )}
 
       {/* Replay controls */}
-      {dripFeed.isReplaying && (
+      {showPlaybackBar && dripFeed.isReplaying && (
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 bg-cyan-100 dark:bg-cyan-900/90 border border-cyan-300 dark:border-cyan-700 text-cyan-700 dark:text-cyan-200 px-4 py-1.5 rounded-full text-xs font-medium flex items-center gap-2">
           <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
           Replaying recording...
@@ -987,7 +1015,7 @@ export default function GraphExplorer({
 
       {interaction.pathMode && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-100 dark:bg-amber-900/90 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-200 px-4 py-2 rounded-lg text-sm z-50">
-          Click the START node
+          {interaction.pathNodes?.length ? 'Click the END node' : 'Click the START node'}
           <button onClick={interaction.handlePathMode} className="ml-3 text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline">Cancel</button>
         </div>
       )}

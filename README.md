@@ -21,6 +21,19 @@ function App() {
 }
 ```
 
+### Controls hidden until fully built
+
+`GraphExplorer` hides these behind props that default to `false`. Nothing is deleted: pass the prop to bring a control back.
+
+| Prop | Brings back | Why hidden |
+|---|---|---|
+| `enableTimeTravel` | Time button, slider, `#asof=` in a link | time travel not fully built |
+| `showPlaybackBar` | bottom live-feed bar (status, pause, speed, ticker, Replay) and the "Replaying recording" banner | feed and replay not fully built |
+| `enableEntityEditing` | detail panel: change entity type, rename, Remove grounding | the local Lite server has no write routes for them |
+| `enableGrounding` | detail panel: Ground (Wikipedia picker) | Accept does not save anywhere yet |
+| `enableDecisionTools` | decision block: Find conflicts, Load provenance | the local Lite server has no routes for them |
+| `enableSvgExport` | Export > SVG | needs the `cytoscape-svg` plugin, not installed |
+
 ## Architecture
 
 ```

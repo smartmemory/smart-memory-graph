@@ -27,8 +27,9 @@ import {
  * @param {GraphAPIAdapter} [props.adapter] - Optional adapter; required for live conflict / provenance lookup
  * @param {function(string[]|null): void} [props.onChainHighlight] - Apply chain highlight to canvas
  * @param {function(string): void} [props.onSelectId] - Navigate to another node by id
+ * @param {boolean} [props.toolsEnabled=true] - Show "Find conflicts" and "Load provenance" (GraphExplorer passes enableDecisionTools, default off)
  */
-export default function DecisionDetailBlock({ node, adapter, onChainHighlight, onSelectId }) {
+export default function DecisionDetailBlock({ node, adapter, onChainHighlight, onSelectId, toolsEnabled = true }) {
   const [conflicts, setConflicts] = useState(null);
   const [conflictError, setConflictError] = useState(null);
   const [conflictLoading, setConflictLoading] = useState(false);
@@ -190,6 +191,7 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
         )}
       </div>
 
+      {toolsEnabled && (<>
       {/* Conflicts */}
       <div className="space-y-1">
         {conflicts == null ? (
@@ -257,6 +259,7 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           </div>
         )}
       </div>
+      </>)}
     </section>
   );
 }

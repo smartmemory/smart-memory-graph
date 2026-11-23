@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { LAYOUT_OPTIONS } from '../core/constants';
 import { MEMORY_TYPE_SET } from '../core/graphColors';
 import { graphNodeToCyElement, graphEdgeToCyElement, cyElementToGraphNode } from '../internal/cytoscapeConvert';
 
@@ -43,7 +44,10 @@ export function useGraphInteraction({
   const [timeTravelOpen, setTimeTravelOpen] = useState(!!urlState?.asOfTime);
   const [asOfTime, setAsOfTime] = useState(urlState?.asOfTime || null);
   const [timeTravelLoading, setTimeTravelLoading] = useState(false);
-  const [layout, setLayout] = useState('cose-bilkent');
+  // A shared link carries #layout=...: start on it when it is one of the known layouts.
+  const [layout, setLayout] = useState(() => (
+    LAYOUT_OPTIONS.some((o) => o.id === urlState?.layout) ? urlState.layout : 'cose-bilkent'
+  ));
 
   // Single click: select node + highlight neighbors + open detail panel
   const handleNodeClick = useCallback((nodeData) => {
@@ -58,11 +62,13 @@ export function useGraphInteraction({
         if (next.length === 2) {
           if (!adapter) { setPathMode(false); return []; }
           adapter.findPath(next[0], next[1]).then((result) => {
-            setPathResult(result);
-            if (result?.path) {
-              const nodeIds = result.path.map((n) => n.item_id || n.id);
-              cytoscape.highlightElements(nodeIds);
+            const path = Array.isArray(result?.path) ? result.path : [];
+            if (path.length === 0 || result?.path_found === false) {
+              setPathResult({ error: 'No path between these nodes' });
+              return;
             }
+            setPathResult(result);
+            cytoscape.highlightElements(path.map((n) => n.item_id || n.id));
           }).catch(() => setPathResult({ error: 'Path not found' }));
           setPathMode(false);
           return [];
@@ -257,9 +263,8 @@ export function useGraphInteraction({
     };
     const url = getShareableUrl?.(state);
     saveToUrl?.(state);
-    if (url) {
-      navigator.clipboard.writeText(url).catch(() => {});
-    }
+    if (!url || !navigator.clipboard?.writeText) return false;
+    return navigator.clipboard.writeText(url).then(() => true, () => false);
   }, [layout, selectedNode, filters, asOfTime, cytoscape, getShareableUrl, saveToUrl]);
 
   // Restore URL state on initial load
@@ -300,6 +305,7 @@ export function useGraphInteraction({
     connectedEdges,
     detailPanelOpen,
     pathMode,
+    pathNodes,
     pathResult,
     expanding,
     timeTravelOpen,

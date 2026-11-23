@@ -21,8 +21,11 @@ const EDGES_PAGE_SIZE = 10;
  * @param {boolean} props.expanding - Whether neighbor expansion is in progress
  * @param {function} props.onNodeUpdate - Callback to update node data (nodeId, updates)
  * @param {GraphAPIAdapter} props.adapter - API adapter for entity corrections
+ * @param {boolean} [props.enableEntityEditing=false] - type change, rename, remove grounding
+ * @param {boolean} [props.enableGrounding=false] - Ground button and Wikipedia picker
+ * @param {boolean} [props.enableDecisionTools=false] - decision conflicts and provenance
  */
-export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState }) {
+export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState, enableEntityEditing = false, enableGrounding = false, enableDecisionTools = false }) {
   const [edgesShown, setEdgesShown] = useState(EDGES_PAGE_SIZE);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -34,6 +37,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
   }, [node?.id]);
 
   const isEntity = node?.category === 'entity';
+  const canEditEntity = isEntity && enableEntityEditing;
 
   const corrections = useEntityCorrections({
     node,
@@ -76,7 +80,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: color }} />
 
             {/* Type badge — clickable for entities */}
-            {isEntity ? (
+            {canEditEntity ? (
               <div className="relative">
                 <button
                   onClick={() => corrections.setTypeDropdownOpen(!corrections.typeDropdownOpen)}
@@ -133,7 +137,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           </div>
 
           {/* Label — editable for entities */}
-          {isEntity && corrections.editingLabel ? (
+          {canEditEntity && corrections.editingLabel ? (
             <input
               ref={corrections.labelInputRef}
               type="text"
@@ -145,14 +149,14 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             />
           ) : (
             <h2
-              className={`text-sm font-medium text-foreground dark:text-slate-100 break-words ${isEntity ? 'cursor-pointer hover:bg-muted/50 dark:hover:bg-slate-700/50 rounded px-1 -mx-1 transition-colors' : ''} ${corrections.labelSaved ? 'ring-1 ring-green-300 dark:ring-green-500 rounded' : ''}`}
+              className={`text-sm font-medium text-foreground dark:text-slate-100 break-words ${canEditEntity ? 'cursor-pointer hover:bg-muted/50 dark:hover:bg-slate-700/50 rounded px-1 -mx-1 transition-colors' : ''} ${corrections.labelSaved ? 'ring-1 ring-green-300 dark:ring-green-500 rounded' : ''}`}
               onClick={() => {
-                if (isEntity) {
+                if (canEditEntity) {
                   corrections.setLabelValue(node.label);
                   corrections.setEditingLabel(true);
                 }
               }}
-              title={isEntity ? 'Click to rename' : undefined}
+              title={canEditEntity ? 'Click to rename' : undefined}
             >
               {node.label}
             </h2>
@@ -179,6 +183,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                       </svg>
                     </a>
+                    {enableEntityEditing && (
                     <button
                       onClick={corrections.handleUnground}
                       className="text-red-700 dark:text-red-400/60 hover:text-red-700 dark:hover:text-red-400 transition-colors"
@@ -188,10 +193,11 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                       </svg>
                     </button>
+                    )}
                   </div>
                 )}
               </div>
-            ) : isEntity ? (
+            ) : (enableGrounding && isEntity) ? (
               <button
                 onClick={corrections.handleGround}
                 disabled={corrections.wikiLoading}
@@ -207,7 +213,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         )}
 
         {/* Wikipedia overlay */}
-        {corrections.showWikiOverlay && (
+        {enableGrounding && corrections.showWikiOverlay && (
           <WikipediaOverlay
             results={corrections.wikiResults}
             loading={corrections.wikiLoading}
@@ -294,6 +300,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             adapter={adapter}
             onChainHighlight={onDecisionChainHighlight}
             onSelectId={onSelectId}
+            toolsEnabled={enableDecisionTools}
           />
         )}
 
