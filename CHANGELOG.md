@@ -6,6 +6,8 @@ Version bump to 2.0.1, every SmartMemory repo reads the same version (REL-2.0-VE
 
 ## Unreleased
 
+- UI-HIDE-TIME-SLIDER-1 (2026-11-23, user-visible): the Time button, the time slider and the bottom live-feed bar are hidden by default until they are fully built. `GraphExplorer` takes `enableTimeTravel` (default `false`) and `showPlaybackBar` (default `false`). With `enableTimeTravel` off there is no Time button and no slider, and a past time in the URL (`#asof=...`) is ignored, so the live graph shows and no "Viewing: <date>" label can appear. With `showPlaybackBar` off the whole bar at the bottom of the canvas (status dot and ops/s, pause and expand, speed slider, event ticker, Replay) is not rendered. Nothing is deleted: pass the prop to bring either back. The detail panel's "Replay hops" is separate (`useMultiHopReplay`) and stays. Test: `tests/hideTimeSlider.test.js`.
+
 - REL-CALLERS-ORIGIN-TAGS-1 (2026-10-26): `contracts/origin-contract.json` registers `mcp:memory_save`, `mcp:memory_save_document` and `mcp:memory_save_conversation` at tier 2 (exact keys, as `getOriginTier` looks them up). The legacy `mcp:memory_add` row stays. `mcp:memory_ingest` is not added: this file never carried it and has no comment saying it should. Test: `tests/originTiers.test.js`.
 
 ### Added (2026-10-24): UI-LIGHT-MODE-LM1-1

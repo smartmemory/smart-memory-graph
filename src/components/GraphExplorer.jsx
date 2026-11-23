@@ -38,6 +38,10 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  * @param {Object} [props.auth] - SDK AuthCore for live credentials and session recovery
  * @param {string} [props.workspaceId] - Recreate the subscription when scope changes
  * @param {string} [props.sseToken] - Bearer JWT for SSE auth
+ * @param {boolean} [props.enableTimeTravel=false] - Show the Time button and slider (and honour a past time in the URL).
+ *   Hidden by default until time travel is fully built.
+ * @param {boolean} [props.showPlaybackBar=false] - Show the bottom live-feed bar (status, pause, speed, ticker, Replay).
+ *   Hidden by default. The detail panel's "Replay hops" does not use this bar.
  * @param {string} [props.replayRunId] - When set, replays a specific run (passes runId+fromSeq:0)
  * @param {Object} [props.clock] - Optional shared replay clock from useReplayClock().
  *   When provided, GraphExplorer consumes events released by the clock instead
@@ -96,6 +100,8 @@ export default function GraphExplorer({
   autoReplayKey = null,
   showOriginLegend = true,
   hideSelectionToolbar = false,
+  enableTimeTravel = false,
+  showPlaybackBar = false,
   className = '',
   onNodeOpen,
   theme = null,
@@ -336,6 +342,7 @@ export default function GraphExplorer({
     stream,
     filters,
     urlState,
+    enableTimeTravel,
     data: { nodes, edges },
     refresh,
     getShareableUrl,
@@ -712,7 +719,7 @@ export default function GraphExplorer({
         stats={stats}
         cy={cytoscape.cy}
         onCopyLink={interaction.handleCopyLink}
-        onToggleTimeTravelSlider={() => interaction.setTimeTravelOpen((p) => !p)}
+        onToggleTimeTravelSlider={enableTimeTravel ? () => interaction.setTimeTravelOpen((p) => !p) : undefined}
         timeTravelActive={interaction.timeTravelOpen || !!interaction.asOfTime}
         autoFit={cytoscape.autoFit}
         onAutoFitChange={cytoscape.setAutoFit}
@@ -764,7 +771,7 @@ export default function GraphExplorer({
         )}
       </div>
 
-      {interaction.timeTravelOpen && (
+      {enableTimeTravel && interaction.timeTravelOpen && (
         <TimeTravelSlider
           onTimeChange={interaction.handleTimeTravel}
           onClose={() => {
@@ -824,14 +831,14 @@ export default function GraphExplorer({
         </div>
       )}
 
-      {interaction.timeTravelLoading && (
+      {enableTimeTravel && interaction.timeTravelLoading && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-purple-100 dark:bg-purple-900/90 border border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-2">
           <div className="w-3 h-3 border-2 border-purple-300 dark:border-purple-400 border-t-transparent rounded-full animate-spin" />
           Loading temporal snapshot...
         </div>
       )}
 
-      {interaction.asOfTime && !interaction.timeTravelLoading && (
+      {enableTimeTravel && interaction.asOfTime && !interaction.timeTravelLoading && (
         <div className="absolute top-16 right-4 bg-purple-100 dark:bg-purple-900/80 border border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-200 px-3 py-1.5 rounded-lg text-xs z-50">
           Viewing: {new Date(interaction.asOfTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
         </div>
@@ -957,7 +964,7 @@ export default function GraphExplorer({
           </button>
         </div>
       )}
-      {sseEnabled && stream.status === 'connected' && (
+      {showPlaybackBar && sseEnabled && stream.status === 'connected' && (
         <OperationsBar
           status={stream.status}
           operations={stream.operations}

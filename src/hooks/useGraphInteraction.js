@@ -23,13 +23,16 @@ export function useGraphInteraction({
   adapter,
   stream,
   filters,
-  urlState,
+  urlState: rawUrlState,
+  enableTimeTravel = false,
   data,
   refresh,
   getShareableUrl,
   saveToUrl,
   onNodeOpen,
 }) {
+  // Time travel is hidden until fully built: with it off, a past time in the URL is ignored (live graph).
+  const urlState = enableTimeTravel ? rawUrlState : (rawUrlState ? { ...rawUrlState, asOfTime: undefined } : rawUrlState);
   const [selectedNode, setSelectedNode] = useState(null);
   const [connectedEdges, setConnectedEdges] = useState([]);
   const [detailPanelOpen, setDetailPanelOpen] = useState(false);

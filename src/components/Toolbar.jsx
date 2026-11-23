@@ -167,19 +167,21 @@ export default function Toolbar({
 
       <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
-      {/* Time Travel */}
-      <button
-        onClick={onToggleTimeTravelSlider}
-        className={`px-3 py-1.5 text-sm rounded transition-colors ${
-          timeTravelActive ? 'bg-purple-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
-        }`}
-        title="Time travel — view graph at a past point in time"
-      >
-        <svg className="w-4 h-4 inline -mt-0.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        Time
-      </button>
+      {/* Time Travel: hidden until fully built (host passes enableTimeTravel) */}
+      {onToggleTimeTravelSlider && (
+        <button
+          onClick={onToggleTimeTravelSlider}
+          className={`px-3 py-1.5 text-sm rounded transition-colors ${
+            timeTravelActive ? 'bg-purple-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
+          }`}
+          title="Time travel — view graph at a past point in time"
+        >
+          <svg className="w-4 h-4 inline -mt-0.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Time
+        </button>
+      )}
 
       {/* Decision contradiction overlay */}
       {onToggleContradictionOverlay && (
