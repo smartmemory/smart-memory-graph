@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import DecisionEffects from './effects/DecisionEffects';
 import CytoscapeCanvas from './CytoscapeCanvas';
 import Toolbar from './Toolbar';
 import FilterPanel from './FilterPanel';
@@ -29,6 +30,10 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  * @param {{hash: string}} [props.focusRequest] - An explicit selection in the current view.
  * @param {GraphAPIAdapter} props.adapter - API adapter for data fetching
  * @param {{ nodes: GraphNode[], edges: GraphEdge[] }} [props.data] - External data (controlled mode)
+ * @param {boolean} [props.decisionEffectsLoading=false] - Show the outstanding effects read.
+ * @param {boolean} [props.enableDecisionEffects=false] - Display the controlled decision-effects view.
+ * @param {import('./effects/types').DecisionEffectsSnapshot} [props.decisionEffects] - Effects for the supplied data.
+ * @param {import('./effects/types').EffectsActions} [props.decisionEffectsActions] - Host callbacks for draft and focus changes.
  * @param {GraphAnnotations} [props.annotations] - Annotation overlay.
  *   Shape: { nodes: Record<id, {kind, value}[]>, edges: Record<id, {kind, value}[]>,
  *            activeKinds: string[], precedence?: string[] }
@@ -95,7 +100,17 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  * @param {string} [props.theme.palette.labelOutline] - Node label outline color.
  * @param {string} [props.theme.palette.selectionBorder] - Selected-element border.
  */
-export default function GraphExplorer({
+export default function GraphExplorer({ enableDecisionEffects = false, decisionEffects, decisionEffectsActions, decisionEffectsLoading = false, ...props }) {
+  if (enableDecisionEffects) {
+    if (decisionEffectsLoading) return <p role="status">Loading decision effects…</p>;
+    if (!props.data || !decisionEffects) return <p role="status">Decision effects unavailable.</p>;
+    return <DecisionEffects key={JSON.stringify([props.workspaceId, decisionEffects.focus, decisionEffects.phase, decisionEffects.today, decisionEffects.revision])}
+      data={props.data} effects={decisionEffects} actions={decisionEffectsActions} className={props.className} />;
+  }
+  return <WorkspaceGraph {...props} />;
+}
+
+function WorkspaceGraph({
   adapter,
   data: externalData,
   readOnlyReason,
