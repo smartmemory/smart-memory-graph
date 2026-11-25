@@ -10,6 +10,8 @@ Version bump to 2.0.1, every SmartMemory repo reads the same version (REL-2.0-VE
 
 ## Unreleased
 
+- Decision effects now clears draft state on workspace changes, requires an explicit write policy, labels stale conflicts and pending resolutions, lists every overflow branch, and distinguishes loading from unavailable data.
+
 - Added the opt-in decision effects view for a controlled `GraphExplorer`. Drafts show the retiring rule, conflicts and review hops. Hosts can supply date history, numbered source paths, result freshness and overflow counts. The new `enableDecisionEffects` prop defaults to `false`.
 
 - UI-GRAPH-FILTER-PERSIST-1 (2026-11-23, user-visible): the left bar's memory-type, entity-type and relation-type choices (all, none or a specific set) now survive a refresh. Saved in `localStorage` under `graph:filters:<workspaceId>` (`graph:filters:default` when the host passes no `workspaceId`), shape `{v:1, memory, entity, relation}`. The unchecked set is saved, so a type that first appears later shows checked (a saved "none" stays none). A corrupt or unreadable value falls back to all-checked with one console WARNING, and unavailable storage (private mode) no longer breaks the panel, including the existing cascade-edge checkbox. `useGraphFilters(nodes, edges, persistKey)` takes the scope as a third argument; `GraphExplorer` passes its `workspaceId`. Test: `tests/graphFilterPersist.test.js`.

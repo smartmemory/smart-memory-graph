@@ -29,6 +29,8 @@ dependencies, inspect the source path, or view rules on an earlier date.
 ```jsx
 <GraphExplorer
   enableDecisionEffects
+  workspaceId={workspaceId}
+  decisionEffectsLoading={loading}
   data={focusedGraph}
   decisionEffects={snapshot}
   decisionEffectsActions={{ onCommit, onCancel, onRefocus }}
@@ -43,11 +45,15 @@ See the [typed inputs](src/components/effects/types.d.ts) and the
 Pass the complete conflict, replacement and review lists for accurate counts,
 plus dated overflow counts for branches outside the supplied graph.
 
-The host owns writes. In direct-save mode settling the final conflict calls
+Pass the current workspace ID so switching workspaces clears the draft and view state.
+While a read is outstanding, set `decisionEffectsLoading`.
+
+The host owns writes. Without an explicit policy, the preview is read-only.
+With `policy="save"`, settling the final conflict calls
 `onCommit(focus, resolutions)`. Under `policy="propose"` the user chooses
 **Send for review**. Return the acknowledged standing or held snapshot to
 display the outcome. A rejected save leaves the draft available to retry.
-`onCancel` restores the host's standing snapshot. Clicking an overflow stub
+`onCancel` restores the host's standing snapshot. An overflow stub lists the hidden branches at that hop. Selecting a branch
 calls `onRefocus(branchId)` so the host can supply that branch.
 
 Run the browser acceptance scenarios with `npm run test:decision-effects`.

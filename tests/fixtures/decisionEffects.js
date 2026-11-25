@@ -43,7 +43,7 @@ function snapshot(focus, phase, distances, extras = {}) {
   const subset = nodes.filter(n => Object.hasOwn(distances, n.id)).map(n => ({ ...n, hop: distances[n.id] }));
   return {
     data: { nodes: subset, edges: edges.filter(e => Object.hasOwn(distances, e.source) && Object.hasOwn(distances, e.target)) },
-    decisionEffects: { focus, phase, today, freshness: computed, replaces: [], conflicts: [], review: [], whyPaths, ...extras },
+    decisionEffects: { focus, phase, today, policy: 'save', freshness: computed, replaces: [], conflicts: [], review: [], whyPaths, ...extras },
   };
 }
 

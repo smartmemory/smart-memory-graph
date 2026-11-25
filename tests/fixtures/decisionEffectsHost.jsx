@@ -5,9 +5,12 @@ import { GraphExplorer } from '../../src';
 import { email, committedEmail, friday, pilots, refunds, standing, crowded } from './decisionEffects';
 
 function fixture(name) {
+  if (name === 'unknown-policy') return { ...email, decisionEffects: { ...email.decisionEffects, policy: undefined } };
+  if (name === 'reject') return email;
   if (name === 'crowded') return crowded();
   if (name === 'stale') return { ...email, decisionEffects: {
     ...email.decisionEffects,
+    conflicts: email.decisionEffects.conflicts.map(c => ({ ...c, freshness: { ...c.freshness, stale: true } })),
     review: email.decisionEffects.review.map(r => r.id !== 'support' ? r : {
       ...r, state: 'checking', freshness: { kind: 'stored', checked_as_of: '2026-11-20T03:00:00Z', stale: true },
     }),
@@ -18,14 +21,18 @@ function fixture(name) {
   return { email, friday, pilots, refunds, standing }[name];
 }
 
-function Host({ name }) {
+function Host({ name, workspaceId, loading }) {
   const [snapshot, setSnapshot] = useState(() => fixture(name));
   const [branch, setBranch] = useState('');
   if (name === 'off') return <GraphExplorer data={{ nodes: [], edges: [] }} decisionEffects={email.decisionEffects} />;
-  if (name === 'missing') return <GraphExplorer enableDecisionEffects />;
+  if (name === 'missing') return <GraphExplorer enableDecisionEffects decisionEffectsLoading={loading} />;
   const { decisionEffects: effects } = snapshot;
   const actions = {
     onCommit(focus, answers) {
+      if (name === 'reject' && !window.lastCommit) {
+        window.lastCommit = { focus, answers };
+        return Promise.reject(new Error('Write rejected'));
+      }
       window.lastCommit = { focus, answers };
       if (effects.policy === 'propose') {
         setSnapshot({ ...snapshot, decisionEffects: { ...effects, phase: 'held', review: [], conflicts: [], replaces: [] } });
@@ -35,13 +42,17 @@ function Host({ name }) {
     onCancel() { setSnapshot(standing); },
     onRefocus: setBranch,
   };
-  return <><GraphExplorer enableDecisionEffects {...snapshot} decisionEffectsActions={actions} />
+  return <><GraphExplorer enableDecisionEffects workspaceId={workspaceId} {...snapshot} decisionEffectsActions={actions} />
     {branch && <output>Refocus requested: {branch}</output>}</>;
 }
 
 const root = createRoot(document.getElementById('root'));
 let generation = 0;
+const render = (name, workspaceId, loading) => flushSync(() =>
+  root.render(<Host key={generation} name={name} workspaceId={workspaceId} loading={loading} />));
+window.updateHost = render;
 window.loadCase = name => {
   window.lastCommit = null;
-  flushSync(() => root.render(<Host key={++generation} name={name} />));
+  generation++;
+  render(name, 'first', false);
 };

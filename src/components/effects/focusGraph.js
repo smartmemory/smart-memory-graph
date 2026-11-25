@@ -37,7 +37,6 @@ export function focusWindow(data, effects, date, showRetired, path) {
   const nodes = [];
   const reservedPath = new Set(candidates.filter(c => why.has(c.node.id)).map(c => c.node.id));
   const perHop = new Map();
-  const localOverflow = new Map();
   let subjects = 0;
   for (const { node, hop, kind } of candidates) {
     const count = perHop.get(hop) || 0;
@@ -50,12 +49,10 @@ export function focusWindow(data, effects, date, showRetired, path) {
       nodes.push(node);
       perHop.set(hop, count + 1);
     } else {
-      const stub = localOverflow.get(hop) || { hop, branchId: node.id, count: 0 };
-      stub.count++;
-      localOverflow.set(hop, stub);
+      overflow.push({ hop, branchId: node.id, count: 1 });
     }
   }
-  return { nodes, overflow: [...overflow, ...localOverflow.values()] };
+  return { nodes, overflow: overflow };
 }
 
 export function graphLinks(data, effects, nodes, today, path, choices) {
@@ -67,8 +64,11 @@ export function graphLinks(data, effects, nodes, today, path, choices) {
   if (today) {
     for (const id of effects.replaces) add(effects.focus, id, 'replaces', 'replaces');
     for (const c of effects.conflicts) {
-      const resolution = choices[c.id] || c.resolution;
-      add(effects.focus, c.id, resolution ? 'settled' : 'conflict', resolution?.choice || 'conflict', { partner: c.id });
+      const pending = choices[c.id];
+      const kind = c.resolution ? 'settled' : pending ? 'pending' : 'conflict';
+      const label = c.resolution?.choice || (pending ? 'pending: ' + pending.choice : 'conflict');
+      add(effects.focus, c.id, kind, label + (c.freshness?.stale ? ' · ◷ stale' : ''),
+        { partner: c.id, freshness: c.freshness });
     }
     for (const r of visibleReview(effects)) {
       if (r.hop <= 3) add(r.via, r.id, 'ripple', 'R' + r.hop);

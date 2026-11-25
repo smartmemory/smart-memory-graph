@@ -26,6 +26,7 @@ export default function DecisionEffects({ data, effects, actions = {}, className
   const first = data.nodes.reduce((start, n) => n.validFrom < start ? n.validFrom : start, effects.today.slice(0, 4) + '-01-01');
   const focus = byId.get(effects.focus);
   const draft = today && effects.phase === 'draft';
+  const policyKnown = effects.policy === 'save' || effects.policy === 'propose';
   const review = today ? visibleReview(effects) : [];
   const unsettled = effects.conflicts.filter(c => !choices[c.id] && !c.resolution);
   const hidden = overflow.reduce((sum, s) => sum + s.count, 0);
@@ -49,10 +50,10 @@ export default function DecisionEffects({ data, effects, actions = {}, className
   }
   const cancel = actions.onCancel && (() => actions.onCancel(effects.focus));
   async function commit(resolutions) {
-    if (!actions.onCommit || pending.current || !draft) return;
+    if (!actions.onCommit || pending.current || !draft || !policyKnown) return;
     const answers = Object.create(null);
     for (const c of effects.conflicts) {
-      const answer = resolutions[c.id] || c.resolution;
+      const answer = c.resolution || resolutions[c.id];
       if (!answer) return;
       answers[c.id] = answer;
     }
@@ -73,7 +74,7 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     setChoices(next);
     closePanel();
     // In direct-save workspaces the final choice commits, as in the approved preview.
-    if (effects.policy !== 'propose') void commit(next);
+    if (effects.policy === 'save') void commit(next);
   }
   // Auxiliary pills live on the canvas. Layout IDs must never shadow a caller's node ID.
   const extras = [];
@@ -82,11 +83,15 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     while (byId.has(key)) key += '_';
     extras.push({ key, label, anchor, onClick, stub });
   }
-  for (const stub of overflow) {
-    const predecessor = effects.review.find(r => r.id === stub.branchId)?.via;
-    const anchor = nodes.some(n => n.id === predecessor) ? predecessor : effects.focus;
-    pill('+' + stub.count + ' more at hop ' + stub.hop, anchor,
-      actions.onRefocus && (() => actions.onRefocus(stub.branchId)), true);
+  const branchesByHop = new Map();
+  for (const { hop, branchId, count } of overflow) {
+    if (!branchesByHop.has(hop)) branchesByHop.set(hop, new Map());
+    const branches = branchesByHop.get(hop);
+    branches.set(branchId, (branches.get(branchId) || 0) + count);
+  }
+  for (const [hop, branches] of branchesByHop) {
+    const count = Array.from(branches.values()).reduce((sum, n) => sum + n, 0);
+    pill('+' + count + ' more at hop ' + hop, effects.focus, () => openPanel('overflow', hop), true);
   }
   if (today && effects.possiblyRelated?.length) {
     pill(effects.possiblyRelated.length + ' possibly related', effects.focus, () => openPanel('related'));
@@ -122,8 +127,12 @@ export default function DecisionEffects({ data, effects, actions = {}, className
       {panel.kind === 'node' && selected && <DecisionCard node={selected} data={data} effects={effects} date={date}
         choices={choices} onWhy={canShowPath ? () => { setPath(selectedPath); closePanel(); } : null} />}
       {panel.kind === 'conflict' && conflict && <ConflictCard key={panel.id} focus={focus} partner={selected || { label: conflict.id }}
-        conflict={conflict} choice={choices[conflict.id] || conflict.resolution} busy={busy}
-        onResolve={draft && actions.onCommit ? resolve : null} onCancel={cancel} />}
+        conflict={conflict} choice={conflict.resolution || choices[conflict.id]} busy={busy}
+        onResolve={!conflict.resolution && draft && policyKnown && actions.onCommit ? resolve : null} onCancel={cancel} />}
+      {panel.kind === 'overflow' && <section className="de-detail"><h3>Branches at hop {panel.id}</h3>
+        <ul>{Array.from(branchesByHop.get(panel.id) || [], ([id, count]) =>
+          <li key={id}><button disabled={!actions.onRefocus} onClick={() => actions.onRefocus(id)}>
+            {byId.get(id)?.label || id}{count > 1 && ' (' + count + ' more)'}</button></li>)}</ul></section>}
       {panel.kind === 'related' && <section className="de-detail"><h3>Possibly related by wording</h3>
         <ul>{effects.possiblyRelated.map(n => <li key={n.id}>{n.label}</li>)}</ul></section>}
     </aside>}
@@ -132,6 +141,6 @@ export default function DecisionEffects({ data, effects, actions = {}, className
         R{r.hop} · {byId.get(r.id)?.label || r.id}</button></li>)}</ul></section>}
     {error && <p role="alert">{error}</p>}
     {draft && <CommitBar effects={effects} unsettled={unsettled} review={review} busy={busy} onCancel={cancel}
-      onConflict={id => openPanel('conflict', id)} onSave={actions.onCommit && (() => commit(choices))} />}
+      onConflict={id => openPanel('conflict', id)} onSave={policyKnown && actions.onCommit && (() => commit(choices))} />}
   </section>;
 }

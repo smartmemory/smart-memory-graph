@@ -153,7 +153,7 @@ test('multiple conflicts require every choice', async () => {
   await button('Replace the old rule').click();
   assert.equal(await button('Save').isDisabled(), true);
   assert.equal(await edge('conflict').count(), 1);
-  assert.equal(await edge('settled').count(), 1);
+  assert.equal(await edge('pending').count(), 1);
   assert.equal(await readCommit(), null);
 });
 
@@ -251,5 +251,64 @@ test('F · 47 decisions render 40 cards, seven hidden and a working overflow stu
   await stub.scrollIntoViewIfNeeded();
   await shot('14-focus-frame-and-stub');
   await stub.click();
-  assert.equal(await page.locator('output').innerText(), 'Refocus requested: term-2');
+  assert.equal(await aside().getByRole('listitem').count(), 7);
+  for (let i = 2; i <= 8; i++) {
+    await button('Pilot term ' + (i + 1)).click();
+    assert.equal(await page.locator('output').innerText(), 'Refocus requested: term-' + i);
+  }
+});
+
+test('workspace switch clears choices, open scope input and view settings on an identical snapshot', async () => {
+  await show('multi');
+  await page.getByRole('checkbox').check();
+  await openConflict();
+  await button('Replace the old rule').click();
+  await openConflict();
+  await page.getByLabel('Scope', { exact: true }).fill('First workspace only');
+  await page.evaluate(() => window.updateHost('multi', 'second'));
+  assert.equal(await aside().count(), 0);
+  assert.equal(await page.getByRole('checkbox').isChecked(), false);
+  assert.equal(await edge('conflict').count(), 2);
+  await edge('conflict').last().getByRole('button').click();
+  assert.equal(await page.getByLabel('Scope', { exact: true }).inputValue(), '');
+  assert.equal(await button('Keep both with a scope').isDisabled(), true);
+  assert.equal(await readCommit(), null);
+});
+
+test('unknown policy offers conflict inspection without write actions', async () => {
+  await show('unknown-policy');
+  assert.equal(await button('Save').count() + await button('Send for review').count(), 0);
+  await openConflict();
+  assert.match(await aside().innerText(), /Customer data stays in the EU/);
+  assert.equal(await button('Replace the old rule').count() + await button('Keep both with a scope').count(), 0);
+  assert.equal(await readCommit(), null);
+});
+
+test('stored stale conflict has a persistent cue on a computed graph', async () => {
+  await show('stale');
+  assert.match(await page.locator('.de-header').innerText(), /computed now/);
+  assert.match(await edge('conflict').getByRole('button').innerText(), /conflict.*◷ stale/);
+});
+
+test('outstanding read becomes unavailable when loading ends without inputs', async () => {
+  await page.evaluate(() => window.loadCase('missing'));
+  await page.evaluate(() => window.updateHost('missing', 'first', true));
+  assert.match(await page.getByRole('status').innerText(), /Loading decision effects/);
+  await page.evaluate(() => window.updateHost('missing', 'first', false));
+  assert.match(await page.getByRole('status').innerText(), /unavailable/);
+});
+
+test('rejected direct save shows a pending link and retries the preserved scope', async () => {
+  await show('reject');
+  await openConflict();
+  await page.getByLabel('Scope', { exact: true }).fill('Billing only');
+  await button('Keep both with a scope').click();
+  assert.equal(await page.getByRole('alert').innerText(), 'Write rejected');
+  assert.equal(await edge('settled').count(), 0);
+  await edge('pending').getByRole('button', { name: 'pending: scoped' }).click();
+  assert.equal(await page.getByLabel('Scope', { exact: true }).inputValue(), 'Billing only');
+  await button('Close detail').click();
+  await button('Save').click();
+  assert.equal(await edge('settled').getByRole('button').innerText(), 'scoped');
+  assert.equal((await readCommit()).answers.eu.scope, 'Billing only');
 });

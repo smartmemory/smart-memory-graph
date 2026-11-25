@@ -59,10 +59,10 @@ export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCa
   const conflicts = effects.conflicts.length;
   return <footer className="de-commit" aria-label="Commit bar">
     <div><strong>{conflicts} conflict{conflicts === 1 ? '' : 's'} · {effects.replaces.length} replaced · {review.length} to review</strong>
-      <div>{unsettled.length ? <button onClick={() => onConflict(unsettled[0].id)}>Settle {unsettled.length} open conflict{unsettled.length === 1 ? '' : 's'}</button>
+      <div>{!onSave ? 'Writes unavailable' : unsettled.length ? <button onClick={() => onConflict(unsettled[0].id)}>Settle {unsettled.length} open conflict{unsettled.length === 1 ? '' : 's'}</button>
         : conflicts === 0 && !review.length && !effects.replaces.length ? 'Safe to save' : 'Ready to save'}</div></div>
     <div className="de-actions"><button onClick={onCancel} disabled={busy || !onCancel}>Cancel</button>
-      <button className="de-primary" disabled={busy || !onSave || !!unsettled.length} onClick={onSave}>
-        {effects.policy === 'propose' ? 'Send for review' : 'Save'}</button></div>
+      {onSave && <button className="de-primary" disabled={busy || !!unsettled.length} onClick={onSave}>
+        {effects.policy === 'propose' ? 'Send for review' : 'Save'}</button>}</div>
   </footer>;
 }

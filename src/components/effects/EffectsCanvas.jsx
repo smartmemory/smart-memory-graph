@@ -41,7 +41,7 @@ function Edge({ edge, geometry, marker, dim, onConflict }) {
   const hasButton = !!edge.partner;
   return <g data-edge={edge.kind} data-source={edge.source} data-target={edge.target}
     className={'de-edge de-' + edge.kind} data-dimmed={dim || undefined}>
-    <title>{edge.label}{edge.freshness?.stale ? ' · stale' : ''}</title>
+    <title>{edge.label}{!hasButton && edge.freshness?.stale ? ' · stale' : ''}</title>
     <path d={d} markerEnd={'url(#' + marker + ')'} />
     {hasButton ? <foreignObject x={x - w / 2 - 6} y={y - 14} width={w + 12} height="30">
       <button className="de-link-button" onClick={() => onConflict(edge.partner)}>{edge.label}</button>
