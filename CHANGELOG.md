@@ -10,6 +10,8 @@ Version bump to 2.0.1, every SmartMemory repo reads the same version (REL-2.0-VE
 
 ## Unreleased
 
+- DECISION-EFFECTS-GRAPH-1 freezes the [Shape A decision effects contract](contracts/decision-effects.json) and registers the four routes in the [decision contract](contracts/decisions.json).
+
 - OPS-UI-WIRING-AUDIT-1 (2026-11-25, user-visible): night wiring fixes rebased on main. Hidden controls stay hidden by default (UI-CONTROLS-AUDIT-1, UI-HIDE-TIME-SLIDER-1); when a host turns them on they now need an adapter that can do the job.
   - Graph selection links can focus directed relations. Export and local viewer controls explain renderer and daemon limitations.
   - Data-only graph views can explain why refresh, path, history, neighbor expansion and editing are unavailable.

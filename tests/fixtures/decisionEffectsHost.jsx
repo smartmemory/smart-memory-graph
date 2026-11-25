@@ -10,7 +10,7 @@ function fixture(name) {
   if (name === 'crowded') return crowded();
   if (name === 'stale') return { ...email, decisionEffects: {
     ...email.decisionEffects,
-    conflicts: email.decisionEffects.conflicts.map(c => ({ ...c, freshness: { ...c.freshness, stale: true } })),
+    conflicts: email.decisionEffects.conflicts.map(c => ({ ...c, freshness: { kind: 'stored', checked_as_of: '2026-11-24T04:41:00Z', stale: true } })),
     review: email.decisionEffects.review.map(r => r.id !== 'support' ? r : {
       ...r, state: 'checking', freshness: { kind: 'stored', checked_as_of: '2026-11-20T03:00:00Z', stale: true },
     }),

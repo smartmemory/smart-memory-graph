@@ -33,7 +33,7 @@ export interface Conflict {
   id: string // partner of the focused decision
   why: string
   freshness: Freshness
-  resolution?: Resolution
+  resolution?: Resolution | Settlement
 }
 export interface Review {
   id: string
@@ -43,7 +43,7 @@ export interface Review {
   freshness: Freshness
 }
 
-export interface DecisionEffectsSnapshot {
+export interface EffectsPresentation {
   focus: string
   today: string
   revision?: string // change when replacing a draft or its authoritative conflict set
@@ -55,10 +55,30 @@ export interface DecisionEffectsSnapshot {
   freshness: Freshness
   // Ordered provenance, source first, up to five edges. Each pair has a graph edge.
   whyPaths?: Record<string, string[]>
+  counts?: { conflicts: number, replaced: number, to_review: number }
+  possibly_related?: { id: string, label: string }[]
   possiblyRelated?: { id: string, label: string }[]
   // True counts beyond the supplied data, for the indicated working date.
   overflow?: { date: string, hop: number, count: number, branchId: string }[]
   sweepWatermark?: string
+}
+
+// Phase 1 HTTP reply. Stored marks remain available to presentation-only hosts.
+type Computed = { kind: 'computed' }
+export type Settlement = { choice: 'replace' } | { choice: 'keep_both_scoped', scope: string }
+export type CommitResolution = Settlement | { choice: 'cancel' }
+
+export interface DecisionEffectsSnapshot extends Omit<EffectsPresentation, 'possiblyRelated' | 'sweepWatermark'> {
+  data: {
+    nodes: (EffectsNode & { check?: 'unchecked' })[]
+    edges: (EffectsEdge & { freshness?: Computed })[]
+  }
+  freshness: Computed
+  conflicts: (Omit<Conflict, 'resolution'> & { freshness: Computed, resolution?: Settlement })[]
+  review: (Review & { freshness: Computed, state: 'preview' | 'flagged' })[]
+  counts: NonNullable<EffectsPresentation['counts']>
+  possibly_related: NonNullable<EffectsPresentation['possibly_related']>
+  overflow: NonNullable<EffectsPresentation['overflow']>
 }
 
 export interface EffectsActions {

@@ -2,6 +2,46 @@
   "_source": "smart-memory-graph/contracts/decisions.json",
   "_description": "Decision memory-type visual + lifecycle contract. Mirrors REST surface in smart-memory-service/memory_service/api/routes/decisions.py and MCP decision_* tools. Source of truth for the @smartmemory/graph package.",
   "_routes": {
+    "effects": {
+      "route": "GET /memory/decisions/{id}/effects",
+      "request": "decision-effects.json#/$defs/EffectsRequest",
+      "reply": "decision-effects.json#/$defs/DecisionEffectsSnapshot",
+      "errors": {
+        "404": "Unknown or unreadable decision id",
+        "429": "Budget exhausted"
+      }
+    },
+    "effects_preview": {
+      "route": "POST /memory/decisions/effects/preview",
+      "request": "decision-effects.json#/$defs/PreviewRequest",
+      "reply": "decision-effects.json#/$defs/DecisionEffectsSnapshot",
+      "errors": {
+        "404": "Unknown or unreadable decision id",
+        "429": "Budget exhausted"
+      }
+    },
+    "effects_commit": {
+      "route": "POST /memory/decisions/effects/commit",
+      "request": "decision-effects.json#/$defs/CommitRequest",
+      "reply": "decision-effects.json#/$defs/CommitReply",
+      "errors": {
+        "404": "Unknown or unreadable decision id",
+        "429": "Budget exhausted",
+        "409": {
+          "description": "Unsettled conflict. No writes.",
+          "reply": "decision-effects.json#/$defs/UnsettledConflict"
+        }
+      }
+    },
+    "depends_on": {
+      "route": "POST /memory/decisions/{id}/depends-on",
+      "request": "decision-effects.json#/$defs/DependsOnRequest",
+      "reply": "decision-effects.json#/$defs/DependsOnReply",
+      "errors": {
+        "404": "Unknown or unreadable decision id",
+        "429": "Budget exhausted"
+      }
+    },
     "list_active": "GET /memory/decisions",
     "_list_active_params": {
       "domain": "optional string",
