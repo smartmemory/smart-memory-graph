@@ -129,3 +129,23 @@ describe('GraphExplorer mode prop', () => {
     expect(snapshot().label).toBe('rgb(15,23,42)');
   });
 });
+
+it('focuses Ask results on the mounted canvas, including a relation with a server-assigned id', async () => {
+  const focus = (hash) => render({ adapter: undefined, focusRequest: { hash } });
+  await focus('#selected=m1');
+  const canvas = cy();
+  expect(canvas.$id('m1').selected()).toBe(true);
+
+  await focus('#relation=m1-%3Ee1%3AMENTIONS');
+  expect(cy()).toBe(canvas);
+  expect(canvas.$id('x1').selected()).toBe(true);
+  expect(canvas.$id('x1').hasClass('highlighted')).toBe(true);
+  expect(canvas.$id('m1').hasClass('highlighted')).toBe(true);
+  expect(canvas.$id('e1').hasClass('highlighted')).toBe(true);
+  expect(canvas.$id('m1').selected()).toBe(false);
+
+  await focus('#relation=e1-%3Em1%3AMENTIONS');
+  expect(host.textContent).toContain('The selected relation is unavailable');
+  expect(canvas.$id('x1').selected()).toBe(false);
+  expect(canvas.$id('x1').hasClass('highlighted')).toBe(false);
+});

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { LAYOUT_OPTIONS } from '../core/constants';
 import { MEMORY_TYPE_SET } from '../core/graphColors';
-import { graphNodeToCyElement, graphEdgeToCyElement, cyElementToGraphNode } from '../internal/cytoscapeConvert';
+import { graphNodeToCyElement } from '../internal/cytoscapeConvert';
+import { normalizeAPIResponse } from '../core/normalize';
 
 /**
  * Node interaction logic extracted from GraphExplorer.jsx:307-586 (R1).
@@ -31,6 +32,8 @@ export function useGraphInteraction({
   getShareableUrl,
   saveToUrl,
   onNodeOpen,
+  manageCanvas = true,
+  temporalUnavailable = false,
 }) {
   // Time travel is hidden until fully built: with it off, a past time in the URL is ignored (live graph).
   const urlState = enableTimeTravel ? rawUrlState : (rawUrlState ? { ...rawUrlState, asOfTime: undefined } : rawUrlState);
@@ -41,8 +44,13 @@ export function useGraphInteraction({
   const [pathNodes, setPathNodes] = useState([]);
   const [pathResult, setPathResult] = useState(null);
   const [expanding, setExpanding] = useState(false);
+  const [expandStatus, setExpandStatus] = useState(null);
+  const [snapshot, setSnapshot] = useState(null);
+  const [timeTravelError, setTimeTravelError] = useState(null);
+  const snapshotRequest = useRef(0);
+  useEffect(() => () => { snapshotRequest.current++; }, [adapter]);
   const [timeTravelOpen, setTimeTravelOpen] = useState(!!urlState?.asOfTime);
-  const [asOfTime, setAsOfTime] = useState(urlState?.asOfTime || null);
+  const [asOfTime, setAsOfTime] = useState(null);
   const [timeTravelLoading, setTimeTravelLoading] = useState(false);
   // A shared link carries #layout=...: start on it when it is one of the known layouts.
   const [layout, setLayout] = useState(() => (
@@ -50,33 +58,35 @@ export function useGraphInteraction({
   ));
 
   // Single click: select node + highlight neighbors + open detail panel
-  const handleNodeClick = useCallback((nodeData) => {
+  const selectNode = useCallback((nodeData) => {
+    setExpandStatus(null);
     setSelectedNode(nodeData);
     setDetailPanelOpen(true);
     cytoscape.selectNode(nodeData.id);
     setConnectedEdges(cytoscape.getConnectedEdges(nodeData.id));
+  }, [cytoscape.selectNode, cytoscape.getConnectedEdges]);
 
+  const handleNodeClick = useCallback((nodeData) => {
+    selectNode(nodeData);
     if (pathMode) {
-      setPathNodes((prev) => {
-        const next = [...prev, nodeData.id];
-        if (next.length === 2) {
-          if (!adapter) { setPathMode(false); return []; }
-          adapter.findPath(next[0], next[1]).then((result) => {
-            const path = Array.isArray(result?.path) ? result.path : [];
-            if (path.length === 0 || result?.path_found === false) {
-              setPathResult({ error: 'No path between these nodes' });
-              return;
-            }
-            setPathResult(result);
-            cytoscape.highlightElements(path.map((n) => n.item_id || n.id));
-          }).catch(() => setPathResult({ error: 'Path not found' }));
-          setPathMode(false);
-          return [];
+      if (!pathNodes.length) {
+        setPathNodes([nodeData.id]);
+        return;
+      }
+      setPathMode(false);
+      setPathNodes([]);
+      if (!adapter?.findPath) return;
+      setPathResult({ loading: true });
+      adapter.findPath(pathNodes[0], nodeData.id).then((result) => {
+        if (!result?.path?.length || result?.path_found === false) {
+          setPathResult({ error: 'No path between these nodes' });
+          return;
         }
-        return next;
-      });
+        setPathResult(result);
+        cytoscape.highlightElements(result.path.map((n) => n.item_id || n.id));
+      }).catch(() => setPathResult({ error: 'Could not find a path.' }));
     }
-  }, [pathMode, cytoscape, adapter]);
+  }, [pathMode, pathNodes, cytoscape, adapter, selectNode]);
 
   // Double-click: host hook (e.g. open in vault), fall back to detail panel.
   const handleNodeDblClick = useCallback((nodeData) => {
@@ -84,6 +94,7 @@ export function useGraphInteraction({
       onNodeOpen(nodeData);
       return;
     }
+    setExpandStatus(null);
     setSelectedNode(nodeData);
     setDetailPanelOpen(true);
     cytoscape.selectNode(nodeData.id);
@@ -101,7 +112,7 @@ export function useGraphInteraction({
         if (updates.entity_type) cyNode.data('entity_type', updates.entity_type);
       }
     }
-    setSelectedNode((prev) => prev ? { ...prev, ...updates } : prev);
+    setSelectedNode((prev) => prev?.id === nodeId ? { ...prev, ...updates } : prev);
   }, [cytoscape]);
 
   // Wire event handlers into Cytoscape
@@ -115,12 +126,19 @@ export function useGraphInteraction({
 
   // Expand neighbors
   const handleExpand = useCallback(async (nodeId) => {
-    if (!adapter) return;
+    if (!adapter?.getNeighbors) return;
+    const context = snapshotRequest.current;
     setExpanding(true);
+    setExpandStatus(null);
     try {
       const res = await adapter.getNeighbors(nodeId);
+      if (context !== snapshotRequest.current) return;
       const neighbors = res?.neighbors || [];
-      if (!Array.isArray(neighbors) || neighbors.length === 0) return;
+      if (!Array.isArray(neighbors)) throw new Error('Invalid neighbor response.');
+      if (neighbors.length === 0) {
+        setExpandStatus({ nodeId, message: 'No neighbors found.' });
+        return;
+      }
 
       const newCyElements = [];
       for (const item of neighbors) {
@@ -136,9 +154,10 @@ export function useGraphInteraction({
         });
 
         const edgeType = item.link_type || 'RELATES_TO';
+        const [source, target] = item.direction === 'incoming' ? [id, nodeId] : [nodeId, id];
         newCyElements.push({
           group: 'edges',
-          data: { id: `${nodeId}-${id}:${edgeType}`, source: nodeId, target: id, label: edgeType, type: edgeType },
+          data: { id: `${source}->${target}:${edgeType}`, source, target, label: edgeType, type: edgeType },
         });
       }
 
@@ -170,13 +189,21 @@ export function useGraphInteraction({
         }
       }
 
-      setConnectedEdges(cytoscape.getConnectedEdges(nodeId));
-    } catch (err) {
-      console.error('Failed to expand neighbors:', err);
+      setExpandStatus({ nodeId, message: `Loaded ${neighbors.length} neighbor links.` });
+    } catch {
+      if (context === snapshotRequest.current) {
+        setExpandStatus({ nodeId, error: true, message: 'Could not expand neighbors.' });
+      }
     } finally {
       setExpanding(false);
     }
   }, [adapter, cytoscape]);
+
+  useEffect(() => {
+    if (!expandStatus?.error && selectedNode?.id && expandStatus?.nodeId === selectedNode.id) {
+      setConnectedEdges(cytoscape.getConnectedEdges(selectedNode.id));
+    }
+  }, [expandStatus, selectedNode, cytoscape.getConnectedEdges]);
 
   // Refresh
   const handleRefresh = useCallback(() => {
@@ -185,9 +212,9 @@ export function useGraphInteraction({
   }, [refresh, stream]);
 
   // Layout change
-  const handleLayoutChange = useCallback((newLayout) => {
+  const handleLayoutChange = useCallback((newLayout, options) => {
     setLayout(newLayout);
-    cytoscape.runLayout(newLayout);
+    cytoscape.runLayout(newLayout, options);
   }, [cytoscape]);
 
   // Search highlight
@@ -212,65 +239,63 @@ export function useGraphInteraction({
   // filters and selection mode. Will be replaced with proper collapsible cluster nodes.
   // See: docs/features/VIS-GRAPH-13/design.md
 
-  // Time travel
+  // Only the latest request can change the displayed graph.
   const handleTimeTravel = useCallback(async (isoTimestamp) => {
+    const request = ++snapshotRequest.current;
+    setTimeTravelError(null);
     if (!isoTimestamp) {
-      handleRefresh();
       setAsOfTime(null);
+      setSnapshot(null);
+      setTimeTravelLoading(false);
+      handleRefresh();
       return;
     }
-    if (!adapter) return;
+    if (temporalUnavailable || !adapter?.getTemporalSnapshot) {
+      setTimeTravelError(temporalUnavailable ? 'The local viewer supports only the live graph.' : 'Historical snapshots are unavailable.');
+      return;
+    }
     setTimeTravelLoading(true);
-    setAsOfTime(isoTimestamp);
     try {
       const res = await adapter.getTemporalSnapshot(isoTimestamp);
-      const items = res?.state || res?.items || res?.memories || [];
-      if (Array.isArray(items) && items.length > 0) {
-        const newElements = items.map((item) => ({
-          group: 'nodes',
-          data: {
-            id: item.item_id || item.id,
-            label: item.title || item.content?.substring(0, 40) || (item.item_id || item.id).substring(0, 12),
-            type: item.memory_type || 'semantic',
-            category: 'memory',
-            content: item.content || '',
-            confidence: item.confidence,
-            created_at: item.created_at,
-            updated_at: item.updated_at,
-            metadata: item.metadata || {},
-          },
-        }));
-        cytoscape.setElements(newElements);
+      if (request !== snapshotRequest.current) return;
+      const items = res?.state ?? res?.items ?? res?.memories;
+      if (!Array.isArray(items)) throw new Error('Invalid historical snapshot.');
+      const nextSnapshot = normalizeAPIResponse({ nodes: items });
+      setSnapshot(nextSnapshot);
+      setAsOfTime(isoTimestamp);
+      if (manageCanvas) {
+        cytoscape.setElements(nextSnapshot.nodes.map(graphNodeToCyElement));
         cytoscape.runLayout(layout);
       }
-    } catch (err) {
-      console.error('Time travel failed:', err);
+    } catch {
+      if (request === snapshotRequest.current) setTimeTravelError('Could not load the historical snapshot.');
     } finally {
-      setTimeTravelLoading(false);
+      if (request === snapshotRequest.current) setTimeTravelLoading(false);
     }
-  }, [handleRefresh, cytoscape, layout, adapter]);
+  }, [adapter, cytoscape, handleRefresh, layout, manageCanvas, temporalUnavailable]);
 
   // Copy shareable link
-  const handleCopyLink = useCallback(() => {
+  const handleCopyLink = useCallback(async () => {
     const cy = cytoscape.cy.current;
     const state = {
       layout,
       selected: selectedNode?.id || null,
+      relation: !selectedNode ? cy?.edges(':selected').first().id() : null,
       filters: [...(filters?.activeMemoryTypes || []), ...(filters?.activeEntityTypes || [])],
       zoom: cy?.zoom() || 1,
       pan: cy?.pan() || { x: 0, y: 0 },
       asOfTime,
     };
     const url = getShareableUrl?.(state);
+    if (!url || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable.');
+    await navigator.clipboard.writeText(url);
     saveToUrl?.(state);
-    if (!url || !navigator.clipboard?.writeText) return false;
-    return navigator.clipboard.writeText(url).then(() => true, () => false);
   }, [layout, selectedNode, filters, asOfTime, cytoscape, getShareableUrl, saveToUrl]);
 
   // Restore URL state on initial load
   const urlRestoredRef = useRef(false);
   useEffect(() => {
-    if (urlRestoredRef.current) return;
+    if (!manageCanvas || urlRestoredRef.current) return;
     if ((data?.nodes?.length || 0) === 0 && !urlState?.asOfTime) return;
     urlRestoredRef.current = true;
 
@@ -305,16 +330,20 @@ export function useGraphInteraction({
     connectedEdges,
     detailPanelOpen,
     pathMode,
-    pathNodes,
+    pathStart: pathNodes[0],
     pathResult,
     expanding,
+    expandStatus: expandStatus?.nodeId === selectedNode?.id ? expandStatus : null,
     timeTravelOpen,
     setTimeTravelOpen,
     asOfTime,
     timeTravelLoading,
+    timeTravelError,
+    snapshot,
     layout,
     adapterAvailable: !!adapter,
     handleNodeClick,
+    selectNode,
     handleNodeDblClick,
     handleNodeUpdate,
     handleExpand,

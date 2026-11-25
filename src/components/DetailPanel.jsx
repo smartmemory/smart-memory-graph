@@ -25,7 +25,7 @@ const EDGES_PAGE_SIZE = 10;
  * @param {boolean} [props.enableGrounding=false] - Ground button and Wikipedia picker
  * @param {boolean} [props.enableDecisionTools=false] - decision conflicts and provenance
  */
-export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState, enableEntityEditing = false, enableGrounding = false, enableDecisionTools = false }) {
+export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState, enableEntityEditing = false, enableGrounding = false, enableDecisionTools = false, daemon = false, decisionUnavailable, readOnlyReason, deleteUnavailable, expandStatus }) {
   const [edgesShown, setEdgesShown] = useState(EDGES_PAGE_SIZE);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -37,11 +37,11 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
   }, [node?.id]);
 
   const isEntity = node?.category === 'entity';
-  const canEditEntity = isEntity && enableEntityEditing;
-
+  // Hidden unless the host turns editing on (UI-CONTROLS-AUDIT-1), and then only with an adapter that can write.
+  const canEditEntity = isEntity && enableEntityEditing && !daemon && !!adapter?.updateEntityNode;
   const corrections = useEntityCorrections({
     node,
-    adapter,
+    adapter: isEntity && !daemon ? adapter : null,
     onNodeUpdate,
   });
 
@@ -79,14 +79,15 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: color }} />
 
-            {/* Type badge — clickable for entities */}
-            {canEditEntity ? (
+            {/* Type badge — a button only when the host enables editing (disabled with the reason when it cannot write) */}
+            {isEntity && enableEntityEditing ? (
               <div className="relative">
                 <button
+                  disabled={!canEditEntity || corrections.saving}
                   onClick={() => corrections.setTypeDropdownOpen(!corrections.typeDropdownOpen)}
                   className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize cursor-pointer hover:ring-1 hover:ring-border dark:hover:ring-white/20 transition-all ${corrections.typeSaved ? 'ring-2 ring-green-300 dark:ring-green-500' : ''}`}
                   style={{ backgroundColor: color + '20', color }}
-                  title="Click to change entity type"
+                  title={readOnlyReason || (canEditEntity ? 'Click to change entity type' : undefined)}
                 >
                   {node.type}
                   <svg className="w-2.5 h-2.5 inline ml-1 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,14 +150,14 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             />
           ) : (
             <h2
-              className={`text-sm font-medium text-foreground dark:text-slate-100 break-words ${canEditEntity ? 'cursor-pointer hover:bg-muted/50 dark:hover:bg-slate-700/50 rounded px-1 -mx-1 transition-colors' : ''} ${corrections.labelSaved ? 'ring-1 ring-green-300 dark:ring-green-500 rounded' : ''}`}
+              className={`text-sm font-medium text-foreground dark:text-slate-100 break-words ${canEditEntity && !corrections.saving ? 'cursor-pointer hover:bg-muted/50 dark:hover:bg-slate-700/50 rounded px-1 -mx-1 transition-colors' : ''} ${corrections.labelSaved ? 'ring-1 ring-green-300 dark:ring-green-500 rounded' : ''}`}
               onClick={() => {
-                if (canEditEntity) {
+                if (canEditEntity && !corrections.saving) {
                   corrections.setLabelValue(node.label);
                   corrections.setEditingLabel(true);
                 }
               }}
-              title={canEditEntity ? 'Click to rename' : undefined}
+              title={isEntity ? readOnlyReason || (canEditEntity ? 'Click to rename' : undefined) : undefined}
             >
               {node.label}
             </h2>
@@ -212,21 +213,29 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           </div>
         )}
 
+        {isEntity && readOnlyReason && <p className="text-xs">Entity names and types are read-only here.</p>}
+        {isEntity && daemon && <p className="text-xs">The local viewer cannot change entity types or names.</p>}
+        {corrections.saving && <p role="status" className="text-xs">Saving entity…</p>}
+        {corrections.correctionError && <p role="alert" className="text-xs">{corrections.correctionError}</p>}
+        {corrections.groundingLoading && <p role="status" className="text-xs">Checking grounding…</p>}
+        {corrections.groundingError && <p role="alert" className="text-xs">{corrections.groundingError}</p>}
+
         {/* Wikipedia overlay */}
         {enableGrounding && corrections.showWikiOverlay && (
           <WikipediaOverlay
             results={corrections.wikiResults}
             loading={corrections.wikiLoading}
-            onAccept={corrections.handleGroundAccept}
+            error={corrections.wikiError}
             onCancel={() => corrections.setShowWikiOverlay(false)}
           />
         )}
 
         {/* Expand neighbors button */}
-        {onExpand && (
+        {(onExpand || readOnlyReason) && (
           <button
             onClick={() => onExpand(node.id)}
-            disabled={expanding}
+            disabled={expanding || !!readOnlyReason}
+            title={readOnlyReason || undefined}
             className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-blue-600/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-600/30 rounded-lg hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {expanding ? (
@@ -244,6 +253,8 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             )}
           </button>
         )}
+
+        {expandStatus && <p role={expandStatus.error ? 'alert' : 'status'} className="text-xs">{expandStatus.message}</p>}
 
         {/* Multi-hop replay button */}
         {onHopReplay && (
@@ -297,6 +308,8 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         {isDecisionNode(node) && (
           <DecisionDetailBlock
             node={node}
+            daemon={daemon}
+            decisionUnavailable={decisionUnavailable}
             adapter={adapter}
             onChainHighlight={onDecisionChainHighlight}
             onSelectId={onSelectId}
@@ -415,7 +428,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
       </div>
 
       {/* Footer — destructive actions */}
-      {onDelete && (
+      {(onDelete || deleteUnavailable || readOnlyReason) && (
         <div className="border-t border-border dark:border-slate-700 p-3 bg-card dark:bg-slate-800 shrink-0">
           {confirmDelete ? (
             <div className="flex items-center gap-2">
@@ -443,11 +456,12 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
           ) : (
             <button
               type="button"
+              disabled={!!(deleteUnavailable || readOnlyReason)}
               onClick={() => setConfirmDelete(true)}
               className="w-full px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-400 hover:text-foreground dark:hover:text-white hover:bg-red-600/80 border border-red-300 dark:border-red-600/40 hover:border-red-300 dark:hover:border-red-500 rounded transition-colors"
-              title="Delete this node from the graph"
+              title={readOnlyReason || 'Delete this node from the graph'}
             >
-              Delete Node
+              {deleteUnavailable || 'Delete Node'}
             </button>
           )}
         </div>

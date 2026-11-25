@@ -57,6 +57,8 @@ const adapter = () => ({
   findPath,
   findDecisionConflicts: vi.fn(async () => ({ conflicts: [] })),
   getDecisionProvenance: vi.fn(async () => ({})),
+  // Entity editing needs an adapter that can write (OPS-UI-WIRING-AUDIT-1).
+  updateEntityNode: vi.fn(async () => ({})),
 });
 
 async function render(props = {}, data = DATA) {

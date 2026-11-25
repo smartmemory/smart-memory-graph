@@ -414,22 +414,25 @@ export function useCytoscape(containerRef, options = {}) {
       },
     };
 
+    const { onComplete, ...layoutOptions } = options;
     const config = {
       ...(layoutDefaults[layoutName] || { name: layoutName }),
-      ...options,
+      ...layoutOptions,
     };
 
     if (isFirstLayout) {
-      config.fit = true;
+      if (layoutOptions.fit !== false) config.fit = true;
       if (Object.prototype.hasOwnProperty.call(config, 'randomize')) {
         config.randomize = true;
       }
     }
 
     const fitOnStop = () => {
-      if (config.fit === false) return;
-      cy.resize();
-      cy.fit(getFitElements(cy), getFitPadding(cy));
+      if (config.fit !== false) {
+        cy.resize();
+        cy.fit(getFitElements(cy), getFitPadding(cy));
+      }
+      onComplete?.();
     };
     // A layout is done only when it moved the nodes (checkedLayout.js): one that stops before
     // its first animation frame is re-run, and a hidden document is waited out.

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   resolveDecisionStatus,
   isDecisionNode,
@@ -29,12 +29,16 @@ import {
  * @param {function(string): void} [props.onSelectId] - Navigate to another node by id
  * @param {boolean} [props.toolsEnabled=true] - Show "Find conflicts" and "Load provenance" (GraphExplorer passes enableDecisionTools, default off)
  */
-export default function DecisionDetailBlock({ node, adapter, onChainHighlight, onSelectId, toolsEnabled = true }) {
+export default function DecisionDetailBlock({ node, adapter, onChainHighlight, onSelectId, toolsEnabled = true, daemon = false, decisionUnavailable = daemon ? 'Unavailable through this daemon' : null }) {
   const [conflicts, setConflicts] = useState(null);
   const [conflictError, setConflictError] = useState(null);
   const [conflictLoading, setConflictLoading] = useState(false);
   const [provenance, setProvenance] = useState(null);
   const [provenanceLoading, setProvenanceLoading] = useState(false);
+
+  const [chainLoading, setChainLoading] = useState(false);
+  const [chainError, setChainError] = useState(null);
+  const chainRequest = useRef(0);
 
   // Reset on node change
   useEffect(() => {
@@ -42,7 +46,10 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
     setConflictError(null);
     setProvenance(null);
     if (onChainHighlight) onChainHighlight(null);
-    return () => { if (onChainHighlight) onChainHighlight(null); };
+    return () => {
+      chainRequest.current++;
+      onChainHighlight?.(null);
+    };
   }, [node?.id, onChainHighlight]);
 
   if (!isDecisionNode(node)) return null;
@@ -53,14 +60,36 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
     : (node.supersedes ? [node.supersedes] : []);
   const supersededBy = node.superseded_by || null;
 
-  const handleHighlightChain = () => {
-    const ids = [node.id, ...supersedes];
-    if (supersededBy) ids.push(supersededBy);
-    if (onChainHighlight) onChainHighlight(ids);
+  const handleHighlightChain = async () => {
+    const request = ++chainRequest.current;
+    const ids = new Set([node.id, ...supersedes, supersededBy].filter(Boolean));
+    setChainError(null);
+    setChainLoading(true);
+    try {
+      if (!daemon && adapter?.getDecisionCausalChain) {
+        const chain = await adapter.getDecisionCausalChain(node.id);
+        for (const direction of ['causes', 'effects']) {
+          const pending = [...(chain?.[direction] || [])];
+          while (pending.length) {
+            const entry = pending.pop();
+            if (entry.node_id) ids.add(entry.node_id);
+            pending.push(...(entry[direction] || []));
+          }
+        }
+      }
+      if (request === chainRequest.current) onChainHighlight?.([...ids]);
+    } catch {
+      if (request === chainRequest.current) setChainError('Could not load the decision chain.');
+    } finally {
+      if (request === chainRequest.current) setChainLoading(false);
+    }
   };
 
   const handleClearChain = () => {
-    if (onChainHighlight) onChainHighlight(null);
+    chainRequest.current++;
+    setChainLoading(false);
+    setChainError(null);
+    onChainHighlight?.(null);
   };
 
   const handleLoadConflicts = async () => {
@@ -150,7 +179,8 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
               {supersedes.map((id) => (
                 <li key={id}>
                   <button
-                    onClick={() => onSelectId && onSelectId(id)}
+                    disabled={!onSelectId}
+                    onClick={() => onSelectId?.(id)}
                     className="text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline truncate font-mono text-[11px]"
                     title={id}
                   >
@@ -165,7 +195,8 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           <div className="text-xs">
             <span className="text-muted-foreground dark:text-slate-500">Superseded by:</span>{' '}
             <button
-              onClick={() => onSelectId && onSelectId(supersededBy)}
+              disabled={!onSelectId}
+                    onClick={() => onSelectId?.(supersededBy)}
               className="text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline font-mono text-[11px]"
               title={supersededBy}
             >
@@ -177,12 +208,14 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           <div className="flex gap-2 mt-1">
             <button
               onClick={handleHighlightChain}
+              disabled={!onChainHighlight || chainLoading}
               className="text-[11px] px-2 py-0.5 rounded bg-amber-600/20 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-600/40 hover:bg-amber-600/30"
             >
-              Highlight chain
+              {chainLoading ? 'Loading chain…' : 'Highlight chain'}
             </button>
             <button
               onClick={handleClearChain}
+              disabled={!onChainHighlight}
               className="text-[11px] px-2 py-0.5 rounded bg-muted/40 dark:bg-slate-700/40 text-foreground dark:text-slate-300 border border-input/40 dark:border-slate-600/40 hover:bg-muted/60 dark:hover:bg-slate-700/60"
             >
               Clear
@@ -191,16 +224,18 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
         )}
       </div>
 
+      {chainError && <p role="alert" className="text-xs">{chainError}</p>}
+
       {toolsEnabled && (<>
       {/* Conflicts */}
       <div className="space-y-1">
         {conflicts == null ? (
           <button
             onClick={handleLoadConflicts}
-            disabled={conflictLoading || !adapter}
+            disabled={!!decisionUnavailable || conflictLoading || !adapter?.findDecisionConflicts}
             className="text-[11px] px-2 py-0.5 rounded bg-red-600/20 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-600/40 hover:bg-red-600/30 disabled:opacity-40"
           >
-            {conflictLoading ? 'Checking…' : 'Find conflicts'}
+            {decisionUnavailable ? `Find conflicts · ${decisionUnavailable}` : conflictLoading ? 'Checking…' : 'Find conflicts'}
           </button>
         ) : (
           <div data-testid="decision-conflicts">
@@ -212,7 +247,8 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
                 {conflicts.slice(0, 10).map((c) => (
                   <li key={c.decision_id || c.id}>
                     <button
-                      onClick={() => onSelectId && onSelectId(c.decision_id || c.id)}
+                      disabled={!onSelectId}
+                    onClick={() => onSelectId?.(c.decision_id || c.id)}
                       className="text-red-700 dark:text-red-300 hover:text-red-700 dark:hover:text-red-200 underline truncate font-mono text-[11px]"
                       title={c.decision_id || c.id}
                     >
@@ -237,10 +273,10 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
         {provenance == null ? (
           <button
             onClick={handleLoadProvenance}
-            disabled={provenanceLoading || !adapter}
+            disabled={!!decisionUnavailable || provenanceLoading || !adapter?.getDecisionProvenance}
             className="text-[11px] px-2 py-0.5 rounded bg-blue-600/20 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-600/40 hover:bg-blue-600/30 disabled:opacity-40"
           >
-            {provenanceLoading ? 'Loading…' : 'Load provenance'}
+            {decisionUnavailable ? `Load provenance · ${decisionUnavailable}` : provenanceLoading ? 'Loading…' : 'Load provenance'}
           </button>
         ) : provenance._error ? (
           <div className="text-[11px] text-red-700 dark:text-red-400">{provenance._error}</div>

@@ -17,6 +17,13 @@ export function useEntityCorrections({ node, adapter, onNodeUpdate }) {
   const [labelValue, setLabelValue] = useState('');
   const [typeSaved, setTypeSaved] = useState(false);
   const [labelSaved, setLabelSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [correctionError, setCorrectionError] = useState(null);
+  const [groundingError, setGroundingError] = useState(null);
+  const [wikiError, setWikiError] = useState(null);
+  const savingRef = useRef(false);
+  const saveTimer = useRef(null);
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
 
   // Grounding state
   const [grounding, setGrounding] = useState(null);
@@ -41,12 +48,13 @@ export function useEntityCorrections({ node, adapter, onNodeUpdate }) {
 
   // Fetch grounding status on node change
   useEffect(() => {
-    if (!nodeId || !adapter) return;
+    if (!nodeId || !adapter?.getGroundingStatus) return;
+    setGroundingError(null);
     let cancelled = false;
     setGroundingLoading(true);
     adapter.getGroundingStatus(nodeId)
       .then((data) => { if (!cancelled) setGrounding(data); })
-      .catch(() => { if (!cancelled) setGrounding({ grounded: false, wikipedia: null }); })
+      .catch(() => { if (!cancelled) setGroundingError('Could not load grounding status.'); })
       .finally(() => { if (!cancelled) setGroundingLoading(false); });
     return () => { cancelled = true; };
   }, [nodeId, adapter]);
@@ -59,50 +67,60 @@ export function useEntityCorrections({ node, adapter, onNodeUpdate }) {
     }
   }, [editingLabel]);
 
+  async function saveCorrection(updates, setSaved, learnRename) {
+    if (savingRef.current || !adapter?.updateEntityNode) return;
+    savingRef.current = true;
+    setSaving(true);
+    setCorrectionError(null);
+    setTypeSaved(false);
+    setLabelSaved(false);
+    clearTimeout(saveTimer.current);
+    try {
+      await adapter.updateEntityNode(node.id, updates);
+      const displayUpdates = updates.entity_type ? { ...updates, type: updates.entity_type } : updates;
+      onNodeUpdate?.(node.id, displayUpdates);
+      if (learnRename && adapter.createOntologyPattern) {
+        try {
+          await adapter.createOntologyPattern(updates.label, node.type, 1.0);
+        } catch {
+          setCorrectionError('Name saved. Could not update the ontology pattern.');
+          return;
+        }
+      }
+      setSaved(true);
+      saveTimer.current = setTimeout(() => setSaved(false), 1500);
+    } catch {
+      setCorrectionError('Could not save the entity change.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
   async function handleTypeChange(newType) {
     setTypeDropdownOpen(false);
     setCustomType('');
     if (!newType || newType === node.type) return;
-    const oldType = node.type;
-    onNodeUpdate?.(node.id, { type: newType, entity_type: newType });
-    setTypeSaved(true);
-    setTimeout(() => setTypeSaved(false), 1500);
-    try {
-      await Promise.all([
-        adapter.updateEntityNode(node.id, { entity_type: newType }),
-        adapter.createOntologyPattern(node.label, newType, 1.0),
-      ]);
-    } catch (err) {
-      console.error('Type update failed:', err);
-      onNodeUpdate?.(node.id, { type: oldType, entity_type: oldType });
-    }
+    // PATCH already registers a correction pattern for a type change.
+    await saveCorrection({ entity_type: newType }, setTypeSaved, false);
   }
 
   async function handleLabelSave() {
     setEditingLabel(false);
     const newLabel = labelValue.trim();
     if (!newLabel || newLabel === node.label) return;
-    onNodeUpdate?.(node.id, { label: newLabel });
-    setLabelSaved(true);
-    setTimeout(() => setLabelSaved(false), 1500);
-    try {
-      await adapter.updateEntityNode(node.id, { label: newLabel });
-      await adapter.createOntologyPattern(newLabel, node.type, 1.0);
-    } catch (err) {
-      console.error('Label rename failed:', err);
-      onNodeUpdate?.(node.id, { label: node.label });
-    }
+    await saveCorrection({ label: newLabel }, setLabelSaved, true);
   }
 
   async function handleGround() {
     setWikiLoading(true);
+    setWikiError(null);
     setShowWikiOverlay(true);
     try {
       const results = await searchWikipedia(node.label);
       setWikiResults(Array.isArray(results) ? results : []);
-    } catch (err) {
-      console.error('Wikipedia search failed:', err);
-      setWikiResults([]);
+    } catch {
+      setWikiError('Could not search Wikipedia.');
     } finally {
       setWikiLoading(false);
     }
@@ -112,17 +130,14 @@ export function useEntityCorrections({ node, adapter, onNodeUpdate }) {
     try {
       await adapter.removeGrounding(node.id);
       setGrounding({ grounded: false, wikipedia: null });
-    } catch (err) {
-      console.error('Unground failed:', err);
+    } catch {
+      setGroundingError('Could not remove grounding.');
     }
   }
 
-  async function handleGroundAccept(article) {
-    setShowWikiOverlay(false);
-    setGrounding({ grounded: true, wikipedia: article });
-    if (article.suggested_type && article.suggested_type !== node.type) {
-      await handleTypeChange(article.suggested_type);
-    }
+  // Kept for callers of the exported hook. No endpoint persists a selected article.
+  async function handleGroundAccept() {
+    setWikiError('Saving a Wikipedia match is coming soon.');
   }
 
   return {
@@ -131,7 +146,7 @@ export function useEntityCorrections({ node, adapter, onNodeUpdate }) {
     customType, setCustomType,
     editingLabel, setEditingLabel,
     labelValue, setLabelValue,
-    typeSaved, labelSaved,
+    typeSaved, labelSaved, saving, correctionError, groundingError, wikiError,
     grounding, groundingLoading,
     wikiResults, wikiLoading,
     showWikiOverlay, setShowWikiOverlay,

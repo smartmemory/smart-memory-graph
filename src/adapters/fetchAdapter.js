@@ -31,6 +31,15 @@ export function createFetchAdapter({ apiUrl, getToken, getTeamId, fetchFn = glob
   }
 
   return {
+    // The standalone Lite viewer uses a same-origin, workspace-less adapter.
+    // Discord is also same-origin but supplies its sanctuary workspace explicitly.
+    getDaemonCapabilities: !apiUrl && !getTeamId()
+      ? async () => {
+        const { mode, capabilities } = await request('GET', '/health');
+        if (mode !== 'lite' && mode !== 'remote') throw new Error('Viewer mode could not be determined.');
+        return capabilities;
+      }
+      : undefined,
     // No client-side default cap; backend applies the authoritative limit.
     getFullGraph: (limit) => request('GET', limit == null ? '/memory/graph/full' : `/memory/graph/full?limit=${encodeURIComponent(limit)}`),
     getEdgesBulk: (nodeIds) => request('POST', '/memory/graph/edges', { node_ids: nodeIds }),
