@@ -21,6 +21,40 @@ function App() {
 }
 ```
 
+### Controlled decision effects
+
+Pass a focused graph and its effects snapshot to preview a draft, follow its
+dependencies, inspect the source path, or view rules on an earlier date.
+
+```jsx
+<GraphExplorer
+  enableDecisionEffects
+  data={focusedGraph}
+  decisionEffects={snapshot}
+  decisionEffectsActions={{ onCommit, onCancel, onRefocus }}
+/>
+```
+
+The flag defaults to `false`. With the flag enabled the component reads only
+its props. The host supplies the focus, calendar date, graph edges, lifecycle
+dates, review hops with their immediate predecessor, and result freshness.
+See the [typed inputs](src/components/effects/types.d.ts) and the
+[frozen-note example](tests/fixtures/decisionEffects.js).
+Pass the complete conflict, replacement and review lists for accurate counts,
+plus dated overflow counts for branches outside the supplied graph.
+
+The host owns writes. In direct-save mode settling the final conflict calls
+`onCommit(focus, resolutions)`. Under `policy="propose"` the user chooses
+**Send for review**. Return the acknowledged standing or held snapshot to
+display the outcome. A rejected save leaves the draft available to retry.
+`onCancel` restores the host's standing snapshot. Clicking an overflow stub
+calls `onRefocus(branchId)` so the host can supply that branch.
+
+Run the browser acceptance scenarios with `npm run test:decision-effects`.
+Set `CHROMIUM_EXECUTABLE_PATH` to a local Chromium executable or install the
+matching browser with `npx playwright-core install chromium`. Optionally set
+`DECISION_EFFECTS_SCREENSHOTS` to capture the verified elements as PNGs.
+
 ### Controls hidden until fully built
 
 `GraphExplorer` hides these behind props that default to `false`. Nothing is deleted: pass the prop to bring a control back.
