@@ -336,7 +336,6 @@ describe('census: hard-coded dark colour on a surface (class guard)', () => {
     'components/PipelineDag.jsx': { n: 17, why: 'pipeline-DAG nodes are filled shapes with a light label inside the node, readable on either canvas; status fills are signal colours' },
     'components/RunLogPanel.jsx': { n: 0, why: '' },
     'components/DetailPanel.jsx': { n: 3, why: 'confidence bar green/amber/red: a status signal on a filled bar' },
-    'components/OriginLegend.jsx': { n: 1, why: 'unknown-origin dashed red outline: a signal colour (matches the node border)' },
     'core/hopReplayPlan.js': { n: 4, why: 'per-hop reveal hues, documented "do not re-theme"' },
     'core/graphColors.js': { n: 1, why: 'a doc comment naming slate-400' },
     'core/annotationLegend.js': { n: 1, why: 'fallback swatch for a legend entry with no colour' },

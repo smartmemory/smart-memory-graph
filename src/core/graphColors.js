@@ -13,7 +13,9 @@ export const SPECIAL_COLORS = {
   default: graphColors.special.default,
 };
 
-export const ORIGIN_BORDER_COLORS = graphColors.originPrefixes || {};
+// An unknown origin is shown plainly: no colour, so no border, no red, no dash (owner 2026-11-25,
+// UI-ORIGIN-UNKNOWN-NEUTRAL-1). The contract still lists a colour for it; it is not drawn.
+export const ORIGIN_BORDER_COLORS = { ...(graphColors.originPrefixes || {}), unknown: null };
 
 // Maps raw first-segment prefixes to conceptual origin groups for border colors.
 const PREFIX_GROUP_MAP = {

@@ -376,22 +376,19 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
             <div className="flex items-center gap-2">
               {(() => {
                 const borderColor = getOriginBorderColor(node.origin);
-                if (node.origin === 'unknown') {
-                  return <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0 border border-dashed border-red-300 dark:border-red-500" />;
-                }
                 return borderColor
                   ? <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0" style={{ backgroundColor: borderColor }} />
                   : null;
               })()}
-              <span className={`text-xs font-mono ${node.origin === 'unknown' ? 'text-red-700 dark:text-red-400' : 'text-foreground dark:text-slate-300'}`}>
+              <span className="text-xs font-mono text-foreground dark:text-slate-300">
                 {node.origin}
               </span>
             </div>
-            <div className={`text-[10px] mt-0.5 ${node.origin === 'unknown' ? 'text-red-700 dark:text-red-500/70' : 'text-muted-foreground dark:text-slate-500'}`}>
-              {node.origin === 'unknown'
-                ? 'Untagged write path'
-                : getTierLabel(getOriginTier(node.origin))}
-            </div>
+            {node.origin !== 'unknown' && (
+              <div className="text-[10px] mt-0.5 text-muted-foreground dark:text-slate-500">
+                {getTierLabel(getOriginTier(node.origin))}
+              </div>
+            )}
           </section>
         )}
 
