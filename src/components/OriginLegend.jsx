@@ -13,10 +13,7 @@ export default function OriginLegend({ visible = true }) {
           {color ? (
             <span
               className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0"
-              style={{
-                backgroundColor: color,
-                border: prefix === 'unknown' ? '1px dashed #ef4444' : 'none',
-              }}
+              style={{ backgroundColor: color }}
             />
           ) : (
             <span className="w-2.5 h-2.5 rounded-full inline-block flex-shrink-0 border border-input dark:border-slate-600" />

@@ -80,7 +80,7 @@ export function getCytoscapeStyles(theme = null) {
         'border-width': (ele) => {
           const prefix = ele.data('origin_prefix');
           if (!prefix || prefix === 'user' || !ORIGIN_BORDER_COLORS[prefix]) return 0;
-          return prefix === 'unknown' ? 2.5 : 2;
+          return 2;
         },
         'border-color': (ele) => {
           const prefix = ele.data('origin_prefix');
@@ -90,9 +90,7 @@ export function getCytoscapeStyles(theme = null) {
           const prefix = ele.data('origin_prefix');
           return (prefix && prefix !== 'user' && ORIGIN_BORDER_COLORS[prefix]) ? 0.85 : 0;
         },
-        'border-style': (ele) => {
-          return ele.data('origin_prefix') === 'unknown' ? 'dashed' : 'solid';
-        },
+        'border-style': 'solid',
         'text-max-width': '100px',
         'text-wrap': 'ellipsis',
       },
