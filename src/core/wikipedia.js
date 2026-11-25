@@ -6,6 +6,7 @@
 export async function searchWikipedia(entityName) {
   const encoded = encodeURIComponent(entityName);
   const searchRes = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&search=${encoded}&limit=5&format=json&origin=*`);
+  if (!searchRes.ok) throw new Error('Wikipedia search failed.');
   const [, titles, , urls] = await searchRes.json();
 
   if (!titles || titles.length === 0) return [];

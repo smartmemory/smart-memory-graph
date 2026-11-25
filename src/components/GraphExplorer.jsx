@@ -9,6 +9,8 @@ import OperationsBar from './OperationsBar';
 import ReplayButton from './ReplayButton';
 import OriginLegend from './OriginLegend';
 import { useCytoscape } from '../internal/useCytoscape';
+import { useDaemonCapabilities } from '../hooks/useDaemonCapabilities';
+import { useExplorerFocus } from '../hooks/useExplorerFocus';
 import { useGraphData } from '../hooks/useGraphData';
 import { useGraphFilters } from '../hooks/useGraphFilters';
 import { useGraphStream } from '../hooks/useGraphStream';
@@ -24,6 +26,7 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  * Orchestrates data fetching, streaming, filtering, and interaction hooks.
  *
  * @param {Object} props
+ * @param {{hash: string}} [props.focusRequest] - An explicit selection in the current view.
  * @param {GraphAPIAdapter} props.adapter - API adapter for data fetching
  * @param {{ nodes: GraphNode[], edges: GraphEdge[] }} [props.data] - External data (controlled mode)
  * @param {GraphAnnotations} [props.annotations] - Annotation overlay.
@@ -86,6 +89,7 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
  *   event when the consumer re-renders with new values.
  * @param {string} [props.theme.palette.node] - Single fill replacing the
  *   per-type memory/entity/grounding palette (size differentiation preserved).
+ * @param {string} [props.readOnlyReason] - Explain unavailable actions on a data-only graph.
  * @param {string} [props.theme.palette.edge] - Edge line + edge label color.
  * @param {string} [props.theme.palette.label] - Node label text color.
  * @param {string} [props.theme.palette.labelOutline] - Node label outline color.
@@ -94,6 +98,7 @@ import { classifyGraphKey, describeDeletion, isEditableTarget } from '../core/gr
 export default function GraphExplorer({
   adapter,
   data: externalData,
+  readOnlyReason,
   annotations,
   wsToken,
   sseBaseUrl,
@@ -118,9 +123,12 @@ export default function GraphExplorer({
   theme = null,
   mode = 'dark',
   refreshSignal,
+  focusRequest,
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
   // Hybrid mode: adapter powers refresh/reconnect, external data merges as overlay.
+  const controlledReason = !adapter && readOnlyReason;
+  const { daemon, capabilities, error: capabilityError } = useDaemonCapabilities(adapter);
   const internalData = useGraphData(adapter || null, { refreshSignal });
   const externalNodes = externalData?.nodes || [];
   const externalEdges = externalData?.edges || [];
@@ -184,7 +192,8 @@ export default function GraphExplorer({
     internalData.error, internalData.stats, internalData.refresh, internalData.incrementStats,
   ]);
 
-  const filters = useGraphFilters(nodes, edges, workspaceId);
+  const [filterSnapshot, setFilterSnapshot] = useState(null);
+  const filters = useGraphFilters(filterSnapshot?.nodes ?? nodes, filterSnapshot?.edges ?? edges, workspaceId);
 
   const typeCounts = useMemo(() => {
     const counts = {};
@@ -202,7 +211,8 @@ export default function GraphExplorer({
   const containerRef = useRef(null);
   const rootRef = useRef(null);
   const cytoscape = useCytoscape(containerRef, { theme, mode });
-  const { urlState, saveToUrl, getShareableUrl } = useUrlState();
+  const { urlState, saveToUrl, getShareableUrl, clearHistoricalUrl } = useUrlState(focusRequest);
+  const restoredView = useRef(null);
 
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const [originLegendOpen, setOriginLegendOpen] = useState(false);
@@ -250,6 +260,7 @@ export default function GraphExplorer({
   const effectiveSseToken = sseToken || wsToken;
   const sseEnabled = !!(auth || sseBaseUrl || sseToken || replayRunId || clock);
 
+  const historicalRef = useRef(false);
   const stream = useGraphStream({
     sseBaseUrl: effectiveSseBase,
     token: effectiveSseToken,
@@ -264,6 +275,7 @@ export default function GraphExplorer({
     // drip-feed adds a second pacing layer with its own setTimeout queue
     // that does NOT pause when the clock pauses, breaking lockstep pause.
     onElementAdded: (el) => {
+      if (historicalRef.current) return;
       if (clock) {
         const cy = cytoscape.cy?.current;
         if (!cy) return;
@@ -278,6 +290,7 @@ export default function GraphExplorer({
       dripFeedRef.current?.enqueue(el);
     },
     onElementRemoved: ({ nodeIds = [], edgeIds = [], edges = [] }) => {
+      if (historicalRef.current) return;
       const cy = cytoscape.cy?.current;
       dripFeedRef.current?.removeElements?.({ nodeIds, edgeIds, edges });
       if (!cy) return;
@@ -306,8 +319,9 @@ export default function GraphExplorer({
         });
       });
     },
-    onSearchHighlight: (ids) => cytoscape.highlightElements(ids),
+    onSearchHighlight: (ids) => { if (!historicalRef.current) cytoscape.highlightElements(ids); },
     onGroundingFlash: (nodeId) => {
+      if (historicalRef.current) return;
       const cy = cytoscape.cy?.current;
       if (!cy) return;
       const node = cy.getElementById(nodeId);
@@ -318,6 +332,10 @@ export default function GraphExplorer({
     },
     onPipelineProgress: handleStageChange,
     onGraphCleared: () => {
+      if (historicalRef.current) {
+        refresh();
+        return;
+      }
       dripFeedRef.current?.resetDrip();
       streamRef.current?.clearOperations();
       // VIS-PIPELINE-DAG-1 Phase 4 (Codex Round 1 MUST FIX 2):
@@ -337,7 +355,7 @@ export default function GraphExplorer({
     onReplayNotFound: (idbRecording) => {
       if (idbRecording) {
         // IDB fallback available — replay from the local recording
-        dripFeedRef.current?.replayRecording(idbRecording);
+        if (!historicalRef.current) dripFeedRef.current?.replayRecording(idbRecording);
       } else {
         // No IDB recording either — surface "recording not available"
         setReplayNotAvailable(true);
@@ -359,7 +377,26 @@ export default function GraphExplorer({
     getShareableUrl,
     saveToUrl,
     onNodeOpen,
+    manageCanvas: false,
+    temporalUnavailable: daemon,
   });
+  const { snapshot, asOfTime, handleTimeTravel } = interaction;
+  historicalRef.current = !!snapshot;
+  const temporalHandler = useRef(handleTimeTravel);
+  temporalHandler.current = handleTimeTravel;
+  const lastTimeHash = useRef(null);
+  useEffect(() => {
+    if (urlState.focusOnly) return;
+    // A past time in the URL is honoured only when the host enables time travel (UI-HIDE-TIME-SLIDER-1).
+    if (urlState.asOfTime && enableTimeTravel) {
+      interaction.setTimeTravelOpen(!!adapter?.getTemporalSnapshot && !daemon);
+      temporalHandler.current(urlState.asOfTime);
+    } else if (lastTimeHash.current) {
+      interaction.setTimeTravelOpen(false);
+      temporalHandler.current(null);
+    }
+    lastTimeHash.current = urlState;
+  }, [urlState, daemon, adapter?.getTemporalSnapshot, interaction.setTimeTravelOpen]);
 
   const multiHop = useMultiHopReplay({
     cytoscape,
@@ -401,14 +438,14 @@ export default function GraphExplorer({
   // firing here would dim and reveal an empty canvas. The delay lets the merge and
   // its layout land first.
   useEffect(() => {
-    if (autoReplayKey == null) return;
+    if (autoReplayKey == null || snapshot) return;
     if (!cytoscape.ready) return;
     if (!hasHopGroups) return;
     if (!nodes.length) return;
     const timer = setTimeout(replayHopGroups, 250);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoReplayKey, cytoscape.ready, hasHopGroups, nodes.length]);
+  }, [snapshot, autoReplayKey, cytoscape.ready, hasHopGroups, nodes.length]);
 
   // Wire node click/dblclick handlers to Cytoscape events
   useEffect(() => {
@@ -423,6 +460,7 @@ export default function GraphExplorer({
     layout: interaction.layout,
     stream,
     onGroundingFlash: (nodeId) => {
+      if (historicalRef.current) return;
       const cy = cytoscape.cy?.current;
       if (!cy) return;
       const node = cy.getElementById(nodeId);
@@ -437,16 +475,41 @@ export default function GraphExplorer({
   });
   dripFeedRef.current = dripFeed;
 
+  const wasHistorical = useRef(false);
+  const snapshotInCanvas = useRef(null);
+
   // Convert GraphNode/GraphEdge → Cytoscape elements and load into cy
   useEffect(() => {
     if (!cytoscape.ready) return;
+    const pendingView = restoredView.current !== urlState && Object.keys(urlState).length > 0;
+    if (snapshot) {
+      if (snapshotInCanvas.current !== snapshot) {
+        dripFeed.resetDrip();
+        multiHop.stopReplay();
+        stream.drainPending();
+        interaction.closeDetailPanel();
+        setFilterSnapshot(snapshot);
+        cytoscape.setElements(snapshot.nodes.map(graphNodeToCyElement));
+        if (!pendingView) cytoscape.runLayout(interaction.layout);
+        snapshotInCanvas.current = snapshot;
+      }
+      wasHistorical.current = true;
+      return;
+    }
+    if (wasHistorical.current) {
+      wasHistorical.current = false;
+      snapshotInCanvas.current = null;
+      setFilterSnapshot(null);
+      interaction.closeDetailPanel();
+      cytoscape.setElements([]);
+    }
     if (nodes.length > 0 || edges.length > 0) {
       const cyElements = [
         ...nodes.map(graphNodeToCyElement),
         ...edges.map(graphEdgeToCyElement),
       ];
       const { isInitial } = cytoscape.mergeElements(cyElements);
-      if (isInitial) cytoscape.runLayout(interaction.layout);
+      if (isInitial && !pendingView) cytoscape.runLayout(interaction.layout);
 
       // Replay any WS events that arrived during the API fetch
       const pending = stream.drainPending();
@@ -470,15 +533,16 @@ export default function GraphExplorer({
       cytoscape.setElements([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, cytoscape.ready, loading]);
+  }, [nodes, edges, cytoscape.ready, loading, snapshot]);
 
   // Apply filters whenever they change or Cytoscape becomes ready.
   // Only cytoscape.ready is included (not the whole cytoscape object) to avoid
   // re-triggering on unrelated state changes (selection mode, move mode).
   useEffect(() => {
+    if (filterSnapshot !== snapshot) return;
     cytoscape.applyFilter(filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter, cytoscape.ready]);
+  }, [filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter, cytoscape.ready, filterSnapshot, snapshot]);
 
   // Apply annotations whenever they change OR data is replaced.
   // setElements() destroys all Cytoscape elements (and their classes), so annotations
@@ -509,6 +573,9 @@ export default function GraphExplorer({
         ids.map(async (id) => {
           if (!adapter) throw new Error('no adapter to delete with');
           const category = cy?.getElementById(id)?.data('category');
+          if (daemon && (category !== 'memory' || capabilities?.delete !== true)) {
+            throw new Error('The daemon does not support deleting this node.');
+          }
           if (category === 'memory') {
             await adapter.deleteNode(id);
           } else {
@@ -531,7 +598,7 @@ export default function GraphExplorer({
     } finally {
       deletingRef.current = false;
     }
-  }, [adapter, cytoscape]);
+  }, [adapter, cytoscape, daemon, capabilities]);
 
   // Every multi-node delete (keyboard or the selection toolbar) goes through a confirm that
   // names the count. The ids are frozen when the prompt opens.
@@ -579,14 +646,14 @@ export default function GraphExplorer({
     if (action === 'delete') {
       // A host that hides the selection toolbar has opted out of destructive graph actions
       // (Obsidian does, in graph-view.tsx): the keyboard is not a back door around that.
-      if (hideSelectionToolbar) return;
+      if (hideSelectionToolbar || snapshot) return;
       e.preventDefault();
       requestDelete();
     } else if (action === 'select-all') {
       e.preventDefault();
       cytoscape.selectAll();
     }
-  }, [requestDelete, cytoscape, hideSelectionToolbar]);
+  }, [requestDelete, cytoscape, hideSelectionToolbar, snapshot]);
 
   // A press on the canvas or chrome gives the root focus so the shortcuts above reach it;
   // presses on fields, buttons and links keep their own focus.
@@ -601,7 +668,7 @@ export default function GraphExplorer({
   // Operations bar click handler — scrub to event state
   const handleOperationClick = useCallback((op) => {
     const cy = cytoscape.cy.current;
-    if (!cy) return;
+    if (!cy || historicalRef.current) return;
 
     if (op.category === 'node_added' || op.category === 'edge_added' || op.category === 'graph_cleared') {
       dripFeed.dripTimersRef.current.forEach(clearTimeout);
@@ -670,8 +737,43 @@ export default function GraphExplorer({
     }
   }, [cytoscape, interaction]);
 
+  const { focusStatus, handleDecisionSelect } = useExplorerFocus({
+    adapter, daemon, snapshot, asOfTime, loading, urlState, cytoscape, filters, interaction, historicalRef, restoredView,
+  });
+  const highlightDecisionChain = useCallback((ids) => {
+    const cy = cytoscape.cy.current;
+    if (!ids) {
+      cytoscape.clearHighlights();
+      return;
+    }
+    const chainIds = new Set(ids);
+    const chainTypes = new Set(['SUPERSEDES', 'DERIVED_FROM', 'CAUSED_BY', 'CAUSES', 'INFLUENCES', 'PRODUCED']);
+    const edgeIds = cy?.edges().filter((edge) => chainIds.has(edge.source().id()) &&
+      chainIds.has(edge.target().id()) && chainTypes.has(edge.data('type'))).map((edge) => edge.id());
+    cytoscape.highlightElements(ids, edgeIds);
+  }, [cytoscape.cy, cytoscape.clearHighlights, cytoscape.highlightElements]);
+
+  const changeTime = (timestamp) => {
+    if (!timestamp) clearHistoricalUrl();
+    handleTimeTravel(timestamp);
+  };
+  const closeTimeTravel = () => {
+    interaction.setTimeTravelOpen(false);
+    changeTime(null);
+  };
+  const capabilityStatus = capabilityError ? 'Could not check daemon capabilities.' : 'Checking daemon capabilities…';
+  let deleteUnavailable = null;
+  if (daemon && interaction.selectedNode?.category !== 'memory') {
+    deleteUnavailable = 'The local viewer cannot delete entities.';
+  } else if (daemon && capabilities?.delete !== true) {
+    deleteUnavailable = capabilities?.delete === false ? 'Memory deletion is unavailable through this daemon.' : capabilityStatus;
+  }
+  const decisionUnavailable = daemon && capabilities?.decisions !== true
+    ? capabilities?.decisions === false ? 'Unavailable through this daemon' : capabilityStatus
+    : null;
+
   // Error state
-  if (error && nodes.length === 0) {
+  if (error && nodes.length === 0 && !snapshot) {
     return (
       <div className={`flex items-center justify-center bg-background dark:bg-slate-900 ${className || 'h-screen'}`}>
         <div className="text-center max-w-md">
@@ -726,22 +828,30 @@ export default function GraphExplorer({
         </div>
       )}
 
+      {controlledReason && <p className="px-4 py-1 text-xs">{controlledReason}</p>}
       <Toolbar
+        readOnlyReason={controlledReason}
         layout={interaction.layout}
         onLayoutChange={interaction.handleLayoutChange}
         onZoomIn={cytoscape.zoomIn}
         onZoomOut={cytoscape.zoomOut}
         onFitToScreen={cytoscape.fitToScreen}
-        onRefresh={interaction.handleRefresh}
+        onRefresh={adapter && !snapshot ? interaction.handleRefresh : undefined}
         onToggleFilters={() => setFilterPanelOpen((p) => !p)}
-        onPathMode={interaction.handlePathMode}
+        onPathMode={!daemon && !snapshot && adapter?.findPath ? interaction.handlePathMode : undefined}
+        pathUnavailable={daemon}
         pathMode={interaction.pathMode}
         selectionMode={cytoscape.selectionMode}
         onSelectionModeChange={cytoscape.setSelectionMode}
-        stats={stats}
+        stats={snapshot ? { nodes: snapshot.nodes.length, edges: snapshot.edges.length } : stats}
         cy={cytoscape.cy}
         onCopyLink={interaction.handleCopyLink}
-        onToggleTimeTravelSlider={enableTimeTravel ? () => interaction.setTimeTravelOpen((p) => !p) : undefined}
+        timeUnavailable={enableTimeTravel && daemon}
+        timeTravelEnabled={enableTimeTravel}
+        onToggleTimeTravelSlider={enableTimeTravel && !daemon && adapter?.getTemporalSnapshot ? () => {
+          if (interaction.timeTravelOpen) closeTimeTravel();
+          else interaction.setTimeTravelOpen(true);
+        } : undefined}
         timeTravelActive={interaction.timeTravelOpen || !!interaction.asOfTime}
         autoFit={cytoscape.autoFit}
         onAutoFitChange={cytoscape.setAutoFit}
@@ -761,7 +871,7 @@ export default function GraphExplorer({
             typeCounts={typeCounts}
             searchBar={(
               <SearchBar
-                nodes={nodes}
+                nodes={snapshot?.nodes ?? nodes}
                 onSearch={interaction.handleSearch}
                 onNodeSelect={handleSearchNodeSelect}
               />
@@ -779,18 +889,24 @@ export default function GraphExplorer({
         {interaction.detailPanelOpen && interaction.selectedNode && (
           <div className="absolute right-0 top-0 bottom-0 z-30">
             <DetailPanel
+              key={interaction.selectedNode.id}
               node={interaction.selectedNode}
               edges={interaction.connectedEdges}
               onClose={interaction.closeDetailPanel}
-              onExpand={interaction.handleExpand}
+              onExpand={!snapshot && adapter?.getNeighbors ? interaction.handleExpand : undefined}
+              expandStatus={interaction.expandStatus}
               expanding={interaction.expanding}
-              onHopReplay={(nodeId) => multiHop.replayState === 'playing' ? multiHop.stopReplay() : multiHop.startReplay(nodeId)}
+              onHopReplay={!snapshot ? (nodeId) => multiHop.replayState === 'playing' ? multiHop.stopReplay() : multiHop.startReplay(nodeId) : undefined}
               hopReplayState={multiHop.replayState}
               onNodeUpdate={interaction.handleNodeUpdate}
-              onDelete={handleDeleteNode}
-              adapter={adapter}
-              onDecisionChainHighlight={handleDecisionChainHighlight}
-              onSelectId={handleSearchNodeSelect}
+              onDelete={!snapshot && adapter && !deleteUnavailable ? handleDeleteNode : undefined}
+              readOnlyReason={controlledReason}
+              deleteUnavailable={!snapshot ? deleteUnavailable : null}
+              daemon={daemon}
+              decisionUnavailable={decisionUnavailable}
+              adapter={!snapshot ? adapter : null}
+              onSelectId={handleDecisionSelect}
+              onDecisionChainHighlight={highlightDecisionChain}
               enableEntityEditing={enableEntityEditing}
               enableGrounding={enableGrounding}
               enableDecisionTools={enableDecisionTools}
@@ -801,14 +917,24 @@ export default function GraphExplorer({
 
       {enableTimeTravel && interaction.timeTravelOpen && (
         <TimeTravelSlider
-          onTimeChange={interaction.handleTimeTravel}
-          onClose={() => {
-            interaction.setTimeTravelOpen(false);
-            if (interaction.asOfTime) {
-              interaction.handleRefresh();
-            }
-          }}
+          onTimeChange={changeTime}
+          onClose={closeTimeTravel}
+          asOfTime={asOfTime}
+          loading={interaction.timeTravelLoading}
+          error={interaction.timeTravelError}
+          empty={!!snapshot && snapshot.nodes.length === 0}
         />
+      )}
+
+      {!interaction.timeTravelOpen && interaction.timeTravelError && (
+        <p role="alert" className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50 bg-card px-3 py-2 text-xs">
+          {interaction.timeTravelError}
+        </p>
+      )}
+      {focusStatus && (
+        <p role={focusStatus.error ? 'alert' : 'status'} className="absolute top-16 left-1/2 -translate-x-1/2 z-50 bg-card px-3 py-2 text-xs">
+          {focusStatus.message}
+        </p>
       )}
 
       {/* Multi-hop replay indicator */}
@@ -900,7 +1026,7 @@ export default function GraphExplorer({
           </button>
         </div>
       )}
-      {!hideSelectionToolbar && cytoscape.selectedNodeIds.size > 0 && (
+      {!hideSelectionToolbar && !snapshot && adapter && cytoscape.selectedNodeIds.size > 0 && (
         <div className="absolute bottom-16 right-4 z-50 flex items-center gap-2 bg-card dark:bg-slate-800 border border-input dark:border-slate-600 rounded-lg px-3 py-1.5 shadow-lg">
           <span className="text-foreground dark:text-slate-300 text-xs">{cytoscape.selectedNodeIds.size} selected</span>
           <div className="w-px h-4 bg-accent dark:bg-slate-600" />
@@ -992,7 +1118,7 @@ export default function GraphExplorer({
           </button>
         </div>
       )}
-      {showPlaybackBar && sseEnabled && stream.status === 'connected' && (
+      {showPlaybackBar && !snapshot && sseEnabled && stream.status === 'connected' && (
         <OperationsBar
           status={stream.status}
           operations={stream.operations}
@@ -1015,7 +1141,7 @@ export default function GraphExplorer({
 
       {interaction.pathMode && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-amber-100 dark:bg-amber-900/90 border border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-200 px-4 py-2 rounded-lg text-sm z-50">
-          {interaction.pathNodes?.length ? 'Click the END node' : 'Click the START node'}
+          {interaction.pathStart ? 'Click the END node' : 'Click the START node'}
           <button onClick={interaction.handlePathMode} className="ml-3 text-amber-700 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 underline">Cancel</button>
         </div>
       )}
@@ -1026,6 +1152,8 @@ export default function GraphExplorer({
           <button onClick={() => cytoscape.setSelectionMode(false)} className="ml-3 text-blue-700 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline">Exit</button>
         </div>
       )}
+
+      {interaction.pathResult?.loading && <p role="status" className="absolute top-16 left-1/2 z-50 bg-card px-3 py-2 text-xs">Finding path…</p>}
 
       {interaction.pathResult?.error && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-red-100 dark:bg-red-900/90 border border-red-300 dark:border-red-600 text-red-700 dark:text-red-200 px-4 py-2 rounded-lg text-sm z-50">

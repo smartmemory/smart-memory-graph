@@ -7,6 +7,9 @@
  *
  * @typedef {Object} GraphAPIAdapter
  *
+ * @property {function(): Promise<{delete: boolean}>} [getDaemonCapabilities]
+ *   Read the same-origin Viewer daemon capabilities. Hosted adapters omit this method.
+ *
  * @property {function(number=): Promise<Object>} getFullGraph
  *   Fetch the full graph. Returns raw API response (normalized by useGraphData).
  *

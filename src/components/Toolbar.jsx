@@ -9,9 +9,12 @@ export default function Toolbar({
   onZoomOut,
   onFitToScreen,
   onRefresh,
+  readOnlyReason,
   onToggleFilters,
   onPathMode,
   pathMode,
+  pathUnavailable,
+  timeUnavailable,
   selectionMode,
   onSelectionModeChange,
   stats,
@@ -29,10 +32,15 @@ export default function Toolbar({
   originLegendVisible = false,
   onToggleOriginLegend,
   svgExportEnabled = false,
+  // UI-CONTROLS-AUDIT-1 keeps Time hidden unless the host enables time travel; only then is an unavailable Time explained.
+  timeTravelEnabled = false,
 }) {
   const [exportOpen, setExportOpen] = useState(false);
   const [layoutOpen, setLayoutOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [linkError, setLinkError] = useState(false);
+  const [exportError, setExportError] = useState(false);
   const toolbarRef = useRef(null);
   const linkTimerRef = useRef(null);
 
@@ -56,8 +64,13 @@ export default function Toolbar({
   const handleExport = useCallback((format) => {
     const cyInstance = cy?.current;
     if (!cyInstance) return;
-    if (format === 'png') exportPNG(cyInstance);
-    if (format === 'svg' && svgExportEnabled) exportSVG(cyInstance);
+    try {
+      setExportError(false);
+      if (format === 'png') exportPNG(cyInstance);
+      if (format === 'svg' && svgExportEnabled) exportSVG(cyInstance);
+    } catch {
+      setExportError(true);
+    }
     setExportOpen(false);
   }, [cy, svgExportEnabled]);
 
@@ -133,17 +146,18 @@ export default function Toolbar({
       <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
       {/* Path finder */}
-      <button
+      {(onPathMode || pathUnavailable || readOnlyReason) && <button
+        disabled={!!(pathUnavailable || readOnlyReason)}
         onClick={onPathMode}
         data-testid="graph-path-button"
         aria-pressed={!!pathMode}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${
           pathMode ? 'bg-amber-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
         }`}
-        title="Find shortest path between two nodes"
+        title={readOnlyReason || 'Find shortest path between two nodes'}
       >
-        Path
-      </button>
+        {pathUnavailable ? 'Path unavailable in the local viewer' : 'Path'}
+      </button>}
 
       {/* Export */}
       <div className="relative">
@@ -171,21 +185,22 @@ export default function Toolbar({
 
       <div className="w-px h-6 bg-muted dark:bg-slate-700" />
 
-      {/* Time Travel: hidden until fully built (host passes enableTimeTravel) */}
-      {onToggleTimeTravelSlider && (
-        <button
-          onClick={onToggleTimeTravelSlider}
-          className={`px-3 py-1.5 text-sm rounded transition-colors ${
-            timeTravelActive ? 'bg-purple-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
-          }`}
-          title="Time travel — view graph at a past point in time"
-        >
-          <svg className="w-4 h-4 inline -mt-0.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Time
-        </button>
-      )}
+      {exportError && <span role="alert" className="text-xs">Could not export graph.</span>}
+
+      {/* Time Travel */}
+      {(onToggleTimeTravelSlider || (timeTravelEnabled && (timeUnavailable || readOnlyReason))) && <button
+        disabled={!!(timeUnavailable || readOnlyReason)}
+        onClick={onToggleTimeTravelSlider}
+        className={`px-3 py-1.5 text-sm rounded transition-colors ${
+          timeTravelActive ? 'bg-purple-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'
+        }`}
+        title={readOnlyReason || 'Time travel — view graph at a past point in time'}
+      >
+        <svg className="w-4 h-4 inline -mt-0.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {timeUnavailable ? 'Time unavailable in the local viewer' : 'Time'}
+      </button>}
 
       {/* Decision contradiction overlay */}
       {onToggleContradictionOverlay && (
@@ -204,15 +219,20 @@ export default function Toolbar({
 
       {/* Copy Link */}
       <button
-        onClick={() => {
-          if (onCopyLink) {
-            // "Copied!" only when the clipboard write really succeeded (handleCopyLink resolves false otherwise).
-            Promise.resolve(onCopyLink()).then((ok) => {
-              if (ok === false) return;
-              setLinkCopied(true);
-              if (linkTimerRef.current) clearTimeout(linkTimerRef.current);
-              linkTimerRef.current = setTimeout(() => setLinkCopied(false), 2000);
-            });
+        disabled={copying || !onCopyLink}
+        onClick={async () => {
+          setLinkCopied(false);
+          setLinkError(false);
+          setCopying(true);
+          clearTimeout(linkTimerRef.current);
+          try {
+            await onCopyLink();
+            setLinkCopied(true);
+            linkTimerRef.current = setTimeout(() => setLinkCopied(false), 2000);
+          } catch {
+            setLinkError(true);
+          } finally {
+            setCopying(false);
           }
         }}
         className={`px-3 py-1.5 text-sm rounded transition-colors ${
@@ -223,8 +243,10 @@ export default function Toolbar({
         <svg className="w-4 h-4 inline -mt-0.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
         </svg>
-        {linkCopied ? 'Copied!' : 'Link'}
+        {copying ? 'Copying…' : linkCopied ? 'Copied!' : 'Link'}
       </button>
+
+      {linkError && <span role="alert" className="text-xs">Could not copy link.</span>}
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -249,13 +271,15 @@ export default function Toolbar({
       )}
 
       {/* Refresh */}
-      <button
+      {(onRefresh || readOnlyReason) && <button
+        disabled={!!readOnlyReason}
+        aria-label="Refresh graph"
         onClick={onRefresh}
         className="p-1.5 text-muted-foreground dark:text-slate-400 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700 rounded transition-colors"
-        title="Refresh graph"
+        title={readOnlyReason || 'Refresh graph'}
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-      </button>
+      </button>}
 
       {/* Fullscreen */}
       <button

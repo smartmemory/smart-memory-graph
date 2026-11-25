@@ -4,8 +4,12 @@ import { useState } from 'react';
  * Wikipedia disambiguation overlay for grounding entities.
  * Renders inside DetailPanel when user clicks "Ground" on an entity node.
  */
-export default function WikipediaOverlay({ results, onAccept, onCancel, loading }) {
+export default function WikipediaOverlay({ results, onAccept, onCancel, loading, error }) {
   const [selectedIdx, setSelectedIdx] = useState(0);
+
+  if (error) {
+    return <div role="alert" className="text-xs">{error} <button onClick={onCancel}>Close</button></div>;
+  }
 
   if (loading) {
     return (
@@ -124,10 +128,11 @@ export default function WikipediaOverlay({ results, onAccept, onCancel, loading 
       {/* Action buttons */}
       <div className="flex gap-2 pt-1">
         <button
-          onClick={() => onAccept(selected)}
+          disabled={!onAccept}
+          onClick={() => onAccept?.(selected)}
           className="flex-1 px-3 py-1.5 text-xs font-medium bg-green-600/20 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-600/30 rounded hover:bg-green-600/30 transition-colors"
         >
-          Accept
+          {onAccept ? 'Accept' : 'Accept unavailable until article matches can be saved'}
         </button>
         <button
           onClick={onCancel}

@@ -8,7 +8,7 @@ import { useState, useCallback, useMemo, useRef } from 'react';
 // type that arrived later.
 function resolveActiveTypes(state, available) {
   if (state === null) return new Set(available);
-  if (state.only) return new Set(state.only);
+  if (state.only) return new Set(available.filter((type) => state.only.has(type)));
   return new Set(available.filter((t) => !state.hidden.has(t)));
 }
 
@@ -253,7 +253,14 @@ export function useGraphFilters(nodes, edges, persistKey) {
   // Legacy setter: a Set of active relation types (exactly those), or null for all.
   const setActiveRelationTypes = useCallback((active) => setRelationTypeState(() => fromActiveSet(active)), []);
 
+  const restoreTypes = useCallback((types) => {
+    setMemoryTypeState(() => fromActiveSet(types));
+    setEntityTypeState(() => fromActiveSet(types));
+    setRelationTypeState(() => null);
+  }, []);
+
   return {
+    restoreTypes,
     activeMemoryTypes: activeMemorySet,
     activeEntityTypes: activeEntitySet,
     activeRelationTypes: relationTypeState === null ? null : activeEdgeTypes,

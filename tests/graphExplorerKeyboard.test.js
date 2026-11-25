@@ -309,6 +309,22 @@ describe('a failed backend delete keeps the node and says so', () => {
     expect(q('[data-testid="graph-delete-failure"]')).not.toBeNull();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('delete failed for'), expect.any(TypeError));
   });
+  it('explains disabled actions when a host labels its retrieval graph read-only', async () => {
+    const reason = 'This view contains only the search results.';
+    // Time and entity editing are hidden unless the host enables them (UI-HIDE-TIME-SLIDER-1, UI-CONTROLS-AUDIT-1);
+    // enabled here so their read-only reasons are checked too.
+    await render({ adapter: null, readOnlyReason: reason, hideSelectionToolbar: true, enableTimeTravel: true, enableEntityEditing: true });
+    await act(async () => cy().getElementById('e1').emit('tap'));
+    expect(rootEl().querySelector('p').textContent).toBe(reason);
+    const buttons = [...rootEl().querySelectorAll('button')];
+    for (const name of ['Refresh graph', 'Path', 'Time', 'Expand Neighbors', 'person', 'Delete Node']) {
+      const button = buttons.find((el) => (el.getAttribute('aria-label') || el.textContent.trim()) === name);
+      expect(button?.disabled, name).toBe(true);
+      expect(button.title).toBe(reason);
+    }
+    await click(rootEl().querySelector('h2'));
+    expect(rootEl().querySelector('input[value="Entity one"]')).toBeNull();
+  });
   it('a graph with no adapter cannot delete and says so, without prompting', async () => {
     await render({ adapter: null });
     await selectIds(['m1']);
