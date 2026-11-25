@@ -5,7 +5,7 @@ import { focusWindow, graphLinks, visibleReview } from './focusGraph';
 import './effects.css';
 
 /**
- * @param {{data: import('./types').EffectsGraphData, effects: import('./types').DecisionEffectsSnapshot,
+ * @param {{data: import('./types').EffectsGraphData, effects: import('./types').EffectsPresentation,
  * actions?: import('./types').EffectsActions, className?: string}} props
  */
 export default function DecisionEffects({ data, effects, actions = {}, className = '' }) {
@@ -93,8 +93,9 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     const count = Array.from(branches.values()).reduce((sum, n) => sum + n, 0);
     pill('+' + count + ' more at hop ' + hop, effects.focus, () => openPanel('overflow', hop), true);
   }
-  if (today && effects.possiblyRelated?.length) {
-    pill(effects.possiblyRelated.length + ' possibly related', effects.focus, () => openPanel('related'));
+  const related = effects.possibly_related ?? effects.possiblyRelated ?? [];
+  if (today && related.length) {
+    pill(related.length + ' possibly related', effects.focus, () => openPanel('related'));
   }
   if (!focus) return <p role="status">Decision effects unavailable: the focus is missing.</p>;
   return <section className={'de-view ' + className} aria-label="Decision effects" onKeyDown={e => {
@@ -134,7 +135,7 @@ export default function DecisionEffects({ data, effects, actions = {}, className
           <li key={id}><button disabled={!actions.onRefocus} onClick={() => actions.onRefocus(id)}>
             {byId.get(id)?.label || id}{count > 1 && ' (' + count + ' more)'}</button></li>)}</ul></section>}
       {panel.kind === 'related' && <section className="de-detail"><h3>Possibly related by wording</h3>
-        <ul>{effects.possiblyRelated.map(n => <li key={n.id}>{n.label}</li>)}</ul></section>}
+        <ul>{related.map(n => <li key={n.id}>{n.label}</li>)}</ul></section>}
     </aside>}
     {today && effects.phase === 'standing' && !!review.length && <section className="de-review-list"><h3>Needs review</h3>
       <ul>{review.map(r => <li key={r.id}><button onClick={() => openPanel('node', r.id)} disabled={!byId.has(r.id)}>

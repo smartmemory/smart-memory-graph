@@ -66,7 +66,8 @@ export function graphLinks(data, effects, nodes, today, path, choices) {
     for (const c of effects.conflicts) {
       const pending = choices[c.id];
       const kind = c.resolution ? 'settled' : pending ? 'pending' : 'conflict';
-      const label = c.resolution?.choice || (pending ? 'pending: ' + pending.choice : 'conflict');
+      const settled = c.resolution?.choice;
+      const label = (settled === 'keep_both_scoped' ? 'scoped' : settled) || (pending ? 'pending: ' + pending.choice : 'conflict');
       add(effects.focus, c.id, kind, label + (c.freshness?.stale ? ' · ◷ stale' : ''),
         { partner: c.id, freshness: c.freshness });
     }

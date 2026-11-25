@@ -3,7 +3,6 @@
 // The graph package never parses natural language or treats wording as a conflict.
 const today = '2026-11-24';
 const computed = { kind: 'computed' };
-const checked = { kind: 'stored', checked_as_of: '2026-11-24T04:41:00Z' };
 const rows = [
   ['eu', '2026-03-04', 'Customer data stays in the EU region', 'Most customers are in the EU and our contracts promise EU storage.',
     ['Store data wherever hosting is cheapest', 'Let each customer pick a region']],
@@ -41,20 +40,26 @@ const review = (id, via, hop) => ({ id, via, hop, state: 'preview', freshness: c
 
 function snapshot(focus, phase, distances, extras = {}) {
   const subset = nodes.filter(n => Object.hasOwn(distances, n.id)).map(n => ({ ...n, hop: distances[n.id] }));
+  const data = { nodes: subset, edges: edges.filter(e => Object.hasOwn(distances, e.source) && Object.hasOwn(distances, e.target)) };
   return {
-    data: { nodes: subset, edges: edges.filter(e => Object.hasOwn(distances, e.source) && Object.hasOwn(distances, e.target)) },
-    decisionEffects: { focus, phase, today, policy: 'save', freshness: computed, replaces: [], conflicts: [], review: [], whyPaths, ...extras },
+    data,
+    decisionEffects: {
+      data, focus, phase, today, policy: 'save', freshness: computed, replaces: [], conflicts: [], review: [],
+      counts: { conflicts: 0, replaced: 0, to_review: 0 }, possibly_related: [], overflow: [], whyPaths, ...extras,
+    },
   };
 }
 
 export const email = snapshot('A', 'draft', { A: 0, vendor: 1, eu: 1, support: 2, growth: 2, exports: 3, legal: 2 }, {
   replaces: ['vendor'],
-  conflicts: [{ id: 'eu', why: 'The US vendor would store and process customer email addresses outside the EU.', freshness: checked }],
+  conflicts: [{ id: 'eu', why: 'The US vendor would store and process customer email addresses outside the EU.', freshness: computed }],
   review: [review('support', 'vendor', 1), review('growth', 'vendor', 1), review('exports', 'support', 2)],
-  possiblyRelated: [{ id: 'mention', label: 'Meeting note mentioning EU' }],
+  counts: { conflicts: 1, replaced: 1, to_review: 3 },
+  possibly_related: [{ id: 'mention', label: 'Meeting note mentioning EU' }],
 });
 export const friday = snapshot('B', 'draft', { B: 0, release: 1, quarter: 2, hotfix: 2 });
 export const pilots = snapshot('C', 'draft', { C: 0, pilot: 1, billing: 2 }, {
+  counts: { conflicts: 0, replaced: 1, to_review: 1 },
   replaces: ['pilot'], review: [review('billing', 'pilot', 1)],
 });
 export const refunds = snapshot('refund', 'standing', { refund: 0, manager: 1 });
@@ -62,15 +67,20 @@ export const standing = snapshot('vendor', 'standing', { vendor: 0, eu: 1, legal
 
 export function committedEmail(answers) {
   const retired = ['vendor', ...(answers.eu.choice === 'replace' ? ['eu'] : [])];
+  const data = {
+    nodes: email.data.nodes.map(n => retired.includes(n.id) ? { ...n, retiredAt: today } : n),
+    edges: [...email.data.edges, ...retired.map(id => edge('A', id, 'supersedes'))],
+  };
   return {
-    data: {
-      nodes: email.data.nodes.map(n => retired.includes(n.id) ? { ...n, retiredAt: today } : n),
-      edges: [...email.data.edges, ...retired.map(id => edge('A', id, 'supersedes'))],
-    },
+    data,
     decisionEffects: {
-      ...email.decisionEffects, phase: 'standing', freshness: checked,
-      conflicts: email.decisionEffects.conflicts.map(c => ({ ...c, resolution: answers[c.id] })),
-      review: email.decisionEffects.review.map(r => ({ ...r, state: 'flagged', freshness: checked })),
+      ...email.decisionEffects, data, phase: 'standing',
+      conflicts: email.decisionEffects.conflicts.map(c => {
+        const answer = answers[c.id];
+        const resolution = answer.choice === 'scoped' ? { choice: 'keep_both_scoped', scope: answer.scope } : answer;
+        return { ...c, resolution };
+      }),
+      review: email.decisionEffects.review.map(r => ({ ...r, state: 'flagged', freshness: computed })),
     },
   };
 }
@@ -91,8 +101,12 @@ export function crowded() {
   const peers = Array.from({ length: 9 }, (_, i) => ({
     id: 'term-' + i, type: 'decision', validFrom: today, label: 'Pilot term ' + (i + 1), hop: 1,
   }));
+  const data = { nodes: [...subset, ...peers], edges: peers.map(n => edge('C', n.id)) };
   return {
-    data: { nodes: [...subset, ...peers], edges: peers.map(n => edge('C', n.id)) },
-    decisionEffects: { ...pilots.decisionEffects, review: dependents },
+    data,
+    decisionEffects: {
+      ...pilots.decisionEffects, data, review: dependents,
+      counts: { ...pilots.decisionEffects.counts, to_review: dependents.length },
+    },
   };
 }

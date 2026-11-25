@@ -29,7 +29,7 @@ export function ConflictCard({ focus, partner, conflict, choice, onResolve, onCa
         <button onClick={onCancel} disabled={!onCancel}>Cancel</button>
       </div>
     </fieldset>}
-    {!onResolve && choice && <p>{choice.choice === 'scoped' ? 'Scoped: ' + choice.scope : 'Replaced'}</p>}
+    {!onResolve && choice && <p>{choice.choice === 'scoped' || choice.choice === 'keep_both_scoped' ? 'Scoped: ' + choice.scope : 'Replaced'}</p>}
   </section>;
 }
 
