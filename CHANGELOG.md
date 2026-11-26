@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- BUG-GRAPH-VIEW-NO-REPLACES-LINK-1 (2026-11-26, user-visible): a replaced decision now arrives with its `status` (`superseded`), `supersedes` and `superseded_by`, so the graph draws it as retired with its replaces link instead of leaving the replacement alone.
 - Decision effects now follow the host graph theme and default to dark. Conflict, replacement, review and suggested links retain their visual cues in both modes.
 
 ## 2.0.2
