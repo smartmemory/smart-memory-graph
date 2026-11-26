@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Decision effects now follow the host graph theme and default to dark. Conflict, replacement, review and suggested links retain their visual cues in both modes.
+
 ## 2.0.2
 
 - UI-ORIGIN-UNKNOWN-NEUTRAL-1 (2026-11-25, user-visible): an unknown origin is shown plainly. No red dashed node border (the node looks like a user node), no red text and no "Untagged write path" sentence in the detail panel (it shows `unknown` in the normal colour), and the legend's unknown entry has a neutral swatch (the entry stays). `ORIGIN_BORDER_COLORS.unknown` is now `null` and `getOriginBorderColor('unknown')` returns `null`; the contract file still lists a colour for it and is unchanged. No data, filter or tier logic changed. Test: `tests/originUnknownNeutral.test.js`. Consumers (Studio, Insights, web, Obsidian) take the graph by `file:` link: rebuild or redeploy them to pick it up.

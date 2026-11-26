@@ -22,7 +22,7 @@ function fixture(name) {
   return { email, friday, pilots, refunds, standing }[name];
 }
 
-function Host({ name, workspaceId, loading, reply }) {
+function Host({ name, workspaceId, loading, reply, graphTheme }) {
   const [snapshot, setSnapshot] = useState(() => reply ? { data: reply.data, decisionEffects: reply } : fixture(name));
   const [branch, setBranch] = useState('');
   if (name === 'off') return <GraphExplorer data={{ nodes: [], edges: [] }} decisionEffects={email.decisionEffects} />;
@@ -47,16 +47,16 @@ function Host({ name, workspaceId, loading, reply }) {
       onRemoveLink: (...pair) => { window.lastLink = ['remove', ...pair]; },
     }),
   };
-  return <><GraphExplorer enableDecisionEffects workspaceId={workspaceId} {...snapshot} decisionEffectsActions={actions} />
+  return <><GraphExplorer enableDecisionEffects workspaceId={workspaceId} {...graphTheme} {...snapshot} decisionEffectsActions={actions} />
     {branch && <output>Refocus requested: {branch}</output>}</>;
 }
 
 const root = createRoot(document.getElementById('root'));
 let generation = 0;
-const render = (name, workspaceId, loading, reply) => flushSync(() =>
-  root.render(<Host key={generation} name={name} workspaceId={workspaceId} loading={loading} reply={reply} />));
+const render = (name, workspaceId, loading, reply, graphTheme) => flushSync(() =>
+  root.render(<Host key={generation} name={name} workspaceId={workspaceId} loading={loading} reply={reply} graphTheme={graphTheme} />));
 window.updateHost = render;
-window.loadCase = async name => {
+window.loadCase = async (name, graphTheme) => {
   window.lastCommit = null;
   generation++;
   let reply;
@@ -76,5 +76,5 @@ window.loadCase = async name => {
   if (name === 'email') reply = await adapter.previewDecisionEffects(draftA);
   if (['dashed', 'treat_as_real', 'suggest_only'].includes(name)) reply = await adapter.previewDecisionEffects(draftH);
   if (['billing-list', 'readonly'].includes(name)) reply = await adapter.getDecisionEffects('billing');
-  render(name, 'first', false, reply);
+  render(name, 'first', false, reply, graphTheme);
 };

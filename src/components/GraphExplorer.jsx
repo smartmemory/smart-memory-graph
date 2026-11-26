@@ -106,7 +106,7 @@ export default function GraphExplorer({ enableDecisionEffects = false, decisionE
     if (decisionEffectsLoading) return <p role="status">Loading decision effects…</p>;
     if (!props.data || !decisionEffects) return <p role="status">Decision effects unavailable.</p>;
     return <DecisionEffects key={JSON.stringify([props.workspaceId, decisionEffects.focus, decisionEffects.phase, decisionEffects.today, decisionEffects.revision])}
-      data={props.data} effects={decisionEffects} actions={decisionEffectsActions} className={props.className} />;
+      theme={props.theme} mode={props.mode} data={props.data} effects={decisionEffects} actions={decisionEffectsActions} className={props.className} />;
   }
   return <WorkspaceGraph {...props} />;
 }

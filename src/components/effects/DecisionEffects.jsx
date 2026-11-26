@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { effectiveTheme } from '../../internal/useCytoscape';
 import EffectsCanvas, { FreshnessChip } from './EffectsCanvas';
 import { CommitBar, ConflictCard, DecisionCard, RulesSlider } from './EffectControls';
 import { focusWindow, graphLinks, visibleReview } from './focusGraph';
@@ -6,9 +7,19 @@ import './effects.css';
 
 /**
  * @param {{data: import('./types').EffectsGraphData, effects: import('./types').EffectsPresentation,
- * actions?: import('./types').EffectsActions, className?: string}} props
+ * actions?: import('./types').EffectsActions, className?: string, mode?: 'dark'|'light', theme?: object}} props
  */
-export default function DecisionEffects({ data, effects, actions = {}, className = '' }) {
+export default function DecisionEffects({ data, effects, actions = {}, className = '', theme, mode }) {
+  const applyTheme = useCallback(container => {
+    if (container) container.style.colorScheme = effectiveTheme(theme, mode, container).mode;
+  }, [theme, mode]);
+  const palette = theme?.palette;
+  const style = {
+    '--de-node': palette?.node,
+    '--de-edge': palette?.edge,
+    '--de-label': palette?.label,
+    '--de-selection': palette?.selectionBorder,
+  };
   const [date, setDate] = useState(effects.today);
   const [showRetired, setRetired] = useState(false);
   const [panel, setPanel] = useState(null);
@@ -102,7 +113,7 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     pill(related.length + ' possibly related', effects.focus, () => openPanel('related'));
   }
   if (!focus) return <p role="status">Decision effects unavailable: the focus is missing.</p>;
-  return <section className={'de-view ' + className} aria-label="Decision effects" onKeyDown={e => {
+  return <section ref={applyTheme} style={style} className={'de-view ' + className} aria-label="Decision effects" onKeyDown={e => {
     if (e.key === 'Escape') {
       if (panel) closePanel();
       else setPath([]);

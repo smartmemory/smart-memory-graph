@@ -355,3 +355,106 @@ test('H2 standing billing lists one suggestion with host-controlled actions', as
     }
   }
 });
+
+// Read painted CSS colours as sRGB bytes, including color-mix() used by tinted surfaces.
+async function paint(element, property) {
+  return element.first().evaluate((el, name) => {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.fillStyle = getComputedStyle(el)[name];
+    ctx.fillRect(0, 0, 1, 1);
+    return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
+  }, property);
+}
+
+function contrast(a, b, minimum, label) {
+  const luminance = rgb => rgb.reduce((sum, byte, i) => {
+    const s = byte / 255;
+    return sum + [0.2126, 0.7152, 0.0722][i] * (s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4);
+  }, 0);
+  const [low, high] = [luminance(a), luminance(b)].sort((x, y) => x - y);
+  const ratio = (high + 0.05) / (low + 0.05);
+  assert.ok(ratio >= minimum, label + ' contrast ' + ratio.toFixed(2));
+}
+
+for (const mode of ['dark', 'light']) {
+  test('effects theme rendering and contrast in ' + mode, async () => {
+    const load = name => page.evaluate(([name, mode]) =>
+      window.loadCase(name, mode === 'dark' ? {} : { mode }), [name, mode]);
+    await load('email');
+    await openConflict();
+    const view = page.locator('.de-view');
+    assert.equal(await view.evaluate(el => getComputedStyle(el).colorScheme), mode);
+    const bg = await paint(view, 'backgroundColor');
+    assert.deepEqual(bg, mode === 'dark' ? [4, 6, 19] : [255, 255, 255]);
+    const card = await paint(node('eu').locator('button'), 'backgroundColor');
+    assert.deepEqual(card, mode === 'dark' ? [17, 23, 39] : [255, 255, 255]);
+    assert.deepEqual(await paint(aside(), 'backgroundColor'), card);
+    contrast(await paint(node('eu').locator('strong'), 'color'), card, 4.5, 'Node label');
+    contrast(await paint(aside(), 'color'), card, 4.5, 'Conflict panel');
+    const ghost = node('A').locator('button');
+    const ghostBg = await paint(ghost, 'backgroundColor');
+    assert.notDeepEqual(ghostBg, card);
+    const teal = await paint(ghost, 'borderTopColor');
+    const red = await paint(aside().locator('.de-pair strong'), 'borderLeftColor');
+    const warning = await paint(node('support').locator('button'), 'borderTopColor');
+    const neutral = await paint(view.locator('.de-meta'), 'color');
+    assert.equal(new Set([teal, red, warning, neutral].map(String)).size, 4);
+    // Compare semantic colours to the design-system defaults, independently of the stylesheet.
+    const expected = mode === 'dark'
+      ? [[110, 237, 220], [248, 113, 113], [250, 204, 21]]
+      : [[14, 124, 109], [185, 28, 28], [180, 83, 9]];
+    for (const [index, actual] of [teal, red, warning].entries()) {
+      assert.ok(actual.every((v, i) => Math.abs(v - expected[index][i]) <= 1), 'Semantic colour ' + actual);
+    }
+    contrast(teal, ghostBg, 3, 'Ghost border');
+    contrast(await paint(ghost, 'color'), ghostBg, 4.5, 'Ghost label');
+    contrast(red, card, 4.5, 'Conflict button');
+    assert.deepEqual(await paint(edge('conflict').locator('button'), 'color'), red);
+    const review = node('support').locator('button');
+    const reviewBg = await paint(review, 'backgroundColor');
+    contrast(warning, reviewBg, 3, 'Review border');
+    contrast(await paint(review.locator('.de-meta'), 'color'), reviewBg, 4.5, 'Review metadata');
+    async function checkEdge(kind, colour) {
+      const line = edge(kind).locator('path').first();
+      assert.deepEqual(await paint(line, 'stroke'), colour, kind);
+      const marker = await line.getAttribute('marker-end');
+      const markerPath = page.locator('[id="' + marker.slice(5, -1) + '"] path');
+      assert.deepEqual(await paint(markerPath, 'fill'), colour, kind + ' arrow');
+      contrast(colour, await paint(page.locator('.de-frame'), 'backgroundColor'), 3, kind);
+    }
+    await checkEdge('replaces', teal);
+    await checkEdge('conflict', red);
+    await checkEdge('ripple', warning);
+    await checkEdge('comes_from', neutral);
+    await shot('effects-theme-' + mode);
+    await button('Replace the old rule').click();
+    await checkEdge('settled', neutral);
+    await load('multi');
+    await openConflict();
+    await button('Replace the old rule').click();
+    await checkEdge('pending', neutral);
+    await load('refunds');
+    await page.getByRole('checkbox', { name: 'Show retired' }).check();
+    await checkEdge('supersedes', neutral);
+    await load('standing');
+    await node('exports').getByRole('button').click();
+    await button('Why?').click();
+    await checkEdge('why', teal);
+    await load('dashed');
+    await checkEdge('depends_on', neutral);
+    assert.notEqual(await edge('depends_on').locator('path').first().evaluate(el => getComputedStyle(el).strokeDasharray), 'none');
+  });
+}
+
+test('mounted overlay follows host tokens and graph theme precedence without losing the panel', async () => {
+  await show('email');
+  await openConflict();
+  await page.addStyleTag({ content: '#root { --background: 195 50% 96%; --danger: 0 80% 30%; --ring: 220 70% 30% }' });
+  await page.evaluate(() => window.updateHost('email', 'first', false, undefined, {
+    mode: 'dark', theme: { mode: 'light', palette: { node: 'rgb(213, 232, 231)' } },
+  }));
+  assert.equal(await page.locator('.de-view').evaluate(el => getComputedStyle(el).colorScheme), 'light');
+  assert.deepEqual(await paint(page.locator('.de-view'), 'backgroundColor'), [240, 247, 250]);
+  assert.deepEqual(await paint(node('eu').locator('button'), 'backgroundColor'), [213, 232, 231]);
+  assert.deepEqual(await paint(aside().locator('.de-pair strong'), 'borderLeftColor'), [138, 15, 15]);
+});
