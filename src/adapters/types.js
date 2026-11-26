@@ -66,6 +66,12 @@
  * @property {function(number=, number=): Promise<Object>} listMemories
  *   List memories with pagination.
  *
+ * @property {function(string): Promise<Object>} getDecisionEffects
+ * @property {function(string): Promise<Object>} previewDecisionEffects
+ * @property {function(string, Object): Promise<Object>} commitDecisionEffects
+ * @property {function(string, string): Promise<Object>} addDecisionDependsOn
+ * @property {function(string, string): Promise<Object>} confirmDecisionDependsOn
+ * @property {function(string, string): Promise<Object>} removeDecisionDependsOn
  * @property {function(): string|null} getAuthToken
  *   Get the current auth token (for WS auth).
  *

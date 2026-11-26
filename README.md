@@ -33,7 +33,7 @@ dependencies, inspect the source path, or view rules on an earlier date.
   decisionEffectsLoading={loading}
   data={focusedGraph}
   decisionEffects={snapshot}
-  decisionEffectsActions={{ onCommit, onCancel, onRefocus }}
+  decisionEffectsActions={{ onCommit, onCancel, onRefocus, onConfirmLink, onRemoveLink }}
 />
 ```
 
@@ -46,6 +46,11 @@ Pass the complete conflict, replacement and review lists for accurate counts,
 plus dated overflow counts for branches outside the supplied graph.
 
 Pass the current workspace ID so switching workspaces clears the draft and view state.
+Use `adapter.getDecisionEffects(id)` for a standing decision and `adapter.previewDecisionEffects(text)` for a draft.
+Pass the returned snapshot as `decisionEffects` and its `data` as the graph data.
+Supply `onConfirmLink(source, target)` and `onRemoveLink(source, target)` for hosts that allow suggested-link changes.
+After a successful change, reload the snapshot to update the graph.
+
 While a read is outstanding, set `decisionEffectsLoading`.
 
 The host owns writes. Without an explicit policy, the preview is read-only.

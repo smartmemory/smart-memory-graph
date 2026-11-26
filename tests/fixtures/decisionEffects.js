@@ -110,3 +110,23 @@ export function crowded() {
     },
   };
 }
+
+// Frozen A10 decisions 8–11, after the dependency evolver's first cycle.
+export function suggestedPilots(mode, standingBilling = false) {
+  const listOnly = mode === 'suggest_only';
+  const focus = standingBilling ? 'billing' : 'C';
+  const nodes = [
+    ...pilots.data.nodes.filter(n => !standingBilling || n.id !== 'C'),
+    { id: 'reminder', label: 'Invoice reminder three days before pilot billing', validFrom: '2026-08-12', type: 'decision', hop: 2 },
+    { id: 'onboard', label: 'Pilots get an onboarding call in week 2', validFrom: '2026-08-20', type: 'decision', hop: 2 },
+  ].filter(n => !listOnly || !['reminder', 'billing'].includes(n.id) || n.id === focus)
+    .map(n => ({ ...n, viaSuggested: !listOnly && ['billing', 'reminder'].includes(n.id) }));
+  const edges = listOnly ? [] : [edge('billing', 'pilot'), edge('reminder', 'billing')].map(e => ({ ...e, suggested: true }));
+  const data = { nodes, edges };
+  return { ...pilots.decisionEffects, data, focus, phase: standingBilling ? 'standing' : 'draft',
+    replaces: standingBilling ? [] : ['pilot'], suggestedLinks: mode,
+    suggestions: standingBilling ? [{ source: 'billing', target: 'pilot', reason: 'Billing begins when the free period ends.' }] : [],
+    review: listOnly ? [] : [review('billing', 'pilot', 1), review('reminder', 'billing', 2)],
+    counts: { conflicts: 0, replaced: standingBilling ? 0 : 1, to_review: listOnly ? 0 : 2 },
+  };
+}

@@ -205,6 +205,7 @@ export default function Toolbar({
       {/* Decision contradiction overlay */}
       {onToggleContradictionOverlay && (
         <button
+          aria-pressed={contradictionOverlay}
           onClick={() => onToggleContradictionOverlay(!contradictionOverlay)}
           className={`px-3 py-1.5 text-sm rounded transition-colors ${
             contradictionOverlay ? 'bg-red-600 text-white' : 'text-foreground dark:text-slate-300 hover:text-foreground dark:hover:text-white hover:bg-muted dark:hover:bg-slate-700'

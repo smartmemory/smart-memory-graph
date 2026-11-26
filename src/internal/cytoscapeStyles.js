@@ -327,7 +327,7 @@ export function getCytoscapeStyles(theme = null) {
     style: {
       'line-color': DECISION_EDGE_STYLES.CONFLICTS_WITH.color,
       'target-arrow-color': DECISION_EDGE_STYLES.CONFLICTS_WITH.color,
-      'target-arrow-shape': 'triangle',
+      'target-arrow-shape': DECISION_EDGE_STYLES.CONFLICTS_WITH.arrow,
       width: DECISION_EDGE_STYLES.CONFLICTS_WITH.width,
       'line-style': DECISION_EDGE_STYLES.CONFLICTS_WITH.line_style,
       opacity: 0.9,

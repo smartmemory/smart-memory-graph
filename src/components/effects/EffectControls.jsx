@@ -37,7 +37,7 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy }) {
   const state = nodeState(node, effects, date, choices);
   const labels = new Map(data.nodes.filter(n => n.validFrom <= date).map(n => [n.id, n.label]));
   function related(type, outgoing) {
-    return data.edges.filter(e => e.type === type && e[outgoing ? 'source' : 'target'] === node.id)
+    return data.edges.filter(e => !(e.suggested && effects.suggestedLinks === 'suggest_only') && e.type === type && e[outgoing ? 'source' : 'target'] === node.id)
       .map(e => labels.get(e[outgoing ? 'target' : 'source'])).filter(Boolean);
   }
   const detail = [

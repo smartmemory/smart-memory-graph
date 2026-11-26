@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { DECISION_CONFLICT_EDGE_TYPE, DECISION_CONTRADICTION_CLASS } from '../core/decisionStyles';
 import DecisionEffects from './effects/DecisionEffects';
 import CytoscapeCanvas from './CytoscapeCanvas';
 import Toolbar from './Toolbar';
@@ -229,6 +230,7 @@ function WorkspaceGraph({
   const { urlState, saveToUrl, getShareableUrl, clearHistoricalUrl } = useUrlState(focusRequest);
   const restoredView = useRef(null);
 
+  const [contradictionOverlay, setContradictionOverlay] = useState(false);
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const [originLegendOpen, setOriginLegendOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -559,6 +561,22 @@ function WorkspaceGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter, cytoscape.ready, filterSnapshot, snapshot]);
 
+  useEffect(() => {
+    const cy = cytoscape.cy.current;
+    if (!cytoscape.ready || !cy || !contradictionOverlay) return;
+    const selector = `edge[type="${DECISION_CONFLICT_EDGE_TYPE}"]`;
+    const highlight = () => {
+      cy.nodes().removeClass(DECISION_CONTRADICTION_CLASS);
+      cy.edges(selector).connectedNodes().addClass(DECISION_CONTRADICTION_CLASS);
+    };
+    highlight();
+    cy.on('add remove data', 'edge', highlight);
+    return () => {
+      cy.off('add remove data', 'edge', highlight);
+      cy.nodes().removeClass(DECISION_CONTRADICTION_CLASS);
+    };
+  }, [cytoscape.ready, cytoscape.cy, contradictionOverlay]);
+
   // Apply annotations whenever they change OR data is replaced.
   // setElements() destroys all Cytoscape elements (and their classes), so annotations
   // must be reapplied even if the annotations object itself hasn't changed.
@@ -845,6 +863,8 @@ function WorkspaceGraph({
 
       {controlledReason && <p className="px-4 py-1 text-xs">{controlledReason}</p>}
       <Toolbar
+        contradictionOverlay={contradictionOverlay}
+        onToggleContradictionOverlay={setContradictionOverlay}
         readOnlyReason={controlledReason}
         layout={interaction.layout}
         onLayoutChange={interaction.handleLayoutChange}

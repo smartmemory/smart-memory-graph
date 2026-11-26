@@ -32,3 +32,26 @@ it('validates the frozen-notes renderer snapshots and rejects stored marks on th
     expect(validate({ ...draft, conflicts: [{ ...draft.conflicts[0], freshness }] })).toBe(false);
   }
 });
+
+it('validates A10 link provenance, setting, suggestion rows and path-only mutations', async () => {
+  const { suggestedPilots } = await import('./fixtures/decisionEffects.js');
+  const ajv = new Ajv2020();
+  addFormats(ajv);
+  const validate = ajv.compile(schema);
+  for (const mode of ['dashed', 'suggest_only', 'treat_as_real']) {
+    const draft = suggestedPilots(mode);
+    expect(validate(draft), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate({ ...draft, suggestedLinks: 'unknown' })).toBe(false);
+  }
+  const billing = suggestedPilots('suggest_only', true);
+  expect(validate(billing)).toBe(true);
+  expect(validate({ ...billing, suggestions: [{ source: 'billing', target: 'pilot' }] })).toBe(false);
+  const draft = suggestedPilots('dashed');
+  draft.data.edges[0].suggested = 'yes';
+  expect(validate(draft)).toBe(false);
+  draft.data.edges[0].suggested = true;
+  draft.data.nodes[0].viaSuggested = 'yes';
+  expect(validate(draft)).toBe(false);
+  expect(decisions._routes.confirm_depends_on).toBe('POST /memory/decisions/{id}/depends-on/{target_id}/confirm');
+  expect(decisions._routes.remove_depends_on).toBe('DELETE /memory/decisions/{id}/depends-on/{target_id}');
+});
