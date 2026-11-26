@@ -172,3 +172,32 @@ describe('normalizeAPIResponse', () => {
     expect(edges[0].type).toBe('KNOWS');
   });
 });
+
+// BUG-GRAPH-VIEW-NO-REPLACES-LINK-1: /memory/graph/full now sends each node's lifecycle status, so a replaced decision
+// (admitted only as the far end of a readable replaces-link) is drawn as retired, next to its SUPERSEDES edge.
+describe('normalizeAPIResponse carries decision status (BUG-GRAPH-VIEW-NO-REPLACES-LINK-1)', () => {
+  const fullGraph = {
+    nodes: [
+      { item_id: 'dec_new', label: 'Deploys on Thursdays', memory_type: 'decision', category: 'memory', status: 'active' },
+      { item_id: 'dec_old', label: 'Deploys on Tuesdays', memory_type: 'decision', category: 'memory', status: 'superseded' },
+    ],
+    edges: [{ source_id: 'dec_new', target_id: 'dec_old', edge_type: 'SUPERSEDES' }],
+  };
+
+  it('keeps status on each node and the replaces edge', async () => {
+    const { nodes, edges } = normalizeAPIResponse(fullGraph);
+    const byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
+    expect(byId.dec_old.status).toBe('superseded');
+    expect(byId.dec_new.status).toBe('active');
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: 'dec_new', target: 'dec_old', type: 'SUPERSEDES' });
+  });
+
+  it('draws the replaced decision with the superseded style', async () => {
+    const { graphNodeToCyElement } = await import('../../internal/cytoscapeConvert.js');
+    const { nodes } = normalizeAPIResponse(fullGraph);
+    const old = graphNodeToCyElement(nodes.find((n) => n.id === 'dec_old'));
+    expect(old.classes).toContain('decision-status-superseded');
+    expect(old.data.decision_status).toBe('superseded');
+  });
+});
