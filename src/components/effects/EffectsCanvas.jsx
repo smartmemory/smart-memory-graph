@@ -35,15 +35,18 @@ function markers(id) {
     </marker>);
 }
 
-function Edge({ edge, geometry, marker, dim, onConflict }) {
+function Edge({ edge, geometry, marker, dim, onConflict, onSuggestion }) {
   const { x, y, points, width: w } = geometry;
   const d = points.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
   const hasButton = !!edge.partner;
   return <g data-edge={edge.kind} data-source={edge.source} data-target={edge.target}
     className={'de-edge de-' + edge.kind} data-dimmed={dim || undefined}>
-    <title>{edge.label}{!hasButton && edge.freshness?.stale ? ' · stale' : ''}</title>
-    <path d={d} markerEnd={'url(#' + marker + ')'} />
-    {hasButton ? <foreignObject x={x - w / 2 - 6} y={y - 14} width={w + 12} height="30">
+    <title>{edge.suggestion ? 'Suggested by decision dependencies' : edge.label}{!hasButton && edge.freshness?.stale ? ' · stale' : ''}</title>
+    <path d={d} strokeDasharray={edge.dashed ? '7 3' : undefined} markerEnd={'url(#' + marker + ')'} />
+    {edge.suggestion ? <foreignObject x={x - w / 2 - 6} y={y - 14} width={w + 12} height="30">
+      <button className="de-link-button" aria-label={`Link details: ${edge.source} to ${edge.target}`}
+        onClick={() => onSuggestion(edge.suggestion)}>{edge.label || 'ⓘ'}</button>
+    </foreignObject> : hasButton ? <foreignObject x={x - w / 2 - 6} y={y - 14} width={w + 12} height="30">
       <button className="de-link-button" onClick={() => onConflict(edge.partner)}>{edge.label}</button>
     </foreignObject> : <g className="de-edge-label">
       <rect x={x - w / 2} y={y - 9} width={w} height="18" rx="8" />
@@ -66,6 +69,7 @@ export function nodeState(node, effects, date, choices) {
   if (retiring) tags.push('retiring');
   if (retired) tags.push((node.retirement || 'replaced') + ' ' + formatDate(node.retiredAt));
   if (conflict) tags.push('× conflict');
+  if (today && node.viaSuggested && (effects.suggestedLinks ?? 'dashed') === 'dashed') tags.push('via suggested link');
   if (review) tags.push('R' + review.hop + ' · ' + (review.state === 'checking' ? 'checking' : 'needs review'));
   if ((node.ruleKind || node.check) && today) tags.push('check ' + ({ compiled: 'ok', unchecked: '?', stale: 'stale' })[node.check || 'unchecked']);
   return { ghost, held, fading: !!(retiring || retired), review, tags };
@@ -76,7 +80,7 @@ export function formatDate(date) {
     .format(new Date(date + 'T00:00:00Z'));
 }
 
-export default function EffectsCanvas({ nodes, links, effects, date, path, choices, extras, onSelect, onConflict }) {
+export default function EffectsCanvas({ nodes, links, effects, date, path, choices, extras, onSelect, onConflict, onSuggestion }) {
   const id = 'de' + useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const graph = useMemo(() => layout(nodes, links, extras), [nodes, links, extras]);
   if (!nodes.length) return <p className="de-empty">No rules in force on this date.</p>;
@@ -88,7 +92,7 @@ export default function EffectsCanvas({ nodes, links, effects, date, path, choic
       {links.map((edge, i) => {
         const marker = ['conflict', 'ripple', 'why', 'replaces'].includes(edge.kind) ? edge.kind : 'link';
         return <Edge key={i} edge={edge} geometry={graph.edge(edge.source, edge.target, String(i))}
-          dim={path.length > 0 && edge.kind !== 'why'} marker={id + marker} onConflict={onConflict} />;
+          dim={path.length > 0 && edge.kind !== 'why'} marker={id + marker} onConflict={onConflict} onSuggestion={onSuggestion} />;
       })}
       {extras.map(extra => {
         const { x, y } = graph.node(extra.key);

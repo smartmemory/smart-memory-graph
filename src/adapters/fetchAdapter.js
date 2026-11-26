@@ -75,6 +75,14 @@ export function createFetchAdapter({ apiUrl, getToken, getTeamId, fetchFn = glob
       return request('GET', `/memory/decisions${suffix}`);
     },
     getDecision: (id) => request('GET', `/memory/decisions/${encodeURIComponent(id)}`),
+    getDecisionEffects: id => request('GET', `/memory/decisions/${encodeURIComponent(id)}/effects`),
+    previewDecisionEffects: text => request('POST', '/memory/decisions/effects/preview', { text }),
+    commitDecisionEffects: (text, resolutions) => request('POST', '/memory/decisions/effects/commit', { text, resolutions }),
+    addDecisionDependsOn: (id, targetId) => request('POST', `/memory/decisions/${encodeURIComponent(id)}/depends-on`, { target_id: targetId }),
+    confirmDecisionDependsOn: (id, targetId) =>
+      request('POST', `/memory/decisions/${encodeURIComponent(id)}/depends-on/${encodeURIComponent(targetId)}/confirm`),
+    removeDecisionDependsOn: (id, targetId) =>
+      request('DELETE', `/memory/decisions/${encodeURIComponent(id)}/depends-on/${encodeURIComponent(targetId)}`),
     getDecisionProvenance: (id) => request('GET', `/memory/decisions/${encodeURIComponent(id)}/provenance`),
     getDecisionCausalChain: (id, { direction = 'both', maxDepth = 3 } = {}) =>
       request('GET', `/memory/decisions/${encodeURIComponent(id)}/causal-chain?direction=${encodeURIComponent(direction)}&max_depth=${maxDepth}`),

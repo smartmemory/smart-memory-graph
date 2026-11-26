@@ -81,3 +81,29 @@ describe('DECISION_ROUTES constant matches the in-repo service contract', () => 
     expect(DECISION_ROUTES.causal_chain).toBe('GET /memory/decisions/{decision_id}/causal-chain');
   });
 });
+
+const id = 'first/id';
+const target = 'next id';
+const text = 'Move email';
+const resolutions = { eu: { choice: 'keep_both_scoped', scope: 'Marketing' } };
+it.each([
+  ['getDecisionEffects', [id], 'GET', '/first%2Fid/effects'],
+  ['previewDecisionEffects', [text], 'POST', '/effects/preview', { text }],
+  ['commitDecisionEffects', [text, resolutions], 'POST', '/effects/commit', { text, resolutions }],
+  ['addDecisionDependsOn', [id, target], 'POST', '/first%2Fid/depends-on', { target_id: target }],
+  ['confirmDecisionDependsOn', [id, target], 'POST', '/first%2Fid/depends-on/next%20id/confirm'],
+  ['removeDecisionDependsOn', [id, target], 'DELETE', '/first%2Fid/depends-on/next%20id'],
+])('%s preserves the fetch and SDK contract', async (name, args, method, path, body) => {
+  const reply = { source: id, target };
+  const fetchFn = vi.fn(async () => Response.json(reply));
+  const fetchAdapter = createFetchAdapter({ apiUrl: '', getToken: () => null, getTeamId: () => 'workspace', fetchFn });
+  expect(await fetchAdapter[name](...args)).toEqual(reply);
+  const [[url, options]] = fetchFn.mock.calls;
+  expect(url).toBe('/memory/decisions' + path);
+  expect(options.method).toBe(method);
+  expect(options.body).toBe(JSON.stringify(body));
+  const sdkMethod = vi.fn(async () => reply);
+  expect(await createSDKAdapter({ decisions: { [name]: sdkMethod } })[name](...args)).toBe(reply);
+  expect(sdkMethod).toHaveBeenCalledWith(...args);
+  await expect(createSDKAdapter({})[name](...args)).rejects.toThrow(name + ' unavailable');
+});

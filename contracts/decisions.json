@@ -42,6 +42,8 @@
         "429": "Budget exhausted"
       }
     },
+    "confirm_depends_on": "POST /memory/decisions/{id}/depends-on/{target_id}/confirm",
+    "remove_depends_on": "DELETE /memory/decisions/{id}/depends-on/{target_id}",
     "list_active": "GET /memory/decisions",
     "_list_active_params": {
       "domain": "optional string",

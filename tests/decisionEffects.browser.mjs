@@ -1,4 +1,4 @@
-// Real Chromium, public GraphExplorer entry, no server or adapter.
+// Real Chromium, public GraphExplorer entry and offline adapter fixtures.
 import assert from 'node:assert/strict';
 import { after, afterEach, before, beforeEach, test } from 'node:test';
 import { createRequire } from 'node:module';
@@ -311,4 +311,47 @@ test('rejected direct save shows a pending link and retries the preserved scope'
   await button('Save').click();
   assert.equal(await edge('settled').getByRole('button').innerText(), 'scoped');
   assert.equal((await readCommit()).answers.eu.scope, 'Billing only');
+});
+
+for (const mode of ['dashed', 'treat_as_real', 'suggest_only']) {
+  test('A10 pilot preview through the adapter: ' + mode, async () => {
+    await show(mode);
+    const only = mode === 'suggest_only';
+    const dashed = mode === 'dashed';
+    assert.equal(await edge('replaces').getAttribute('data-target'), 'pilot');
+    assert.match(await bar().innerText(), new RegExp('0 conflicts · 1 replaced · ' + (only ? 0 : 2) + ' to review'));
+    assert.equal(await page.locator('[data-review]').count(), only ? 0 : 2);
+    assert.equal(await edge('depends_on').count(), only ? 0 : 2);
+    assert.equal(await edge('ripple').count(), 0);
+    if (only) return;
+    for (const [id, target, hop] of [['billing', 'pilot', 1], ['reminder', 'billing', 2]]) {
+      const link = page.locator(`[data-edge="depends_on"][data-source="${id}"][data-target="${target}"]`);
+      assert.equal(await link.locator('path').evaluate(el => getComputedStyle(el).strokeDasharray !== 'none'), dashed);
+      assert.equal((await link.getByRole('button').innerText()).includes('suggested'), dashed);
+      assert.equal(await node(id).getByRole('button').getAttribute('data-review'), String(hop));
+      assert.equal((await node(id).getByRole('button').innerText()).includes('via suggested link'), dashed);
+      await link.getByRole('button').click();
+      assert.match(await aside().innerText(), /Suggested by decision dependencies/);
+      await button('Confirm').click();
+      assert.deepEqual(await page.evaluate(() => window.lastLink), ['confirm', id, target]);
+      await button('Close detail').click();
+    }
+  });
+}
+
+test('H2 standing billing lists one suggestion with host-controlled actions', async () => {
+  for (const name of ['billing-list', 'readonly']) {
+    await show(name);
+    await node('billing').getByRole('button').click();
+    const rows = aside().getByRole('listitem');
+    assert.equal(await rows.count(), 1);
+    assert.match(await rows.innerText(), /Pilots get a 30-day free period/);
+    assert.match(await rows.innerText(), /Billing begins when the free period ends/);
+    for (const action of ['Confirm', 'Remove']) {
+      assert.equal(await button(action).count(), name === 'readonly' ? 0 : 1);
+      if (name === 'readonly') continue;
+      await button(action).click();
+      assert.deepEqual(await page.evaluate(() => window.lastLink), [action.toLowerCase(), 'billing', 'pilot']);
+    }
+  }
 });

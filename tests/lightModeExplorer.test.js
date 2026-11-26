@@ -149,3 +149,18 @@ it('focuses Ask results on the mounted canvas, including a relation with a serve
   expect(canvas.$id('x1').selected()).toBe(false);
   expect(canvas.$id('x1').hasClass('highlighted')).toBe(false);
 });
+
+it('toggles only the conflicting endpoints and renders the contract arrow on the mounted canvas', async () => {
+  const edges = [{ id: 'conflict', source: 'm1', target: 'm2', type: 'CONFLICTS_WITH' }];
+  await render({ adapter: undefined, data: { ...DATA, edges } });
+  const button = host.querySelector('[data-testid="toolbar-contradiction-overlay"]');
+  const highlighted = () => cy().nodes('.decision-contradiction').map(n => n.id()).sort();
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  expect(cy().$id('conflict').style('target-arrow-shape')).toBe('triangle-cross');
+  await act(async () => button.click());
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(highlighted()).toEqual(['m1', 'm2']);
+  await act(async () => button.click());
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  expect(highlighted()).toEqual([]);
+});

@@ -15,6 +15,7 @@ export interface EffectsNode {
   rejected?: string[]
   ruleKind?: 'must' | 'must-not'
   check?: 'compiled' | 'unchecked' | 'stale'
+  viaSuggested?: boolean
   importance?: number
 }
 
@@ -23,6 +24,7 @@ export interface EffectsEdge {
   source: string
   target: string
   type: 'depends_on' | 'comes_from' | 'supersedes'
+  suggested?: boolean
   derived?: boolean
   freshness?: Freshness
 }
@@ -44,6 +46,8 @@ export interface Review {
 }
 
 export interface EffectsPresentation {
+  suggestedLinks?: 'suggest_only' | 'dashed' | 'treat_as_real'
+  suggestions?: { source: string, target: string, reason: string }[]
   focus: string
   today: string
   revision?: string // change when replacing a draft or its authoritative conflict set
@@ -82,6 +86,8 @@ export interface DecisionEffectsSnapshot extends Omit<EffectsPresentation, 'poss
 }
 
 export interface EffectsActions {
+  onConfirmLink?: (source: string, target: string) => void
+  onRemoveLink?: (source: string, target: string) => void
   onCommit?: (focus: string, resolutions: Record<string, Resolution>) => void | Promise<void>
   onCancel?: (focus: string) => void
   onRefocus?: (branchId: string) => void

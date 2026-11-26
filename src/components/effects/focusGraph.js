@@ -61,6 +61,8 @@ export function graphLinks(data, effects, nodes, today, path, choices) {
   const add = (source, target, kind, label, extra = {}) => {
     if (ids.has(source) && ids.has(target)) links.push({ source, target, kind, label, ...extra });
   };
+  const suggested = data.edges.filter(e => e.type === 'depends_on' && e.suggested);
+  const hasSuggestedParent = (id, via) => suggested.some(e => e.source === id && e.target === via);
   if (today) {
     for (const id of effects.replaces) add(effects.focus, id, 'replaces', 'replaces');
     for (const c of effects.conflicts) {
@@ -72,7 +74,7 @@ export function graphLinks(data, effects, nodes, today, path, choices) {
         { partner: c.id, freshness: c.freshness });
     }
     for (const r of visibleReview(effects)) {
-      if (r.hop <= 3) add(r.via, r.id, 'ripple', 'R' + r.hop);
+      if (r.hop <= 3 && !hasSuggestedParent(r.id, r.via)) add(r.via, r.id, 'ripple', 'R' + r.hop);
     }
   }
   const pair = (a, b) => JSON.stringify([a, b].sort());
@@ -81,7 +83,11 @@ export function graphLinks(data, effects, nodes, today, path, choices) {
     const i = path.indexOf(e.source);
     const j = path.indexOf(e.target);
     const onPath = i >= 0 && j >= 0 && Math.abs(i - j) === 1;
-    if (onPath) {
+    if (e.type === 'depends_on' && e.suggested) {
+      if (effects.suggestedLinks === 'suggest_only') continue;
+      const dashed = effects.suggestedLinks !== 'treat_as_real';
+      add(e.source, e.target, 'depends_on', dashed ? 'suggested' : '', { suggestion: e, dashed });
+    } else if (onPath) {
       add(path[Math.min(i, j)], path[Math.max(i, j)], 'why', e.derived ? 'derived' : 'why', { freshness: e.freshness });
     } else if (!e.derived && !overlayPairs.has(pair(e.source, e.target))) {
       const label = { comes_from: 'source', supersedes: 'replaces', depends_on: 'depends on' }[e.type];

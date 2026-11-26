@@ -28,6 +28,7 @@
     "EffectsNode": {
       "type": "object",
       "properties": {
+        "viaSuggested": { "type": "boolean" },
         "id": { "$ref": "#/$defs/Id" },
         "label": { "type": "string" },
         "type": { "enum": ["decision", "note", "entity"] },
@@ -53,6 +54,7 @@
     "EffectsEdge": {
       "type": "object",
       "properties": {
+        "suggested": { "type": "boolean" },
         "id": { "$ref": "#/$defs/Id" },
         "source": { "$ref": "#/$defs/Id" },
         "target": { "$ref": "#/$defs/Id" },
@@ -189,6 +191,20 @@
     "DecisionEffectsSnapshot": {
       "type": "object",
       "properties": {
+        "suggestedLinks": { "enum": ["suggest_only", "dashed", "treat_as_real"], "default": "dashed" },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": { "$ref": "#/$defs/Id" },
+              "target": { "$ref": "#/$defs/Id" },
+              "reason": { "$ref": "#/$defs/Text" }
+            },
+            "required": ["source", "target", "reason"],
+            "additionalProperties": false
+          }
+        },
         "data": { "$ref": "#/$defs/EffectsGraphData" },
         "focus": { "$ref": "#/$defs/Id" },
         "today": { "$ref": "#/$defs/Date" },

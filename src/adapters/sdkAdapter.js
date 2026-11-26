@@ -7,6 +7,10 @@
  * @returns {import('./types').GraphAPIAdapter}
  */
 export function createSDKAdapter(client) {
+  const decisionMethod = name => async (...args) => {
+    if (typeof client.decisions?.[name] !== 'function') throw new Error(`Decision SDK method ${name} unavailable`);
+    return client.decisions[name](...args);
+  };
   return {
     getFullGraph: (limit) =>
       client.graph.getFullGraph(limit),
@@ -76,6 +80,12 @@ export function createSDKAdapter(client) {
       client.decisions?.get
         ? client.decisions.get(id)
         : (client.http || client._http || client).get?.(`/memory/decisions/${encodeURIComponent(id)}`),
+    getDecisionEffects: decisionMethod('getDecisionEffects'),
+    previewDecisionEffects: decisionMethod('previewDecisionEffects'),
+    commitDecisionEffects: decisionMethod('commitDecisionEffects'),
+    addDecisionDependsOn: decisionMethod('addDecisionDependsOn'),
+    confirmDecisionDependsOn: decisionMethod('confirmDecisionDependsOn'),
+    removeDecisionDependsOn: decisionMethod('removeDecisionDependsOn'),
     getDecisionProvenance: (id) =>
       client.decisions?.getProvenance
         ? client.decisions.getProvenance(id)

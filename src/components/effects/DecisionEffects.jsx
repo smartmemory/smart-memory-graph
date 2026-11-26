@@ -32,6 +32,10 @@ export default function DecisionEffects({ data, effects, actions = {}, className
   const hidden = overflow.reduce((sum, s) => sum + s.count, 0);
   const selected = byId.get(panel?.id);
   const conflict = effects.conflicts.find(c => c.id === panel?.id);
+  const suggestions = panel?.kind === 'link'
+    ? data.edges.filter(edge => edge.id === panel.id && edge.suggested && effects.suggestedLinks !== 'suggest_only') :
+    today && effects.suggestedLinks === 'suggest_only' && selected
+      ? (effects.suggestions || []).filter(link => link.source === selected.id) : [];
   const selectedPath = selected && Object.hasOwn(effects.whyPaths || {}, selected.id) ? effects.whyPaths[selected.id] : null;
   const canShowPath = selectedPath?.length > 1 && selectedPath.length <= 6 &&
     selectedPath.every(id => byId.get(id)?.validFrom <= date);
@@ -118,7 +122,7 @@ export default function DecisionEffects({ data, effects, actions = {}, className
           <span key={link.source + ':' + link.target}>Step {path.indexOf(link.target) + 1} <FreshnessChip result={link.freshness} /></span>)}
         <button onClick={() => setPath([])}>Clear path</button></div>}
       <EffectsCanvas nodes={nodes} links={links} effects={effects} date={date} path={path} choices={choices}
-        extras={extras} onSelect={id => openPanel('node', id)} onConflict={id => openPanel('conflict', id)} />
+        extras={extras} onSuggestion={link => openPanel('link', link.id)} onSelect={id => openPanel('node', id)} onConflict={id => openPanel('conflict', id)} />
 
     </div>
     {panel && <aside className="de-aside" aria-label="Graph detail" ref={el => {
@@ -127,6 +131,13 @@ export default function DecisionEffects({ data, effects, actions = {}, className
       <button className="de-close" aria-label="Close detail" onClick={closePanel}>×</button>
       {panel.kind === 'node' && selected && <DecisionCard node={selected} data={data} effects={effects} date={date}
         choices={choices} onWhy={canShowPath ? () => { setPath(selectedPath); closePanel(); } : null} />}
+      {suggestions.length > 0 && <section className="de-detail" aria-label="Suggested links"><h3>Suggested links</h3>
+        <ul>{suggestions.map(({ source, target, reason }) => <li key={JSON.stringify([source, target])}>
+          {byId.get(source)?.label || source} → {byId.get(target)?.label || target}
+          <p>Suggested by decision dependencies{reason && ' · ' + reason}</p>
+          {today && actions.onConfirmLink && <button onClick={() => actions.onConfirmLink(source, target)}>Confirm</button>}
+          {today && actions.onRemoveLink && <button onClick={() => actions.onRemoveLink(source, target)}>Remove</button>}
+        </li>)}</ul></section>}
       {panel.kind === 'conflict' && conflict && <ConflictCard key={panel.id} focus={focus} partner={selected || { label: conflict.id }}
         conflict={conflict} choice={conflict.resolution || choices[conflict.id]} busy={busy}
         onResolve={!conflict.resolution && draft && policyKnown && actions.onCommit ? resolve : null} onCancel={cancel} />}
