@@ -133,7 +133,7 @@ describe('AskPanel initialAnswer', () => {
   it('hands the normalized answer to the view, the same shape a live answer has', () => {
     expect(normalizeInitialAnswer({ question: 'q', result: { answer: 'partial' } })).toEqual({
       question: 'q',
-      result: { answer: 'partial', reasoning: '', evidence: [], relations: [] },
+      result: { answer: 'partial', reasoning: '', evidence: [], relations: [], decision: null, lanes_failed: [] },
     });
   });
 });
