@@ -93,6 +93,10 @@ export function normalizeAPIResponse(apiData) {
       metadata: item.metadata,
       grounded: groundedIds.has(id),
       origin,
+      // Decision lifecycle fields (BUG-GRAPH-VIEW-NO-REPLACES-LINK-1): the status draws a replaced decision as retired.
+      status: item.status ?? item.properties?.status ?? item.metadata?.status,
+      supersedes: item.supersedes ?? item.metadata?.supersedes,
+      superseded_by: item.superseded_by ?? item.metadata?.superseded_by,
     });
   }
 
