@@ -32,4 +32,10 @@
 .sm-ask-row-id { flex: none; color: hsl(var(--muted-foreground, 215.38 16.32% 46.86%)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6875rem; }
 .sm-ask-relation-source, .sm-ask-relation-target { color: hsl(var(--foreground, 214.29 31.82% 91.37%)); }
 .sm-ask-relation-type { color: hsl(var(--info, 198.44 93.2% 59.61%)); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.6875rem; }
+.sm-ask-partial { margin: 0; padding: 0.4375rem 0.5rem; border: 1px solid hsl(var(--warning, 38 92% 50%)); border-radius: 0.375rem; color: hsl(var(--foreground, 214.29 31.82% 91.37%)); }
+.sm-ask-decision { display: flex; flex-direction: column; gap: 0.25rem; }
+.sm-ask-decision-row { border-color: hsl(var(--ring, 217.22 91.22% 59.8%)); }
+.sm-ask-decision-row .sm-ask-row-content { overflow: visible; text-overflow: clip; white-space: normal; font-size: 0.9375rem; line-height: 1.5; }
+.sm-ask-decision-line { margin: 0; color: hsl(var(--secondary-foreground, 212.73 26.83% 83.92%)); line-height: 1.5; }
+.sm-ask-decision-label { margin-right: 0.25rem; font-size: 0.6875rem; letter-spacing: 0.05em; text-transform: uppercase; color: hsl(var(--muted-foreground, 215.38 16.32% 46.86%)); }
 .sm-ask-empty { margin: 0; color: hsl(var(--muted-foreground, 215 20.22% 65.1%)); }

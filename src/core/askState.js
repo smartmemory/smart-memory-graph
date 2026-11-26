@@ -65,11 +65,17 @@ export function normalizeAskResponse(raw) {
     reasoning: typeof body.reasoning === 'string' ? body.reasoning : '',
     evidence: Array.isArray(body.evidence) ? body.evidence.map(buildEvidence).filter(Boolean) : [],
     relations: Array.isArray(body.relations) ? body.relations.map(buildRelation).filter(Boolean) : [],
+    decision: buildDecision(body.decision),
+    lanes_failed: Array.isArray(body.lanes_failed) ? body.lanes_failed.filter((lane) => typeof lane === 'string' && lane !== '') : [],
   };
 }
 
 /** The fields of a built evidence row (contract `evidence.items`). */
 export const EVIDENCE_FIELDS = ['item_id', 'content'];
+/** The fields of a built decision block (contract `response.decision`). */
+export const DECISION_FIELDS = ['decision_id', 'content', 'status', 'effective_at', 'replaced', 'reason', 'match'];
+/** The fields of a built replaced row (contract `response.decision.replaced.items`). */
+export const REPLACED_FIELDS = ['decision_id', 'content', 'reason'];
 /** The fields of a built relation row (contract `relations.items`). */
 export const RELATION_FIELDS = ['source', 'type', 'target', 'source_id', 'target_id'];
 
@@ -108,6 +114,43 @@ function buildRelation(row) {
     relation.target_id = row.target_id;
   }
   return relation;
+}
+
+// The current-decision block (SAME-ANSWER-U4, contract `response.decision`) is built the way evidence rows are: a
+// non-object is no block; a block with no id or no text to show is no block (null, never half a block); every other
+// field is text or ''. `replaced` keeps only rows that have text to show. The block is whatever the answer carried:
+// nothing here remembers a decision between answers.
+function buildDecision(row) {
+  if (!isRecord(row) || !isKey(row.decision_id) || !isKey(row.content)) return null;
+  return {
+    decision_id: row.decision_id,
+    content: row.content,
+    status: isText(row.status) ? row.status : '',
+    effective_at: isText(row.effective_at) ? row.effective_at : '',
+    replaced: Array.isArray(row.replaced) ? row.replaced.map(buildReplaced).filter(Boolean) : [],
+    reason: isText(row.reason) ? row.reason : '',
+    match: isText(row.match) ? row.match : '',
+  };
+}
+
+function buildReplaced(row) {
+  if (!isRecord(row) || !isKey(row.content)) return null;
+  return {
+    decision_id: isText(row.decision_id) ? row.decision_id : '',
+    content: row.content,
+    reason: isText(row.reason) ? row.reason : '',
+  };
+}
+
+/**
+ * True when the written answer is only the decision's own text (a record-only workspace, `answers.decisions` =
+ * `record_only`, answers with the rule and its citation `[decision_id]`): the block already shows it, so the view
+ * does not print it a second time as if it were a written answer. Any other answer text stays.
+ */
+export function answerRepeatsDecision(answer, decision) {
+  if (!decision || typeof answer !== 'string') return false;
+  const text = answer.trim();
+  return text === decision.content.trim() || text === `${decision.content.trim()} [${decision.decision_id}]`;
 }
 
 /**
