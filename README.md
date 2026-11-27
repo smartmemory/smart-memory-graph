@@ -30,12 +30,14 @@ Select a saved decision in the normal graph and choose **Show ripple**. You can 
 ### Controlled decision effects
 
 For a dedicated screen, render `DecisionEffects` with `data`, `effects`, `actions` and the optional `proposal` sidebar slot. Key the view by workspace, focus and snapshot revision so a new draft starts with fresh choices.
+
+The bottom date bar shows calendar month ticks and a Today shortcut. A proposal render function receives `{ today }` to follow the selected date.
+
 Use + or − to zoom, scroll over the canvas to zoom at the pointer, and drag the background to pan. **Fit** recentres the displayed neighbourhood.
 
 The conflict drawer shows both rules, the standing rule’s effective date, the reason for the clash, and the consequences of each choice.
 
 Resolve each conflict in the drawer, then use **Save decision** to apply the choices. **Discard** drops the preview.
-
 
 Pass a focused graph and its effects snapshot to preview a draft, follow its
 dependencies, inspect the source path, or view rules on an earlier date.

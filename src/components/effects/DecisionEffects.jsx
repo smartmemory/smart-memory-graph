@@ -170,7 +170,7 @@ function EffectsFrame({ model, data, effects, actions }) {
 function Sidebar({ model, effects, actions, proposal }) {
   const { today, review, openPanel, byId, error, draft, unsettled, busy, cancel, policyKnown, commit, choices } = model;
   return <div className="de-sidebar">
-    {proposal}
+    {typeof proposal === 'function' ? proposal({ today }) : proposal}
     {today && effects.phase === 'standing' && !!review.length && <section className="de-review-list"><h3>Needs review</h3>
       <ul>{review.map(r => <li key={r.id}><button onClick={() => openPanel('node', r.id)} disabled={!byId.has(r.id)}>
         R{r.hop} · {byId.get(r.id)?.label || r.id}</button></li>)}</ul></section>}

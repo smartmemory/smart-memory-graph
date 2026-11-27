@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Month ticks and a Today shortcut accompany the historical rules slider.
 - Decision effects supports zoom, background drag and fit-to-neighbourhood.
 - The conflict drawer labels the proposal and in-force date and accepts a user-entered scope.
 - Draft results show counts, a next step, and an explicit save action after resolving conflicts.

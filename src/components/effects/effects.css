@@ -156,3 +156,14 @@
 .de-canvas:active { cursor: grabbing; }
 .de-zoom { position: absolute; top: 10px; left: 12px; z-index: 1; display: flex; gap: 4px; }
 .de-zoom button { min-width: 34px; box-shadow: 0 1px 3px color-mix(in srgb, var(--de-ink) 12%, transparent); }
+.de-time { display: flex; gap: 12px 24px; padding: 12px 20px 20px; background: var(--de-card); }
+.de-date-label { align-self: flex-start; display: flex; align-items: baseline; gap: 8px; color: var(--de-muted); font-size: 12px; }
+.de-date-label strong { color: var(--de-ink); font-size: 14px; }
+.de-date-track { flex: 1 1 180px; min-width: 0; margin: 0 8px; }
+.de-time input[type=range] { width: 100%; display: block; margin: 0; }
+.de-months { position: relative; height: 18px; margin: 0 8px; color: var(--de-muted); font-size: 11px; }
+.de-months span { position: absolute; top: 2px; transform: translateX(-50%); white-space: nowrap; }
+@media (max-width: 650px) {
+  .de-date-track { flex-basis: 100%; order: 1; }
+  .de-months span:nth-child(even) { visibility: hidden; }
+}

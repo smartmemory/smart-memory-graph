@@ -4,13 +4,32 @@ import { formatDate, FreshnessChip, nodeState } from './EffectsCanvas';
 const dayMs = 86400000;
 const day = date => Date.parse(date + 'T00:00:00Z') / dayMs;
 
+function monthTicks(first, today) {
+  const start = new Date(first + 'T00:00:00Z');
+  const end = new Date(today + 'T00:00:00Z');
+  const months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth() + 1;
+  const stride = Math.ceil(months / 12);
+  const tick = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + (start.getUTCDate() > 1 ? 1 : 0), 1));
+  const ticks = [];
+  while (tick <= end) {
+    const label = tick.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC', ...(months > 12 && { year: '2-digit' }) });
+    ticks.push({ label, position: 100 * (tick - start) / Math.max(dayMs, end - start) });
+    tick.setUTCMonth(tick.getUTCMonth() + stride);
+  }
+  return ticks;
+}
+
 export function RulesSlider({ first, today, date, showRetired, onDate, onRetired }) {
   return <div className="de-time">
-    <label><span>Rules in force on <strong>{formatDate(date)} {date.slice(0, 4)}</strong></span>
+    <div className="de-date-label">Rules in force on<strong>{formatDate(date)} {date.slice(0, 4)}{date === today && ' (today)'}</strong></div>
+    <div className="de-date-track">
       <input type="range" min={day(first)} max={day(today)} value={day(date)}
         aria-label="Rules in force on" aria-valuetext={date}
         onChange={e => onDate(new Date(e.target.valueAsNumber * dayMs).toISOString().slice(0, 10))} />
-    </label>
+      <div className="de-months" aria-hidden="true">{monthTicks(first, today).map(tick =>
+        <span key={tick.position} style={{ left: tick.position + '%' }}>{tick.label}</span>)}</div>
+    </div>
+    <button onClick={() => onDate(today)} disabled={date === today}>Today</button>
     <label><input type="checkbox" checked={showRetired} onChange={e => onRetired(e.target.checked)} /> Show retired</label>
   </div>;
 }
