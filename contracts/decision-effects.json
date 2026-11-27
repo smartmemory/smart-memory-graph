@@ -54,7 +54,7 @@
     "EffectsEdge": {
       "type": "object",
       "properties": {
-        "suggested": { "type": "boolean" },
+        "suggested": { "type": "boolean", "description": "On stored depends_on edges, true for a suggestion and false for a confirmed or manually stated link." },
         "id": { "$ref": "#/$defs/Id" },
         "source": { "$ref": "#/$defs/Id" },
         "target": { "$ref": "#/$defs/Id" },
