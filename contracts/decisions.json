@@ -14,7 +14,7 @@
     "effects_preview": {
       "route": "POST /memory/decisions/effects/preview",
       "request": "decision-effects.json#/$defs/PreviewRequest",
-      "reply": "decision-effects.json#/$defs/DecisionEffectsSnapshot",
+      "reply": "decision-effects.json#/$defs/PreviewResponse",
       "errors": {
         "404": "Unknown or unreadable decision id",
         "429": "Budget exhausted"
