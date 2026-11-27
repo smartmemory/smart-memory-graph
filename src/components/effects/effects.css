@@ -98,8 +98,8 @@
 .de-detail dl { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
 .de-detail dt { font-size: 12px; font-weight: bold; }
 .de-detail dd { margin: 0; }
-.de-detail h4 { margin: 0 0 3px; font-size: 12px; font-weight: bold; }
-.de-detail ul { margin: 0; padding-left: 18px; }
+.de-node-detail h4 { margin: 0 0 3px; font-size: 12px; font-weight: bold; }
+.de-node-detail ul { margin: 0; padding-left: 18px; }
 .de-decided { color: var(--de-muted); font-size: 13px; }
 .de-status { font: 600 12px/1.5 system-ui; border: 1px solid var(--de-line); border-radius: 999px; padding: 1px 9px; }
 .de-status[data-status=review] { color: var(--de-warning); border-color: var(--de-warning); }

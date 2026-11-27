@@ -88,7 +88,7 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy, onSele
     ['Depends on', related('depends_on', true)], ['Depended on by', related('depends_on', false)],
     ['Comes from', related('comes_from', true)],
   ].filter(([, items]) => items.length);
-  return <section className="de-detail" aria-label={node.type === 'note' ? 'Source note details' : node.type === 'entity' ? 'Subject details' : 'Decision details'}>
+  return <section className="de-detail de-node-detail" aria-label={node.type === 'note' ? 'Source note details' : node.type === 'entity' ? 'Subject details' : 'Decision details'}>
     {title && <h3>{title}</h3>}
     {savedDecision && node.validFrom && <p className="de-decided">Decided {formatDate(node.validFrom)}</p>}
     {savedDecision && <span className="de-status" data-status={state.partner ? 'conflict' : state.review ? 'review' : undefined}>{statusPill(node, state)}</span>}

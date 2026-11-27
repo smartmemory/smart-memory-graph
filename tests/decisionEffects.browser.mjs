@@ -352,7 +352,7 @@ test('H2 standing billing lists one suggestion with host-controlled actions', as
   for (const name of ['billing-list', 'readonly']) {
     await show(name);
     await node('billing').getByRole('button').click();
-    const rows = aside().getByRole('listitem');
+    const rows = aside().getByLabel('Suggested links').getByRole('listitem');
     assert.equal(await rows.count(), 1);
     assert.match(await rows.innerText(), /Pilots get a 30-day free period/);
     assert.match(await rows.innerText(), /Billing begins when the free period ends/);
@@ -492,4 +492,18 @@ test('R1 conflict fill and border survive a simultaneous review', async () => {
   assert.match(await both.innerText(), /R1/);
   assert.deepEqual(await colours(both), await colours(node('eu').getByRole('button')));
   assert.notDeepEqual(await colours(both), await colours(node('support').getByRole('button')));
+});
+
+test('R1 node list spacing stays inside the node detail', async () => {
+  await show('crowded');
+  await button('+7 more at hop 1').click();
+  const list = aside().getByRole('list');
+  const spacing = el => [getComputedStyle(el).marginBlockStart, getComputedStyle(el).paddingInlineStart];
+  const overflow = await list.evaluate(spacing);
+  await show('billing-list');
+  await node('billing').getByRole('button').click();
+  assert.deepEqual(await page.getByLabel('Suggested links').getByRole('list').evaluate(spacing), overflow);
+  await show('email');
+  await node('vendor').getByRole('button').click();
+  assert.notDeepEqual(await aside().getByRole('list').first().evaluate(spacing), overflow);
 });

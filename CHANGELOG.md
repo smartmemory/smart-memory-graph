@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Node detail list and subsection spacing stays within the selected node.
 - Conflict partners keep the red fill and border alongside their review tag.
 - Node details omit empty fields and unnamed related buttons and trim visible text.
 - Preview pills and canvas tags distinguish possible review from flagged obligations.
