@@ -8,6 +8,10 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import cytoscape from 'cytoscape';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import DecisionDetailBlock from '../src/components/DecisionDetailBlock.jsx';
+import { normalizeAPIResponse } from '../src/core/normalize.js';
 import { graphNodeToCyElement, graphEdgeToCyElement } from '../src/internal/cytoscapeConvert.js';
 import { getCytoscapeStyles } from '../src/internal/cytoscapeStyles.js';
 import {
@@ -122,6 +126,34 @@ describe('graphNodeToCyElement: decision pass-through', () => {
     expect(el.data.supersedes).toBeUndefined();
     expect(el.classes).toBeUndefined();
   });
+});
+
+describe('decision status on graph selection', () => {
+  it.each(['active', 'superseded', 'retracted', 'pending', undefined])(
+    'renders the badge from Cytoscape click data for %s',
+    (status) => {
+      const { nodes } = normalizeAPIResponse({ nodes: [{ item_id: 'd1', memory_type: 'decision', status }] });
+      const cy = makeCy(nodes.map(graphNodeToCyElement));
+      try {
+        const selected = cy.$id('d1').data();
+        expect(selected.status).toBe(status);
+        const html = renderToStaticMarkup(createElement(DecisionDetailBlock, { node: selected }));
+        const badges = [...html.matchAll(/<span data-testid="decision-status-badge"([^>]*)>([^<]*)<\/span>/g)];
+        expect(badges).toHaveLength(1);
+        const [, attributes, label] = badges[0];
+        if (status) {
+          expect(label).toBe(DECISION_STATUSES[status].label);
+          expect(attributes).toContain(DECISION_STATUSES[status].color);
+        } else {
+          expect(label).toBe('Status not set');
+          expect(attributes).not.toMatch(/red-|#ef4444|dashed|uppercase/);
+          expect(html).not.toMatch(/untagged/i);
+        }
+      } finally {
+        cy.destroy();
+      }
+    },
+  );
 });
 
 describe('Cytoscape style application: decision node', () => {

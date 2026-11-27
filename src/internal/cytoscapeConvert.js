@@ -20,9 +20,8 @@ function computeAgeBucket(createdAt) {
 // GraphNode → Cytoscape node element
 export function graphNodeToCyElement(node) {
   const isDecision = isDecisionNode(node);
-  const decisionStatus = isDecision
-    ? resolveDecisionStatus(node.status ?? node.metadata?.status)
-    : null;
+  const status = isDecision ? (node.status ?? node.metadata?.status) : undefined;
+  const decisionStatus = isDecision ? resolveDecisionStatus(status) : null;
 
   const classList = [];
   if (node.grounded) classList.push('grounded');
@@ -49,6 +48,7 @@ export function graphNodeToCyElement(node) {
       // Decision fields — undefined for non-decision nodes so cytoscape data
       // selectors don't accidentally match (cytoscape's [attr] selectors
       // treat undefined as absent).
+      status,
       decision_status: isDecision ? decisionStatus._resolvedKey : undefined,
       decision_type: isDecision ? (node.decision_type ?? node.metadata?.decision_type) : undefined,
       supersedes: isDecision ? (node.supersedes ?? node.metadata?.supersedes) : undefined,
