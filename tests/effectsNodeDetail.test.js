@@ -107,3 +107,12 @@ it('R1 decision facts are restricted to saved decisions', () => {
     expect(html).not.toMatch(/Decided |class="de-status"/);
   }
 });
+
+it('R1 review labels distinguish proposed and standing obligations', () => {
+  for (const [state, label] of [['preview', 'Would need review'], ['flagged', 'Needs review'], ['checking', 'Checking']]) {
+    const review = [{ id: 'base', state, hop: 1, freshness: computed }];
+    expect(card(data.nodes[3], { effects: { ...effects, review } })).toContain('>' + label + '<');
+    const html = renderToStaticMarkup(createElement(EffectsCanvas, canvasProps([data.nodes[3]], { review })));
+    expect(html).toContain('R1 · ' + label.toLowerCase());
+  }
+});

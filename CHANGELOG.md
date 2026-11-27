@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preview pills and canvas tags distinguish possible review from flagged obligations.
 - Only saved decisions show the Decided date and lifecycle status.
 - Each source note receives independent Dagre coordinates.
 - Month ticks and a Today shortcut accompany the historical rules slider.

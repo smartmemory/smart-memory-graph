@@ -59,6 +59,12 @@ function Edge({ edge, geometry, marker, dim, onConflict, onSuggestion }) {
   </g>;
 }
 
+export function reviewLabel(state) {
+  if (state === 'preview') return 'Would need review';
+  if (state === 'checking') return 'Checking';
+  return 'Needs review';
+}
+
 export function nodeState(node, effects, date, choices) {
   const today = date === effects.today;
   const focus = node.id === effects.focus;
@@ -74,7 +80,7 @@ export function nodeState(node, effects, date, choices) {
   if (retired) tags.push((node.retirement || 'replaced') + ' ' + formatDate(node.retiredAt));
   if (conflict) tags.push('× conflict');
   if (today && node.viaSuggested && (effects.suggestedLinks ?? 'dashed') === 'dashed') tags.push('via suggested link');
-  if (review) tags.push('R' + review.hop + ' · ' + (review.state === 'checking' ? 'checking' : 'needs review'));
+  if (review) tags.push('R' + review.hop + ' · ' + reviewLabel(review.state).toLowerCase());
   if ((node.ruleKind || node.check) && today) tags.push('check ' + ({ compiled: 'ok', unchecked: '?', stale: 'stale' })[node.check || 'unchecked']);
   const partner = conflict && !focus;
   return { ghost, held, partner, fading: !!(retiring || retired), review, tags };

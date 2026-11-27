@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatDate, FreshnessChip, nodeState } from './EffectsCanvas';
+import { formatDate, FreshnessChip, nodeState, reviewLabel } from './EffectsCanvas';
 
 const dayMs = 86400000;
 const day = date => Date.parse(date + 'T00:00:00Z') / dayMs;
@@ -61,7 +61,7 @@ export function ConflictCard({ focus, partner, conflict, proposed, choice, onRes
 function statusPill(node, state) {
   if (node.retiredAt && state.fading) return (node.retirement === 'retracted' ? 'Retracted ' : 'Replaced ') + formatDate(node.retiredAt);
   if (state.partner) return 'In conflict with the proposal';
-  if (state.review) return state.review.state === 'checking' ? 'Checking' : 'Needs review';
+  if (state.review) return reviewLabel(state.review.state);
   return 'In force';
 }
 

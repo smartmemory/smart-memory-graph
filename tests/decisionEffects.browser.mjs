@@ -102,7 +102,7 @@ test('A · exactly three ripple links, with the frozen parents, hop labels and d
   const paths = await edge('ripple').evaluateAll(es => es.map(e => [e.dataset.source, e.dataset.target, e.textContent.includes('R2') ? 2 : 1]));
   assert.deepEqual(paths, [['vendor', 'support', 1], ['vendor', 'growth', 1], ['support', 'exports', 2]]);
   for (const [, id, hop] of paths) {
-    assert.match(await node(id).getByRole('button').innerText(), new RegExp('R' + hop + ' · needs review'));
+    assert.match(await node(id).getByRole('button').innerText(), new RegExp('R' + hop + ' · would need review'));
     assert.equal(await node(id).locator('button').evaluate(el => getComputedStyle(el).borderStyle), 'double');
   }
   await shot('04-ripple', page.locator('.de-frame'));
@@ -176,7 +176,7 @@ test('C · only the pilot billing decision needs review, plus human-review polic
   assert.match(await bar().innerText(), /0 conflicts · 1 replaced · 1 to review/);
   assert.equal(await edge('replaces').getAttribute('data-target'), 'pilot');
   assert.equal(await edge('ripple').getAttribute('data-target'), 'billing');
-  assert.match(await node('billing').getByRole('button').innerText(), /R1 · needs review/);
+  assert.match(await node('billing').getByRole('button').innerText(), /R1 · would need review/);
   await show('propose');
   await button('Send for review').click();
   assert.match(await node('C').getByRole('button').innerText(), /held/);
