@@ -132,8 +132,7 @@
         "via": { "$ref": "#/$defs/Id" },
         "hop": {
           "type": "integer",
-          "minimum": 1,
-          "maximum": 3
+          "minimum": 1
         },
         "state": { "enum": ["preview", "flagged"] },
         "freshness": { "$ref": "#/$defs/Freshness" }

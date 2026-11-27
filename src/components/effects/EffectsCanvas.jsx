@@ -60,7 +60,7 @@ export function nodeState(node, effects, date, choices) {
   const focus = node.id === effects.focus;
   const ghost = focus && effects.phase !== 'standing';
   const held = ghost && effects.phase === 'held';
-  const review = today ? effects.review.find(r => r.id === node.id && r.hop <= 3 && r.state !== 'reviewed') : undefined;
+  const review = today ? effects.review.find(r => r.id === node.id && r.state !== 'reviewed') : undefined;
   const retiring = today && effects.phase === 'draft' && effects.replaces.includes(node.id);
   const retired = node.retiredAt && node.retiredAt <= date;
   const conflict = today && effects.conflicts.some(c => (focus || c.id === node.id) && !choices[c.id] && !c.resolution);
