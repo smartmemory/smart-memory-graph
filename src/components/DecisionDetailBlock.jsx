@@ -123,7 +123,7 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
     }
   };
 
-  const isUnknownStatus = status._resolvedKey === 'unknown';
+  const statusMissing = node.status == null || node.status === '';
 
   return (
     <section
@@ -134,20 +134,17 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
         <h3 className="text-xs font-semibold text-muted-foreground dark:text-slate-400 uppercase tracking-wider">Decision</h3>
         <span
           data-testid="decision-status-badge"
-          className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide"
-          style={{
+          className={`text-[10px] px-2 py-0.5 rounded-full ${statusMissing
+            ? 'bg-muted text-muted-foreground dark:bg-slate-800 dark:text-slate-400'
+            : 'font-bold uppercase tracking-wide'}`}
+          style={statusMissing ? undefined : {
             backgroundColor: status.color + '22',
             color: status.color,
             border: `1px ${status.border_style} ${status.color}`,
           }}
         >
-          {status.label}
+          {statusMissing ? 'Status not set' : status.label}
         </span>
-        {isUnknownStatus && (
-          <span className="text-[10px] text-red-700 dark:text-red-400" title="Decision producer did not set status">
-            (untagged)
-          </span>
-        )}
       </div>
 
       {node.decision_type && DECISION_TYPES.includes(node.decision_type) && (
