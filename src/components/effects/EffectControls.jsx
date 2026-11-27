@@ -58,8 +58,7 @@ export function ConflictCard({ focus, partner, conflict, proposed, choice, onRes
   </section>;
 }
 
-function statusPill(node, state, effects) {
-  if (state.ghost) return state.held ? 'Held, not saved' : 'Proposed, not saved';
+function statusPill(node, state) {
   if (node.retiredAt && state.fading) return (node.retirement === 'retracted' ? 'Retracted ' : 'Replaced ') + formatDate(node.retiredAt);
   if (state.partner) return 'In conflict with the proposal';
   if (state.review) return state.review.state === 'checking' ? 'Checking' : 'Needs review';
@@ -73,6 +72,7 @@ function RelatedLinks({ items, onSelect }) {
 
 export function DecisionCard({ node, data, effects, date, choices, onWhy, onSelect }) {
   const state = nodeState(node, effects, date, choices);
+  const savedDecision = node.type === 'decision' && !state.ghost;
   const labels = new Map(data.nodes.filter(n => n.validFrom <= date).map(n => [n.id, n.label]));
   function related(type, outgoing) {
     const seen = new Set();
@@ -86,10 +86,10 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy, onSele
     ['Depends on', related('depends_on', true)], ['Depended on by', related('depends_on', false)],
     ['Comes from', related('comes_from', true)],
   ].filter(([, items]) => items.length);
-  return <section className="de-detail" aria-label="Decision details">
+  return <section className="de-detail" aria-label={node.type === 'note' ? 'Source note details' : node.type === 'entity' ? 'Subject details' : 'Decision details'}>
     <h3>{node.label}</h3>
-    {node.validFrom && <p className="de-decided">Decided {formatDate(node.validFrom)}</p>}
-    <span className="de-status" data-status={state.partner ? 'conflict' : state.review ? 'review' : undefined}>{statusPill(node, state, effects)}</span>
+    {savedDecision && node.validFrom && <p className="de-decided">Decided {formatDate(node.validFrom)}</p>}
+    {savedDecision && <span className="de-status" data-status={state.partner ? 'conflict' : state.review ? 'review' : undefined}>{statusPill(node, state)}</span>}
     {node.reason && <p>{node.reason}</p>}
     {rejected.length > 0 && <div><h4>Options rejected</h4><ul>{rejected.map(r => <li key={r.id}>{r.label}</li>)}</ul></div>}
     {lists.map(([key, items]) => <div key={key}><h4>{key}</h4><RelatedLinks items={items} onSelect={onSelect} /></div>)}

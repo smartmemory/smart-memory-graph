@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Only saved decisions show the Decided date and lifecycle status.
 - Each source note receives independent Dagre coordinates.
 - Month ticks and a Today shortcut accompany the historical rules slider.
 - Decision effects supports zoom, background drag and fit-to-neighbourhood.

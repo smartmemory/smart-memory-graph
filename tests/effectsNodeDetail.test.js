@@ -99,3 +99,11 @@ it('R1 source notes have distinct rendered positions', () => {
     expect.soft(new Set(positions.map(String)).size).toBe(count);
   }
 });
+
+it('R1 decision facts are restricted to saved decisions', () => {
+  for (const [type, phase] of [['note', 'standing'], ['entity', 'standing'], ['decision', 'draft'], ['decision', 'held']]) {
+    const html = card(node('d', 'Selected item', { type }), { effects: { ...effects, phase } });
+    expect(html).toContain('Selected item');
+    expect(html).not.toMatch(/Decided |class="de-status"/);
+  }
+});
