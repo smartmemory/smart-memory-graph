@@ -73,25 +73,27 @@ function RelatedLinks({ items, onSelect }) {
 export function DecisionCard({ node, data, effects, date, choices, onWhy, onSelect }) {
   const state = nodeState(node, effects, date, choices);
   const savedDecision = node.type === 'decision' && !state.ghost;
-  const labels = new Map(data.nodes.filter(n => n.validFrom <= date).map(n => [n.id, n.label]));
+  const title = node.label.trim();
+  const reason = node.reason?.trim();
+  const labels = new Map(data.nodes.filter(n => n.validFrom <= date).map(n => [n.id, n.label.trim()]));
   function related(type, outgoing) {
     const seen = new Set();
     return data.edges.filter(e => !(e.suggested && effects.suggestedLinks === 'suggest_only') && e.type === type && e[outgoing ? 'source' : 'target'] === node.id)
-      .map(e => e[outgoing ? 'target' : 'source']).filter(id => labels.has(id) && !seen.has(id) && seen.add(id))
+      .map(e => e[outgoing ? 'target' : 'source']).filter(id => labels.get(id) && !seen.has(id) && seen.add(id))
       .map(id => ({ id, label: labels.get(id) }));
   }
-  const rejected = (node.rejected || []).map(label => ({ id: label, label }));
+  const rejected = (node.rejected || []).map(label => label.trim()).filter(Boolean);
   const lists = [
     ['Replaced', related('supersedes', true)], ['Replaced by', related('supersedes', false)],
     ['Depends on', related('depends_on', true)], ['Depended on by', related('depends_on', false)],
     ['Comes from', related('comes_from', true)],
   ].filter(([, items]) => items.length);
   return <section className="de-detail" aria-label={node.type === 'note' ? 'Source note details' : node.type === 'entity' ? 'Subject details' : 'Decision details'}>
-    <h3>{node.label}</h3>
+    {title && <h3>{title}</h3>}
     {savedDecision && node.validFrom && <p className="de-decided">Decided {formatDate(node.validFrom)}</p>}
     {savedDecision && <span className="de-status" data-status={state.partner ? 'conflict' : state.review ? 'review' : undefined}>{statusPill(node, state)}</span>}
-    {node.reason && <p>{node.reason}</p>}
-    {rejected.length > 0 && <div><h4>Options rejected</h4><ul>{rejected.map(r => <li key={r.id}>{r.label}</li>)}</ul></div>}
+    {reason && <p>{reason}</p>}
+    {rejected.length > 0 && <div><h4>Options rejected</h4><ul>{rejected.map((label, index) => <li key={index}>{label}</li>)}</ul></div>}
     {lists.map(([key, items]) => <div key={key}><h4>{key}</h4><RelatedLinks items={items} onSelect={onSelect} /></div>)}
     {state.review && <FreshnessChip result={state.review.freshness} />}
     {onWhy && <button onClick={onWhy}>Why?</button>}

@@ -116,3 +116,14 @@ it('R1 review labels distinguish proposed and standing obligations', () => {
     expect(html).toContain('R1 · ' + label.toLowerCase());
   }
 });
+
+it('R1 blank values do not create fields, unnamed links or options', () => {
+  const selected = node('d', '  A rule  ', { reason: '  ', rejected: [' ', '  Alternative  '] });
+  const mixed = { nodes: [selected, node('base', '  '), node('old', '  Old rule  ')], edges: data.edges };
+  const html = card(selected, { data: mixed });
+  expect(html).toContain('<h3>A rule</h3>');
+  expect(html).not.toMatch(/<p>\s*<\/p>|Depends on|<li>\s*<\/li>/);
+  expect(html).toContain('>Old rule</button>');
+  expect(html).toContain('<li>Alternative</li>');
+  expect(card({ ...selected, label: ' ', rejected: [' '] })).not.toMatch(/<h3>|Options rejected/);
+});
