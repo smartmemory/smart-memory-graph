@@ -4,10 +4,9 @@ import dagre from 'dagre';
 
 const width = 204;
 const height = 136;
-const chip = { width: 150, height: 44 };
 
 // A source note is a small chip, a decision is a full card.
-export const nodeSize = node => node.type === 'note' ? chip : { width, height };
+export const nodeSize = node => node.type === 'note' ? { width: 150, height: 44 } : { width, height };
 
 function layout(nodes, links, extras) {
   const graph = new dagre.graphlib.Graph({ multigraph: true });

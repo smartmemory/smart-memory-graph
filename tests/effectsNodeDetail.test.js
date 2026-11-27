@@ -85,3 +85,17 @@ it('row 17: the conflict partner card is filled red, not only tagged', () => {
   expect(html).toMatch(/<button[^>]*class="de-node"[^>]*title="Email any day"[^>]*data-conflict="true"/);
   expect(html).not.toMatch(/title="Email only on weekdays"[^>]*data-conflict/);
 });
+
+it('R1 source notes have distinct rendered positions', () => {
+  for (const count of [2, 3]) {
+    const notes = Array.from({ length: count }, (_, i) => node('n' + i, 'Note ' + i, { type: 'note' }));
+    const props = canvasProps([data.nodes[0], ...notes]);
+    props.links = notes.map(n => ({ source: 'd', target: n.id, kind: 'comes_from', label: 'comes from' }));
+    const html = renderToStaticMarkup(createElement(EffectsCanvas, props));
+    const positions = [...html.matchAll(/<foreignObject x="([^"]+)" y="([^"]+)"[^>]*data-kind="note"/g)]
+      .map(([, x, y]) => [Number(x), Number(y)]);
+    console.info('Source notes:', count, JSON.stringify(positions));
+    expect(positions).toHaveLength(count);
+    expect.soft(new Set(positions.map(String)).size).toBe(count);
+  }
+});
