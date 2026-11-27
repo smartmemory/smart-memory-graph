@@ -3,6 +3,7 @@ import { effectiveTheme } from '../../internal/useCytoscape';
 import EffectsCanvas, { FreshnessChip } from './EffectsCanvas';
 import { CommitBar, ConflictCard, DecisionCard, RulesSlider } from './EffectControls';
 import { focusWindow, graphLinks, visibleReview } from './focusGraph';
+import SuggestedLinkActions from './SuggestedLinkActions';
 import EffectsLegend from './EffectsLegend';
 import './effects.css';
 
@@ -51,8 +52,6 @@ function useCommit(effects, actions, draft, policyKnown, panel, closePanel) {
     const next = Object.assign(Object.create(null), choices, { [panel.id]: answer });
     setChoices(next);
     closePanel();
-    // In direct-save workspaces the final choice commits, as in the approved preview.
-    if (effects.policy === 'save') void commit(next);
   }
   return { choices, busy, error, cancel, resolve, commit };
 }
@@ -105,8 +104,7 @@ function DetailDrawer({ data, effects, actions, model }) {
         <ul>{suggestions.map(({ source, target, reason }) => <li key={JSON.stringify([source, target])}>
           {byId.get(source)?.label || source} → {byId.get(target)?.label || target}
           <p>Suggested by decision dependencies{reason && ' · ' + reason}</p>
-          {today && actions.onConfirmLink && <button onClick={() => actions.onConfirmLink(source, target)}>Confirm</button>}
-          {today && actions.onRemoveLink && <button onClick={() => actions.onRemoveLink(source, target)}>Remove</button>}
+          {today && <SuggestedLinkActions source={source} target={target} actions={actions} />}
         </li>)}</ul></section>}
       {panel.kind === 'conflict' && conflict && <ConflictCard key={panel.id} focus={focus} partner={selected || { label: conflict.id }}
         conflict={conflict} choice={conflict.resolution || choices[conflict.id]} busy={busy}

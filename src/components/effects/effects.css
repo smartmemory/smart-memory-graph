@@ -139,3 +139,8 @@
   .de-sidebar { max-height: 42dvh; border-right: 0; }
 }
 .de-view.de-page { height: 100%; border-radius: 0; }
+
+.de-commit { display: grid; justify-content: stretch; gap: 10px; }
+.de-commit h3 { margin: 0; }
+.de-commit strong { font-size: 14px; }
+.de-commit p { font-size: 14px; color: var(--de-muted); }

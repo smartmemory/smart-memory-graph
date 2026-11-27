@@ -55,14 +55,29 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy }) {
   </section>;
 }
 
+function nextStep(effects, unsettled, review, onSave) {
+  if (!onSave) return 'Saving is unavailable for this preview.';
+  if (unsettled.length) return 'Resolve the conflict with the rule in force before saving.';
+  if (effects.policy === 'propose') return 'Send the proposal for review to request approval.';
+  if (effects.conflicts.length) return 'Save the decision to apply your conflict choices.';
+  if (effects.replaces.length && review.length) return 'Saving replaces the old rules and marks the affected decisions for review.';
+  if (effects.replaces.length) return 'Saving replaces the rules shown in the preview.';
+  if (review.length) return 'Saving marks the affected decisions for review.';
+  return 'Save this decision to put it in force.';
+}
+
 export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCancel, busy }) {
-  const conflicts = effects.conflicts.length;
+  const conflicts = unsettled.length;
   return <footer className="de-commit" aria-label="Commit bar">
-    <div><strong>{conflicts} conflict{conflicts === 1 ? '' : 's'} · {effects.replaces.length} replaced · {review.length} to review</strong>
-      <div>{!onSave ? 'Writes unavailable' : unsettled.length ? <button onClick={() => onConflict(unsettled[0].id)}>Settle {unsettled.length} open conflict{unsettled.length === 1 ? '' : 's'}</button>
-        : conflicts === 0 && !review.length && !effects.replaces.length ? 'Safe to save' : 'Ready to save'}</div></div>
-    <div className="de-actions"><button onClick={onCancel} disabled={busy || !onCancel}>Cancel</button>
-      {onSave && <button className="de-primary" disabled={busy || !!unsettled.length} onClick={onSave}>
-        {effects.policy === 'propose' ? 'Send for review' : 'Save'}</button>}</div>
+    <h3>What would change</h3>
+    <strong>{conflicts} conflict{conflicts === 1 ? '' : 's'} · {effects.replaces.length} replaced · {review.length} to review</strong>
+    <p>{nextStep(effects, unsettled, review, onSave)}</p>
+    <div className="de-actions">
+      {conflicts > 0 && <button className="de-primary" disabled={busy}
+        onClick={() => onConflict(unsettled[0].id)}>Resolve conflict</button>}
+      {onSave && <button className={conflicts ? '' : 'de-primary'} disabled={busy || !!conflicts} onClick={onSave}>
+        {effects.policy === 'propose' ? 'Send for review' : 'Save decision'}</button>}
+      <button onClick={onCancel} disabled={busy || !onCancel}>Discard</button>
+    </div>
   </footer>;
 }

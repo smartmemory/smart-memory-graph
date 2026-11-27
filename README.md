@@ -30,6 +30,8 @@ Select a saved decision in the normal graph and choose **Show ripple**. You can 
 ### Controlled decision effects
 
 For a dedicated screen, render `DecisionEffects` with `data`, `effects`, `actions` and the optional `proposal` sidebar slot. Key the view by workspace, focus and snapshot revision so a new draft starts with fresh choices.
+Resolve each conflict in the drawer, then use **Save decision** to apply the choices. **Discard** drops the preview.
+
 
 Pass a focused graph and its effects snapshot to preview a draft, follow its
 dependencies, inspect the source path, or view rules on an earlier date.
@@ -62,10 +64,12 @@ After a successful change, reload the snapshot to update the graph.
 While a read is outstanding, set `decisionEffectsLoading`.
 
 The host owns writes. Without an explicit policy, the preview is read-only.
-With `policy="save"`, settling the final conflict calls
+With `policy="save"`, **Save decision** calls
 `onCommit(focus, resolutions)`. Under `policy="propose"` the user chooses
 **Send for review**. Return the acknowledged standing or held snapshot to
 display the outcome. A rejected save leaves the draft available to retry.
+For a suggested dependency, **Confirm** and **Remove** stage the choice. **Save link change** applies it.
+
 `onCancel` restores the host's standing snapshot. An overflow stub lists the hidden branches at that hop. Selecting a branch
 calls `onRefocus(branchId)` so the host can supply that branch.
 

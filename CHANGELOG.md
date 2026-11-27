@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Draft results show counts, a next step, and an explicit save action after resolving conflicts.
 - Decision effects now has a persistent sidebar, a bottom date bar and a detail drawer over the graph.
 - DEMO-1204-RIPPLE-NO-HOP-LIMIT-1 (2026-11-27, user-visible): ripples have no hop limit (OWNER 2026-11-27, verbatim: "no hop limit just no loops"). Contract: `decision-effects.json` `Review.hop` loses its `maximum` of 3 (still an integer of at least 1). The effects view draws, links (`R<hop>`) and tags ("R6 · needs review") a review mark at any hop; before, a mark past hop 3 was dropped in `focusWindow`, `graphLinks` and `nodeState`. The drawing caps stay (40 nodes, 12 per hop, with counts of the rest). Pairs with core `effects.py` on the same branch. Test: `tests/effectsNoHopLimit.test.js` (a six-hop chain). Consumers take the graph by `file:` link: rebuild or redeploy them to pick it up.
 - The graph detail panel shows the selected decision’s lifecycle status. A decision without a status shows one neutral “Status not set” badge.
