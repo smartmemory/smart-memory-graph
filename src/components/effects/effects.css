@@ -76,7 +76,7 @@
 .de-view .de-node[data-retired] { background: var(--de-soft); border-style: dashed; color: var(--de-muted); }
 .de-node[data-retired] strong { text-decoration: line-through; }
 .de-view .de-node[data-conflict] { background: color-mix(in srgb, var(--de-danger) 22%, var(--de-card)); border: 2px solid var(--de-danger); }
-.de-view .de-node[data-review] { background: var(--de-review); border: 4px double var(--de-warning); }
+.de-view .de-node[data-review]:not([data-conflict]) { background: var(--de-review); border: 4px double var(--de-warning); }
 .de-tags { display: flex; flex-wrap: wrap; gap: 3px; }
 .de-tags span, .de-chip, .de-step { background: var(--de-soft); color: var(--de-ink); border-radius: 4px; padding: 1px 5px; font: 600 11px/1.5 system-ui; }
 .de-node[data-review] .de-tags span { background: var(--de-review); color: var(--de-ink); }

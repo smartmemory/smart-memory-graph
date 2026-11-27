@@ -393,10 +393,11 @@ async function checkNodeColours(mode) {
   assert.equal(await view.evaluate(el => getComputedStyle(el).colorScheme), mode);
   const bg = await paint(view, 'backgroundColor');
   assert.deepEqual(bg, mode === 'dark' ? [4, 6, 19] : [255, 255, 255]);
-  const card = await paint(node('eu').locator('button'), 'backgroundColor');
+  const card = await paint(aside(), 'backgroundColor');
+  const partner = await paint(node('eu').locator('button'), 'backgroundColor');
   assert.deepEqual(card, mode === 'dark' ? [17, 23, 39] : [255, 255, 255]);
-  assert.deepEqual(await paint(aside(), 'backgroundColor'), card);
-  contrast(await paint(node('eu').locator('strong'), 'color'), card, 4.5, 'Node label');
+  assert.notDeepEqual(partner, card);
+  contrast(await paint(node('eu').locator('strong'), 'color'), partner, 4.5, 'Node label');
   contrast(await paint(aside(), 'color'), card, 4.5, 'Conflict panel');
   const ghost = node('A').locator('button');
   const ghostBg = await paint(ghost, 'backgroundColor');
@@ -475,6 +476,20 @@ test('mounted overlay follows host tokens and graph theme precedence without los
   }));
   assert.equal(await page.locator('.de-view').evaluate(el => getComputedStyle(el).colorScheme), 'light');
   assert.deepEqual(await paint(page.locator('.de-view'), 'backgroundColor'), [240, 247, 250]);
-  assert.deepEqual(await paint(node('eu').locator('button'), 'backgroundColor'), [213, 232, 231]);
+  assert.deepEqual(await paint(node('eu').locator('button'), 'borderTopColor'), [138, 15, 15]);
   assert.deepEqual(await paint(aside().locator('.de-pair strong'), 'borderLeftColor'), [138, 15, 15]);
+  await date('2026-11-01');
+  assert.deepEqual(await paint(node('eu').locator('button'), 'backgroundColor'), [213, 232, 231]);
+});
+
+test('R1 conflict fill and border survive a simultaneous review', async () => {
+  await show('multi');
+  const colours = locator => locator.evaluate(el => {
+    const css = getComputedStyle(el);
+    return [css.backgroundColor, css.borderTopColor];
+  });
+  const both = node('growth').getByRole('button');
+  assert.match(await both.innerText(), /R1/);
+  assert.deepEqual(await colours(both), await colours(node('eu').getByRole('button')));
+  assert.notDeepEqual(await colours(both), await colours(node('support').getByRole('button')));
 });

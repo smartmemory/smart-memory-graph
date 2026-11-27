@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Conflict partners keep the red fill and border alongside their review tag.
 - Node details omit empty fields and unnamed related buttons and trim visible text.
 - Preview pills and canvas tags distinguish possible review from flagged obligations.
 - Only saved decisions show the Decided date and lifecycle status.
