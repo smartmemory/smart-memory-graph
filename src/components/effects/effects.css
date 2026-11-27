@@ -66,6 +66,10 @@
   display: flex; flex-direction: column; justify-content: center; gap: 5px; align-items: flex-start;
   width: 100%; height: 100%; text-align: left; background: var(--de-node, var(--de-card)); color: var(--de-label, var(--de-ink)); border: 1.5px solid var(--de-line); border-radius: 9px; padding: 8px 10px;
 }
+.de-view .de-node[data-kind=note] { background: var(--de-soft); color: var(--de-muted); border-width: 1px; border-radius: 999px; padding: 4px 12px; justify-content: center; }
+.de-node[data-kind=note] strong { font-size: 12px; font-weight: 500; -webkit-line-clamp: 1; }
+.de-node[data-kind=note] .de-meta { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.de-node[data-kind=note] .de-tags { display: none; }
 .de-node strong { font-size: 15px; line-height: 1.15; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .de-node .de-meta { font-size: 11px; font-weight: 600; }
 .de-view .de-node[data-ghost] { background: var(--de-ghost); border: 2px dashed var(--de-teal); }

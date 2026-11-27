@@ -64,3 +64,17 @@ it('row 21: clicking a related item selects that node', () => {
   buttons.find(b => b.props['data-select'] === 'base').props.onClick();
   expect(picked).toEqual(['base']);
 });
+
+const canvasProps = (nodes, effectsOver = {}) => ({
+  nodes, links: [], effects: { ...effects, ...effectsOver }, date: today, path: [], choices: {}, extras: [],
+  onSelect() {}, onConflict() {}, onSuggestion() {},
+});
+
+it('row 14: a source note is a small grey chip, a decision stays a full card', () => {
+  const html = renderToStaticMarkup(createElement(EffectsCanvas, canvasProps([data.nodes[0], data.nodes[5]])));
+  expect(html).toMatch(/data-node="n1"[^>]*data-kind="note"/);
+  expect(html).toMatch(/data-node="d"[^>]*data-kind="decision"/);
+  const sizes = Object.fromEntries([...html.matchAll(/<foreignObject[^>]*width="(\d+)" height="(\d+)"[^>]*data-node="(\w+)"/g)]
+    .map(m => [m[3], m[1] * m[2]]));
+  expect(sizes.n1).toBeLessThan(sizes.d / 2);
+});
