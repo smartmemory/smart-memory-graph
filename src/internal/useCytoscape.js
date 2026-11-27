@@ -161,7 +161,7 @@ export function useCytoscape(containerRef, options = {}) {
 
     const cy = cytoscape({
       container,
-      style: getCytoscapeStyles(effectiveTheme(theme, mode, container)),
+      style: getCytoscapeStyles(effectiveTheme(theme, mode, container), container),
       elements: [],
       layout: { name: 'preset' },
       minZoom: 0.1,
@@ -901,7 +901,7 @@ export function useCytoscape(containerRef, options = {}) {
     const apply = () => {
       const eff = effectiveTheme(theme, mode, container);
       cy.scratch(MODE_SCRATCH_KEY, resolveMode(eff.mode));
-      cy.style().fromJson(getCytoscapeStyles(eff)).update();
+      cy.style().fromJson(getCytoscapeStyles(eff, container)).update();
       return eff.ring;
     };
     const ring = apply();

@@ -25,7 +25,7 @@ const EDGES_PAGE_SIZE = 10;
  * @param {boolean} [props.enableGrounding=false] - Ground button and Wikipedia picker
  * @param {boolean} [props.enableDecisionTools=false] - decision conflicts and provenance
  */
-export default function DetailPanel({ node, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState, enableEntityEditing = false, enableGrounding = false, enableDecisionTools = false, daemon = false, decisionUnavailable, readOnlyReason, deleteUnavailable, expandStatus }) {
+export default function DetailPanel({ node, rippleCanvas, edges = [], onClose, onExpand, expanding, onNodeUpdate, onDelete, adapter, onDecisionChainHighlight, onSelectId, onHopReplay, hopReplayState, enableEntityEditing = false, enableGrounding = false, enableDecisionTools = false, daemon = false, decisionUnavailable, readOnlyReason, deleteUnavailable, expandStatus }) {
   const [edgesShown, setEdgesShown] = useState(EDGES_PAGE_SIZE);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -307,6 +307,7 @@ export default function DetailPanel({ node, edges = [], onClose, onExpand, expan
         {/* Decision-specific block */}
         {isDecisionNode(node) && (
           <DecisionDetailBlock
+            rippleCanvas={rippleCanvas}
             node={node}
             daemon={daemon}
             decisionUnavailable={decisionUnavailable}

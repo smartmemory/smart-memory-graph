@@ -1,4 +1,5 @@
 import { MEMORY_COLORS, ENTITY_COLORS, SPECIAL_COLORS, ORIGIN_BORDER_COLORS, ANNOTATION_COLORS, ANNOTATION_BORDERS, getNodeColor, desaturateColor } from '../core/graphColors';
+import { rippleStyles } from './rippleStyles';
 import { resolveMode } from '../core/themeColors';
 import {
   DECISION_STATUSES,
@@ -40,7 +41,7 @@ function entityNodeSize(ele) {
  * @param {string} [theme.palette.labelOutline] - Node label outline color.
  * @param {string} [theme.palette.selectionBorder] - Selected-element border.
  */
-export function getCytoscapeStyles(theme = null) {
+export function getCytoscapeStyles(theme = null, container = null) {
   const mode = resolveMode(theme?.mode);
   const palette = theme?.palette || {};
 
@@ -492,7 +493,7 @@ export function getCytoscapeStyles(theme = null) {
     }
   }
 
-  return styles;
+  return styles.concat(rippleStyles(mode, container));
 }
 
 /** Spec name (UI-LIGHT-MODE-1 LM-1): `buildStyles({ mode })`. Same function, same `theme` shape. */

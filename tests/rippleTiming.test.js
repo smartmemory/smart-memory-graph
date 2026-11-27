@@ -40,6 +40,14 @@ describe('decision ripple on the existing canvas', () => {
     expect(offScreen).toBe(5);
   });
 
+  it('matches a clinical decision’s comes_from edge to the stored DERIVED_FROM evidence link', () => {
+    const evidence = edge('evidence', 'F', 'a', 'comes_from');
+    const reply = { ...snapshot, data: { ...data, edges: [evidence] } };
+    const stored = [edge('physical', 'F', 'a', 'DERIVED_FROM'), edge('reverse', 'a', 'F', 'DERIVED_FROM')];
+    expect(planRipple(reply, canvasIds, stored).events.filter(e => e.element === 'edge').map(e => e.id))
+      .toEqual(['physical']);
+  });
+
   it('delivers every visible item at time zero with reduced motion', () => {
     const { events } = planRipple(snapshot, canvasIds, canvasEdges, true);
     expect(events.map(e => e.id).sort()).toEqual(['F', 'a', 'b', 'c', 'd', 'canvas-af', 'bc', 'cd'].sort());

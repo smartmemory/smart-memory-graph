@@ -920,11 +920,11 @@ function WorkspaceGraph({
           <OriginLegend visible={legendAvailable && originLegendOpen} />
         </CytoscapeCanvas>
 
-        {/* Detail panel — absolute overlay */}
         {interaction.detailPanelOpen && interaction.selectedNode && (
           <div className="absolute right-0 top-0 bottom-0 z-30">
             <DetailPanel
-              key={interaction.selectedNode.id}
+              key={JSON.stringify([workspaceId, interaction.selectedNode.id])}
+              rippleCanvas={!daemon && !snapshot ? cytoscape.cy.current : null}
               node={interaction.selectedNode}
               edges={interaction.connectedEdges}
               onClose={interaction.closeDetailPanel}
