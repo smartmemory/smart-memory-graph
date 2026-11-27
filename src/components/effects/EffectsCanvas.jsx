@@ -72,7 +72,8 @@ export function nodeState(node, effects, date, choices) {
   if (today && node.viaSuggested && (effects.suggestedLinks ?? 'dashed') === 'dashed') tags.push('via suggested link');
   if (review) tags.push('R' + review.hop + ' · ' + (review.state === 'checking' ? 'checking' : 'needs review'));
   if ((node.ruleKind || node.check) && today) tags.push('check ' + ({ compiled: 'ok', unchecked: '?', stale: 'stale' })[node.check || 'unchecked']);
-  return { ghost, held, fading: !!(retiring || retired), review, tags };
+  const partner = conflict && !focus;
+  return { ghost, held, partner, fading: !!(retiring || retired), review, tags };
 }
 
 export function formatDate(date) {

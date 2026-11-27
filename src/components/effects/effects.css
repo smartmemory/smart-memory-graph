@@ -93,6 +93,14 @@
 .de-detail dl { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 20px; }
 .de-detail dt { font-size: 12px; font-weight: bold; }
 .de-detail dd { margin: 0; }
+.de-detail h4 { margin: 0 0 3px; font-size: 12px; font-weight: bold; }
+.de-detail ul { margin: 0; padding-left: 18px; }
+.de-decided { color: var(--de-muted); font-size: 13px; }
+.de-status { font: 600 12px/1.5 system-ui; border: 1px solid var(--de-line); border-radius: 999px; padding: 1px 9px; }
+.de-status[data-status=review] { color: var(--de-warning); border-color: var(--de-warning); }
+.de-status[data-status=conflict] { color: var(--de-danger); border-color: var(--de-danger); }
+.de-related { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.de-view .de-related button { color: var(--de-teal); text-decoration: underline; border-color: transparent; background: none; padding: 2px 4px; text-align: left; }
 .de-pair { display: flex; flex-wrap: wrap; gap: 12px; }
 .de-pair strong { flex: 1 1 180px; border-left: 3px solid var(--de-danger); padding-left: 8px; }
 .de-detail fieldset { padding: 0; margin: 0; border: 0; }

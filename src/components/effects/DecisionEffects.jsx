@@ -141,7 +141,7 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     }} tabIndex={-1}>
       <button className="de-close" aria-label="Close detail" onClick={closePanel}>×</button>
       {panel.kind === 'node' && selected && <DecisionCard node={selected} data={data} effects={effects} date={date}
-        choices={choices} onWhy={canShowPath ? () => { setPath(selectedPath); closePanel(); } : null} />}
+        choices={choices} onSelect={id => setPanel({ kind: 'node', id })} onWhy={canShowPath ? () => { setPath(selectedPath); closePanel(); } : null} />}
       {suggestions.length > 0 && <section className="de-detail" aria-label="Suggested links"><h3>Suggested links</h3>
         <ul>{suggestions.map(({ source, target, reason }) => <li key={JSON.stringify([source, target])}>
           {byId.get(source)?.label || source} → {byId.get(target)?.label || target}

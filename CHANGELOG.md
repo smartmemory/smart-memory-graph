@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- DEMO-1204-RIPPLE-VIEW-FRAME-1 row 21 (2026-11-27, user-visible): a decision's detail in the effects view now reads title, decided date, status pill, reason, options rejected, replaced, replaced by, depends on, depended on by, comes from. Related decisions and notes are links that open that node, and a field with no data is left out. No new API fields.
 - DEMO-1204-RIPPLE-NO-HOP-LIMIT-1 (2026-11-27, user-visible): ripples have no hop limit (OWNER 2026-11-27, verbatim: "no hop limit just no loops"). Contract: `decision-effects.json` `Review.hop` loses its `maximum` of 3 (still an integer of at least 1). The effects view draws, links (`R<hop>`) and tags ("R6 · needs review") a review mark at any hop; before, a mark past hop 3 was dropped in `focusWindow`, `graphLinks` and `nodeState`. The drawing caps stay (40 nodes, 12 per hop, with counts of the rest). Pairs with core `effects.py` on the same branch. Test: `tests/effectsNoHopLimit.test.js` (a six-hop chain). Consumers take the graph by `file:` link: rebuild or redeploy them to pick it up.
 - The graph detail panel shows the selected decision’s lifecycle status. A decision without a status shows one neutral “Status not set” badge.
 - The normal graph now offers **Show ripple** on saved decisions. Follow their effects across the current canvas, replay the wave, or clear the highlights. Reduced motion shows the final state immediately. A slow read abandoned by Clear or a decision switch no longer delays the next Show ripple.
