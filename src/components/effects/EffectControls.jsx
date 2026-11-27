@@ -15,19 +15,25 @@ export function RulesSlider({ first, today, date, showRetired, onDate, onRetired
   </div>;
 }
 
-export function ConflictCard({ focus, partner, conflict, choice, onResolve, onCancel, busy }) {
+export function ConflictCard({ focus, partner, conflict, proposed, choice, onResolve, onCancel, busy }) {
   const [scope, setScope] = useState(choice?.scope || '');
   return <section className="de-detail de-conflict-card" aria-label="Conflict details">
-    <h3>Settle conflict</h3>
-    <div className="de-pair"><strong>{focus.label}</strong><strong>{partner.label}</strong></div>
-    <p>{conflict.why}</p><FreshnessChip result={conflict.freshness} />
-    {onResolve && <fieldset disabled={busy}>
-      <label>Scope <input value={scope} placeholder="e.g. Marketing email only" onChange={e => setScope(e.target.value)} /></label>
-      <div className="de-actions">
-        <button onClick={() => onResolve({ choice: 'replace' })}>Replace the old rule</button>
-        <button disabled={!scope.trim()} onClick={() => onResolve({ choice: 'scoped', scope: scope.trim() })}>Keep both with a scope</button>
-        <button onClick={onCancel} disabled={!onCancel}>Cancel</button>
-      </div>
+    <h3>Conflict</h3>
+    <div className="de-pair">
+      <strong><small>{proposed ? 'Proposed today' : 'Selected decision'}</small>{focus.label}</strong>
+      <strong><small>{partner.validFrom ? 'In force since ' + formatDate(partner.validFrom) + ' ' + partner.validFrom.slice(0, 4)
+        : 'In-force date unavailable'}</small>{partner.label}</strong>
+    </div>
+    <p><b>Why they clash:</b> {conflict.why}</p><FreshnessChip result={conflict.freshness} />
+    {onResolve && <fieldset className="de-choices" disabled={busy}>
+      <div><button onClick={() => onResolve({ choice: 'replace' })}>Replace the old rule</button>
+        <p>When the new decision takes effect, the old rule is retired.</p></div>
+      <div><button disabled={!scope.trim()} onClick={() => onResolve({ choice: 'scoped', scope: scope.trim() })}>Keep both with a scope</button>
+        <p>Both rules stay in force. The new decision applies only within the scope you enter.</p>
+        <label>Scope <input value={scope} placeholder="Where does the new decision apply?"
+          onChange={e => setScope(e.target.value)} /></label></div>
+      <div><button onClick={onCancel} disabled={!onCancel}>Cancel</button>
+        <p>Discard this proposal and return to the standing decision.</p></div>
     </fieldset>}
     {!onResolve && choice && <p>{choice.choice === 'scoped' || choice.choice === 'keep_both_scoped' ? 'Scoped: ' + choice.scope : 'Replaced'}</p>}
   </section>;

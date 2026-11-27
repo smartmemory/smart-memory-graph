@@ -107,7 +107,7 @@ function DetailDrawer({ data, effects, actions, model }) {
           {today && <SuggestedLinkActions source={source} target={target} actions={actions} />}
         </li>)}</ul></section>}
       {panel.kind === 'conflict' && conflict && <ConflictCard key={panel.id} focus={focus} partner={selected || { label: conflict.id }}
-        conflict={conflict} choice={conflict.resolution || choices[conflict.id]} busy={busy}
+        conflict={conflict} proposed={effects.phase === 'draft'} choice={conflict.resolution || choices[conflict.id]} busy={busy}
         onResolve={!conflict.resolution && draft && policyKnown && actions.onCommit ? resolve : null} onCancel={cancel} />}
       {panel.kind === 'overflow' && <section className="de-detail"><h3>Branches at hop {panel.id}</h3>
         <ul>{Array.from(branchesByHop.get(panel.id) || [], ([id, count]) =>
