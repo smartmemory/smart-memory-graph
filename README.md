@@ -21,6 +21,12 @@ function App() {
 }
 ```
 
+### Show a decision ripple
+
+Select a saved decision in the normal graph and choose **Show ripple**. You can also Tab to the button and press Enter or Space. The graph calls `adapter.getDecisionEffects(id)` once and keeps the layout in place as the pulse travels outward. Red marks conflicts, amber marks decisions needing review, and a faded outline marks replacements.
+
+**Replay** runs the same snapshot again. **Clear** restores the previous graph styling. The **+N off screen** count includes affected nodes outside the displayed graph and any overflow reported by the service. The animation uses 450 ms per hop and shortens the interval on long chains. With reduced motion enabled, all highlights appear together.
+
 ### Controlled decision effects
 
 Pass a focused graph and its effects snapshot to preview a draft, follow its

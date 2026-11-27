@@ -1,3 +1,4 @@
+import RippleControl from './RippleControl';
 import { useEffect, useRef, useState } from 'react';
 import {
   resolveDecisionStatus,
@@ -29,7 +30,7 @@ import {
  * @param {function(string): void} [props.onSelectId] - Navigate to another node by id
  * @param {boolean} [props.toolsEnabled=true] - Show "Find conflicts" and "Load provenance" (GraphExplorer passes enableDecisionTools, default off)
  */
-export default function DecisionDetailBlock({ node, adapter, onChainHighlight, onSelectId, toolsEnabled = true, daemon = false, decisionUnavailable = daemon ? 'Unavailable through this daemon' : null }) {
+export default function DecisionDetailBlock({ node, rippleCanvas, adapter, onChainHighlight, onSelectId, toolsEnabled = true, daemon = false, decisionUnavailable = daemon ? 'Unavailable through this daemon' : null }) {
   const [conflicts, setConflicts] = useState(null);
   const [conflictError, setConflictError] = useState(null);
   const [conflictLoading, setConflictLoading] = useState(false);
@@ -146,6 +147,10 @@ export default function DecisionDetailBlock({ node, adapter, onChainHighlight, o
           {statusMissing ? 'Status not set' : status.label}
         </span>
       </div>
+
+      {rippleCanvas && adapter?.getDecisionEffects && (
+        <RippleControl key={node.id} cy={rippleCanvas} id={node.id} adapter={adapter} />
+      )}
 
       {node.decision_type && DECISION_TYPES.includes(node.decision_type) && (
         <div className="text-xs text-foreground dark:text-slate-300">

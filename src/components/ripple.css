@@ -1,0 +1,10 @@
+.sm-ripple-controls { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .75rem; }
+.sm-ripple-controls button { display: inline-flex; align-items: center; gap: .35rem; color: inherit; border: 1px solid currentColor; border-radius: .35rem; padding: .2rem .55rem; }
+.sm-ripple-controls button:focus-visible { outline: 2px solid hsl(var(--ring, 215 80% 50%)); outline-offset: 2px; }
+.sm-ripple-chip { padding: .15rem .4rem; border-radius: 1rem; background: hsl(var(--muted-foreground, 215 20% 55%) / .18); }
+.sm-ripple-spinner { display: inline-block; width: .85em; height: .85em; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+@media (prefers-reduced-motion: no-preference) {
+  .sm-ripple-spinner { animation: sm-ripple-spin .7s linear infinite; }
+  @keyframes sm-ripple-spin { to { transform: rotate(1turn); } }
+}
+.sm-ripple-ring { position: absolute; z-index: 4; pointer-events: none; box-sizing: border-box; transform: translate(-50%, -50%); border: 2px solid hsl(var(--ring, 215 80% 50%)); border-radius: 50%; box-shadow: 0 0 10px hsl(var(--ring, 215 80% 50%) / .45); }
