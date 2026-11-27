@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { playRipple } from '../internal/ripplePlayback';
 import './ripple.css';
 
-// An adapter read can outlive its decision panel. Serialize reads on the same canvas.
+// An adapter read can outlive its decision panel. Serialize live reads on the same canvas.
 const inFlight = new WeakMap();
 
 // A native button supports both pointer and keyboard activation inside the decision detail.
@@ -74,13 +74,14 @@ function useRipple(cy, id, adapter) {
   return { status, projection, show, clear };
 }
 
-// Skip a queued read if the user has since selected a different decision.
+// Wait only for a read someone still wants; a discarded one is dropped, not queued behind.
 async function readSnapshot(cy, adapter, id, current) {
   const previous = inFlight.get(cy);
-  if (previous) await previous.catch(() => {});
+  if (previous?.current()) await previous.pending.catch(() => {});
   if (!current()) return;
   const pending = adapter.getDecisionEffects(id);
-  inFlight.set(cy, pending);
+  const entry = { pending, current };
+  inFlight.set(cy, entry);
   try {
     const snapshot = await pending;
     if (snapshot?.focus !== id || !Array.isArray(snapshot.data?.nodes) || !Array.isArray(snapshot.data?.edges)) {
@@ -88,6 +89,6 @@ async function readSnapshot(cy, adapter, id, current) {
     }
     return snapshot;
   } finally {
-    if (inFlight.get(cy) === pending) inFlight.delete(cy);
+    if (inFlight.get(cy) === entry) inFlight.delete(cy);
   }
 }

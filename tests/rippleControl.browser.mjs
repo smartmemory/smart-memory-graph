@@ -23,17 +23,18 @@ test('show, replay and clear a selected decision ripple from the keyboard', asyn
   const errors = [];
   page.on('pageerror', err => errors.push(err.message));
   let reads = 0, reply;
+  const replies = [];
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: '<main></main>' });
     if (url.pathname === '/memory/graph/full') return route.fulfill({ json: graph });
     assert.equal(url.pathname, '/memory/decisions/' + focus + '/effects');
     reads++;
-    reply = options => route.fulfill(options);
+    reply = replies[reads] = options => route.fulfill(options);
   });
   const respond = async (count, response) => {
-    await until(() => reads === count);
-    await reply(response);
+    await until(() => reads >= count);
+    await replies[count](response);
   };
   await mount(page);
   const group = page.getByRole('group', { name: 'Decision ripple' });
@@ -102,7 +103,7 @@ async function checkRetryAndEmpty(group, respond) {
   await group.getByText('This decision touches nothing yet').waitFor();
 }
 
-// A cleared slow read cannot paint over a subsequent request or start it early.
+// A cleared slow read cannot paint over the next request or hold it back.
 async function checkPendingClear(group, respond, readCount) {
   const show = group.getByRole('button', { name: 'Show ripple' });
   const clear = group.getByRole('button', { name: 'Clear' });
@@ -110,11 +111,13 @@ async function checkPendingClear(group, respond, readCount) {
   await until(() => readCount() === 4);
   await clear.click();
   await show.click();
-  assert.equal(readCount(), 4);
-  await respond(4, { json: { focus, data } });
+  await until(() => readCount() === 5);
   await respond(5, { json: { focus, data: { nodes: [], edges: [] } } });
   await group.getByText('This decision touches nothing yet').waitFor();
+  await respond(4, { json: { focus, data } });
+  await new Promise(resolve => setTimeout(resolve, 100));
   assert.equal(await group.getByRole('button', { name: 'Replay' }).count(), 0);
+  assert.equal(await group.getByText('This decision touches nothing yet').count(), 1);
 }
 
 // Wait for the pending intercepted HTTP read without delaying the component.
