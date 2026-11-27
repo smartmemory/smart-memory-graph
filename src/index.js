@@ -6,6 +6,7 @@
  */
 
 // --- Components ---
+export { default as DecisionEffects } from './components/effects/DecisionEffects';
 export { default as GraphExplorer } from './components/GraphExplorer';
 export { default as DetailPanel } from './components/DetailPanel';
 export { default as FilterPanel } from './components/FilterPanel';

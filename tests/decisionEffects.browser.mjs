@@ -102,7 +102,7 @@ test('A · exactly three ripple links, with the frozen parents, hop labels and d
   const paths = await edge('ripple').evaluateAll(es => es.map(e => [e.dataset.source, e.dataset.target, e.textContent.includes('R2') ? 2 : 1]));
   assert.deepEqual(paths, [['vendor', 'support', 1], ['vendor', 'growth', 1], ['support', 'exports', 2]]);
   for (const [, id, hop] of paths) {
-    assert.match(await node(id).getByRole('button').innerText(), new RegExp('R' + hop + ' · needs review'));
+    assert.match(await node(id).getByRole('button').innerText(), new RegExp('R' + hop + ' · would need review'));
     assert.equal(await node(id).locator('button').evaluate(el => getComputedStyle(el).borderStyle), 'double');
   }
   await shot('04-ripple', page.locator('.de-frame'));
@@ -113,7 +113,7 @@ test('A · open conflict, both texts, reason, guarded save, scoped commit and st
   assert.equal(await edge('conflict').count(), 1);
   assert.equal(await edge('conflict').getAttribute('data-target'), 'eu');
   assert.match(await bar().innerText(), /1 conflict · 1 replaced · 3 to review/);
-  assert.equal(await button('Save').isDisabled(), true);
+  assert.equal(await button('Save decision').isDisabled(), true);
   await shot('06-commit-bar', bar());
   await openConflict();
   assert.match(await aside().innerText(), /Move email to the US vendor to cut cost/);
@@ -123,6 +123,8 @@ test('A · open conflict, both texts, reason, guarded save, scoped commit and st
   await page.getByLabel('Scope', { exact: true }).fill('Marketing email only');
   await shot('03-conflict-card', aside());
   await button('Keep both with a scope').click();
+  assert.equal(await readCommit(), null);
+  await button('Save decision').click();
   assert.deepEqual(await readCommit(), { focus: 'A', answers: { eu: { choice: 'scoped', scope: 'Marketing email only' } } });
   assert.equal(await edge('settled').getByRole('button').innerText(), 'scoped');
   assert.equal(await node('A').locator('[data-ghost]').count(), 0);
@@ -136,6 +138,8 @@ test('A · replace retires on 24 Nov and Cancel drops the ghost and all preview 
   await show('email');
   await openConflict();
   await button('Replace the old rule').click();
+  assert.equal(await readCommit(), null);
+  await button('Save decision').click();
   assert.equal((await readCommit()).answers.eu.choice, 'replace');
   for (const id of ['vendor', 'eu']) assert.match(await node(id).getByRole('button').innerText(), /replaced 24 Nov/);
   assert.equal(await page.locator('.de-review-list li').count(), 3);
@@ -151,7 +155,7 @@ test('multiple conflicts require every choice', async () => {
   await show('multi');
   await openConflict();
   await button('Replace the old rule').click();
-  assert.equal(await button('Save').isDisabled(), true);
+  assert.equal(await button('Save decision').isDisabled(), true);
   assert.equal(await edge('conflict').count(), 1);
   assert.equal(await edge('pending').count(), 1);
   assert.equal(await readCommit(), null);
@@ -160,8 +164,8 @@ test('multiple conflicts require every choice', async () => {
 test('B · safe Friday draft depends on Thursday and flags neither of its dependents', async () => {
   await show('friday');
   assert.match(await bar().innerText(), /0 conflicts · 0 replaced · 0 to review/);
-  assert.match(await bar().innerText(), /Safe to save/);
-  assert.equal(await button('Save').isEnabled(), true);
+  assert.match(await bar().innerText(), /Save this decision to put it in force/);
+  assert.equal(await button('Save decision').isEnabled(), true);
   assert.equal(await page.locator('[data-source="B"][data-target="release"]').count(), 1);
   assert.equal(await edge('ripple').count(), 0);
   assert.equal(await page.locator('[data-review]').count(), 0);
@@ -172,7 +176,7 @@ test('C · only the pilot billing decision needs review, plus human-review polic
   assert.match(await bar().innerText(), /0 conflicts · 1 replaced · 1 to review/);
   assert.equal(await edge('replaces').getAttribute('data-target'), 'pilot');
   assert.equal(await edge('ripple').getAttribute('data-target'), 'billing');
-  assert.match(await node('billing').getByRole('button').innerText(), /R1 · needs review/);
+  assert.match(await node('billing').getByRole('button').innerText(), /R1 · would need review/);
   await show('propose');
   await button('Send for review').click();
   assert.match(await node('C').getByRole('button').innerText(), /held/);
@@ -277,7 +281,7 @@ test('workspace switch clears choices, open scope input and view settings on an 
 
 test('unknown policy offers conflict inspection without write actions', async () => {
   await show('unknown-policy');
-  assert.equal(await button('Save').count() + await button('Send for review').count(), 0);
+  assert.equal(await button('Save decision').count() + await button('Send for review').count(), 0);
   await openConflict();
   assert.match(await aside().innerText(), /Customer data stays in the EU/);
   assert.equal(await button('Replace the old rule').count() + await button('Keep both with a scope').count(), 0);
@@ -303,12 +307,14 @@ test('rejected direct save shows a pending link and retries the preserved scope'
   await openConflict();
   await page.getByLabel('Scope', { exact: true }).fill('Billing only');
   await button('Keep both with a scope').click();
+  assert.equal(await readCommit(), null);
+  await button('Save decision').click();
   assert.equal(await page.getByRole('alert').innerText(), 'Write rejected');
   assert.equal(await edge('settled').count(), 0);
   await edge('pending').getByRole('button', { name: 'pending: scoped' }).click();
   assert.equal(await page.getByLabel('Scope', { exact: true }).inputValue(), 'Billing only');
   await button('Close detail').click();
-  await button('Save').click();
+  await button('Save decision').click();
   assert.equal(await edge('settled').getByRole('button').innerText(), 'scoped');
   assert.equal((await readCommit()).answers.eu.scope, 'Billing only');
 });
@@ -332,7 +338,10 @@ for (const mode of ['dashed', 'treat_as_real', 'suggest_only']) {
       assert.equal((await node(id).getByRole('button').innerText()).includes('via suggested link'), dashed);
       await link.getByRole('button').click();
       assert.match(await aside().innerText(), /Suggested by decision dependencies/);
+      const previous = await page.evaluate(() => window.lastLink);
       await button('Confirm').click();
+      assert.deepEqual(await page.evaluate(() => window.lastLink), previous);
+      await button('Save link change').click();
       assert.deepEqual(await page.evaluate(() => window.lastLink), ['confirm', id, target]);
       await button('Close detail').click();
     }
@@ -343,14 +352,17 @@ test('H2 standing billing lists one suggestion with host-controlled actions', as
   for (const name of ['billing-list', 'readonly']) {
     await show(name);
     await node('billing').getByRole('button').click();
-    const rows = aside().getByRole('listitem');
+    const rows = aside().getByLabel('Suggested links').getByRole('listitem');
     assert.equal(await rows.count(), 1);
     assert.match(await rows.innerText(), /Pilots get a 30-day free period/);
     assert.match(await rows.innerText(), /Billing begins when the free period ends/);
     for (const action of ['Confirm', 'Remove']) {
       assert.equal(await button(action).count(), name === 'readonly' ? 0 : 1);
       if (name === 'readonly') continue;
+      const previous = await page.evaluate(() => window.lastLink);
       await button(action).click();
+      assert.deepEqual(await page.evaluate(() => window.lastLink), previous);
+      await button('Save link change').click();
       assert.deepEqual(await page.evaluate(() => window.lastLink), [action.toLowerCase(), 'billing', 'pilot']);
     }
   }
@@ -376,58 +388,67 @@ function contrast(a, b, minimum, label) {
   assert.ok(ratio >= minimum, label + ' contrast ' + ratio.toFixed(2));
 }
 
+async function checkNodeColours(mode) {
+  const view = page.locator('.de-view');
+  assert.equal(await view.evaluate(el => getComputedStyle(el).colorScheme), mode);
+  const bg = await paint(view, 'backgroundColor');
+  assert.deepEqual(bg, mode === 'dark' ? [4, 6, 19] : [255, 255, 255]);
+  const card = await paint(aside(), 'backgroundColor');
+  const partner = await paint(node('eu').locator('button'), 'backgroundColor');
+  assert.deepEqual(card, mode === 'dark' ? [17, 23, 39] : [255, 255, 255]);
+  assert.notDeepEqual(partner, card);
+  contrast(await paint(node('eu').locator('strong'), 'color'), partner, 4.5, 'Node label');
+  contrast(await paint(aside(), 'color'), card, 4.5, 'Conflict panel');
+  const ghost = node('A').locator('button');
+  const ghostBg = await paint(ghost, 'backgroundColor');
+  assert.notDeepEqual(ghostBg, card);
+  const teal = await paint(ghost, 'borderTopColor');
+  const red = await paint(aside().locator('.de-pair strong'), 'borderLeftColor');
+  const warning = await paint(node('support').locator('button'), 'borderTopColor');
+  const neutral = await paint(view.locator('.de-meta'), 'color');
+  assert.equal(new Set([teal, red, warning, neutral].map(String)).size, 4);
+  // Compare semantic colours to the design-system defaults, independently of the stylesheet.
+  const expected = mode === 'dark'
+    ? [[110, 237, 220], [248, 113, 113], [250, 204, 21]]
+    : [[14, 124, 109], [185, 28, 28], [180, 83, 9]];
+  for (const [index, actual] of [teal, red, warning].entries()) {
+    assert.ok(actual.every((v, i) => Math.abs(v - expected[index][i]) <= 1), 'Semantic colour ' + actual);
+  }
+  contrast(teal, ghostBg, 3, 'Ghost border');
+  contrast(await paint(ghost, 'color'), ghostBg, 4.5, 'Ghost label');
+  contrast(red, card, 4.5, 'Conflict button');
+  assert.deepEqual(await paint(edge('conflict').locator('button'), 'color'), red);
+  const review = node('support').locator('button');
+  const reviewBg = await paint(review, 'backgroundColor');
+  contrast(warning, reviewBg, 3, 'Review border');
+  contrast(await paint(review.locator('.de-meta'), 'color'), reviewBg, 4.5, 'Review metadata');
+  return { teal, red, warning, neutral };
+}
+
+async function checkEdge(kind, colour) {
+  const line = edge(kind).locator('path').first();
+  assert.deepEqual(await paint(line, 'stroke'), colour, kind);
+  const marker = await line.getAttribute('marker-end');
+  const markerPath = page.locator('[id="' + marker.slice(5, -1) + '"] path');
+  assert.deepEqual(await paint(markerPath, 'fill'), colour, kind + ' arrow');
+  contrast(colour, await paint(page.locator('.de-frame'), 'backgroundColor'), 3, kind);
+}
+
 for (const mode of ['dark', 'light']) {
   test('effects theme rendering and contrast in ' + mode, async () => {
     const load = name => page.evaluate(([name, mode]) =>
       window.loadCase(name, mode === 'dark' ? {} : { mode }), [name, mode]);
     await load('email');
     await openConflict();
-    const view = page.locator('.de-view');
-    assert.equal(await view.evaluate(el => getComputedStyle(el).colorScheme), mode);
-    const bg = await paint(view, 'backgroundColor');
-    assert.deepEqual(bg, mode === 'dark' ? [4, 6, 19] : [255, 255, 255]);
-    const card = await paint(node('eu').locator('button'), 'backgroundColor');
-    assert.deepEqual(card, mode === 'dark' ? [17, 23, 39] : [255, 255, 255]);
-    assert.deepEqual(await paint(aside(), 'backgroundColor'), card);
-    contrast(await paint(node('eu').locator('strong'), 'color'), card, 4.5, 'Node label');
-    contrast(await paint(aside(), 'color'), card, 4.5, 'Conflict panel');
-    const ghost = node('A').locator('button');
-    const ghostBg = await paint(ghost, 'backgroundColor');
-    assert.notDeepEqual(ghostBg, card);
-    const teal = await paint(ghost, 'borderTopColor');
-    const red = await paint(aside().locator('.de-pair strong'), 'borderLeftColor');
-    const warning = await paint(node('support').locator('button'), 'borderTopColor');
-    const neutral = await paint(view.locator('.de-meta'), 'color');
-    assert.equal(new Set([teal, red, warning, neutral].map(String)).size, 4);
-    // Compare semantic colours to the design-system defaults, independently of the stylesheet.
-    const expected = mode === 'dark'
-      ? [[110, 237, 220], [248, 113, 113], [250, 204, 21]]
-      : [[14, 124, 109], [185, 28, 28], [180, 83, 9]];
-    for (const [index, actual] of [teal, red, warning].entries()) {
-      assert.ok(actual.every((v, i) => Math.abs(v - expected[index][i]) <= 1), 'Semantic colour ' + actual);
-    }
-    contrast(teal, ghostBg, 3, 'Ghost border');
-    contrast(await paint(ghost, 'color'), ghostBg, 4.5, 'Ghost label');
-    contrast(red, card, 4.5, 'Conflict button');
-    assert.deepEqual(await paint(edge('conflict').locator('button'), 'color'), red);
-    const review = node('support').locator('button');
-    const reviewBg = await paint(review, 'backgroundColor');
-    contrast(warning, reviewBg, 3, 'Review border');
-    contrast(await paint(review.locator('.de-meta'), 'color'), reviewBg, 4.5, 'Review metadata');
-    async function checkEdge(kind, colour) {
-      const line = edge(kind).locator('path').first();
-      assert.deepEqual(await paint(line, 'stroke'), colour, kind);
-      const marker = await line.getAttribute('marker-end');
-      const markerPath = page.locator('[id="' + marker.slice(5, -1) + '"] path');
-      assert.deepEqual(await paint(markerPath, 'fill'), colour, kind + ' arrow');
-      contrast(colour, await paint(page.locator('.de-frame'), 'backgroundColor'), 3, kind);
-    }
+    const { teal, red, warning, neutral } = await checkNodeColours(mode);
     await checkEdge('replaces', teal);
     await checkEdge('conflict', red);
     await checkEdge('ripple', warning);
     await checkEdge('comes_from', neutral);
     await shot('effects-theme-' + mode);
     await button('Replace the old rule').click();
+    assert.equal(await readCommit(), null);
+    await button('Save decision').click();
     await checkEdge('settled', neutral);
     await load('multi');
     await openConflict();
@@ -455,6 +476,34 @@ test('mounted overlay follows host tokens and graph theme precedence without los
   }));
   assert.equal(await page.locator('.de-view').evaluate(el => getComputedStyle(el).colorScheme), 'light');
   assert.deepEqual(await paint(page.locator('.de-view'), 'backgroundColor'), [240, 247, 250]);
-  assert.deepEqual(await paint(node('eu').locator('button'), 'backgroundColor'), [213, 232, 231]);
+  assert.deepEqual(await paint(node('eu').locator('button'), 'borderTopColor'), [138, 15, 15]);
   assert.deepEqual(await paint(aside().locator('.de-pair strong'), 'borderLeftColor'), [138, 15, 15]);
+  await date('2026-11-01');
+  assert.deepEqual(await paint(node('eu').locator('button'), 'backgroundColor'), [213, 232, 231]);
+});
+
+test('R1 conflict fill and border survive a simultaneous review', async () => {
+  await show('multi');
+  const colours = locator => locator.evaluate(el => {
+    const css = getComputedStyle(el);
+    return [css.backgroundColor, css.borderTopColor];
+  });
+  const both = node('growth').getByRole('button');
+  assert.match(await both.innerText(), /R1/);
+  assert.deepEqual(await colours(both), await colours(node('eu').getByRole('button')));
+  assert.notDeepEqual(await colours(both), await colours(node('support').getByRole('button')));
+});
+
+test('R1 node list spacing stays inside the node detail', async () => {
+  await show('crowded');
+  await button('+7 more at hop 1').click();
+  const list = aside().getByRole('list');
+  const spacing = el => [getComputedStyle(el).marginBlockStart, getComputedStyle(el).paddingInlineStart];
+  const overflow = await list.evaluate(spacing);
+  await show('billing-list');
+  await node('billing').getByRole('button').click();
+  assert.deepEqual(await page.getByLabel('Suggested links').getByRole('list').evaluate(spacing), overflow);
+  await show('email');
+  await node('vendor').getByRole('button').click();
+  assert.notDeepEqual(await aside().getByRole('list').first().evaluate(spacing), overflow);
 });
