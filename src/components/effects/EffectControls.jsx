@@ -58,23 +58,41 @@ export function ConflictCard({ focus, partner, conflict, proposed, choice, onRes
   </section>;
 }
 
-export function DecisionCard({ node, data, effects, date, choices, onWhy }) {
+function statusPill(node, state, effects) {
+  if (state.ghost) return state.held ? 'Held, not saved' : 'Proposed, not saved';
+  if (node.retiredAt && state.fading) return (node.retirement === 'retracted' ? 'Retracted ' : 'Replaced ') + formatDate(node.retiredAt);
+  if (state.partner) return 'In conflict with the proposal';
+  if (state.review) return state.review.state === 'checking' ? 'Checking' : 'Needs review';
+  return 'In force';
+}
+
+function RelatedLinks({ items, onSelect }) {
+  return <ul className="de-related">{items.map(({ id, label }) => <li key={id}>
+    <button type="button" data-select={id} onClick={() => onSelect?.(id)} disabled={!onSelect}>{label}</button></li>)}</ul>;
+}
+
+export function DecisionCard({ node, data, effects, date, choices, onWhy, onSelect }) {
   const state = nodeState(node, effects, date, choices);
   const labels = new Map(data.nodes.filter(n => n.validFrom <= date).map(n => [n.id, n.label]));
   function related(type, outgoing) {
+    const seen = new Set();
     return data.edges.filter(e => !(e.suggested && effects.suggestedLinks === 'suggest_only') && e.type === type && e[outgoing ? 'source' : 'target'] === node.id)
-      .map(e => labels.get(e[outgoing ? 'target' : 'source'])).filter(Boolean);
+      .map(e => e[outgoing ? 'target' : 'source']).filter(id => labels.has(id) && !seen.has(id) && seen.add(id))
+      .map(id => ({ id, label: labels.get(id) }));
   }
-  const detail = [
-    ['Options rejected', node.rejected], ['Replaced', related('supersedes', true)],
-    ['Replaced by', related('supersedes', false)], ['Depends on', related('depends_on', true)],
-    ['Depended on by', related('depends_on', false)], ['Source notes', related('comes_from', true)],
-  ];
+  const rejected = (node.rejected || []).map(label => ({ id: label, label }));
+  const lists = [
+    ['Replaced', related('supersedes', true)], ['Replaced by', related('supersedes', false)],
+    ['Depends on', related('depends_on', true)], ['Depended on by', related('depends_on', false)],
+    ['Comes from', related('comes_from', true)],
+  ].filter(([, items]) => items.length);
   return <section className="de-detail" aria-label="Decision details">
     <h3>{node.label}</h3>
-    {state.tags.length > 0 && <p>{state.tags.join(' · ')}</p>}
+    {node.validFrom && <p className="de-decided">Decided {formatDate(node.validFrom)}</p>}
+    <span className="de-status" data-status={state.partner ? 'conflict' : state.review ? 'review' : undefined}>{statusPill(node, state, effects)}</span>
     {node.reason && <p>{node.reason}</p>}
-    <dl>{detail.map(([key, value]) => <div key={key}><dt>{key}</dt><dd>{value?.join(' · ') || 'None'}</dd></div>)}</dl>
+    {rejected.length > 0 && <div><h4>Options rejected</h4><ul>{rejected.map(r => <li key={r.id}>{r.label}</li>)}</ul></div>}
+    {lists.map(([key, items]) => <div key={key}><h4>{key}</h4><RelatedLinks items={items} onSelect={onSelect} /></div>)}
     {state.review && <FreshnessChip result={state.review.freshness} />}
     {onWhy && <button onClick={onWhy}>Why?</button>}
   </section>;
