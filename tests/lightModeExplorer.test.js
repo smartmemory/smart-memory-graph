@@ -164,3 +164,23 @@ it('toggles only the conflicting endpoints and renders the contract arrow on the
   expect(button.getAttribute('aria-pressed')).toBe('false');
   expect(highlighted()).toEqual([]);
 });
+
+it('retains a filter on in-app return and restores it when a kept graph reloads', async () => {
+  const props = { workspaceId: 'filter-reload', keepView: true };
+  const episodic = () => [...host.querySelectorAll('label')]
+    .find(label => label.textContent.includes('episodic')).querySelector('input');
+  await render(props);
+  const original = cy();
+  expect(episodic().checked).toBe(true);
+  await act(async () => episodic().click());
+  await render({ ...props, active: false });
+  await render(props);
+  expect(cy()).toBe(original);
+  expect(episodic().checked).toBe(false);
+
+  await act(async () => reactRoot.unmount());
+  reactRoot = createRoot(host);
+  await render(props);
+  expect(cy()).not.toBe(original);
+  expect(episodic().checked).toBe(false);
+});

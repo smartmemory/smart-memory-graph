@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { DECISION_CONFLICT_EDGE_TYPE, DECISION_CONTRADICTION_CLASS } from '../core/decisionStyles';
 import DecisionEffects from './effects/DecisionEffects';
 import CytoscapeCanvas from './CytoscapeCanvas';
@@ -140,12 +140,16 @@ function WorkspaceGraph({
   mode = 'dark',
   refreshSignal,
   focusRequest,
+  active: attached = true,
+  documentVisible = true,
+  keepView = false,
 }) {
   // Data: controlled (data only), uncontrolled (adapter only), or hybrid (both).
   // Hybrid mode: adapter powers refresh/reconnect, external data merges as overlay.
   const controlledReason = !adapter && readOnlyReason;
   const { daemon, capabilities, error: capabilityError } = useDaemonCapabilities(adapter);
-  const internalData = useGraphData(adapter || null, { refreshSignal });
+  const active = attached && documentVisible;
+  const internalData = useGraphData(adapter || null, { refreshSignal, active: attached });
   const externalNodes = externalData?.nodes || [];
   const externalEdges = externalData?.edges || [];
   const hasExternal = externalNodes.length > 0 || externalEdges.length > 0;
@@ -226,7 +230,15 @@ function WorkspaceGraph({
 
   const containerRef = useRef(null);
   const rootRef = useRef(null);
-  const cytoscape = useCytoscape(containerRef, { theme, mode });
+  const cytoscape = useCytoscape(containerRef, { theme, mode, keepView });
+  // Cytoscape skips drawing and its per-frame renderer callbacks inside a batch.
+  // Keep the canvas pixels and model intact until the host attaches its slot again.
+  useLayoutEffect(() => {
+    const cy = cytoscape.cy.current;
+    if (active || !cy) return;
+    cy.startBatch();
+    return () => { if (!cy.destroyed()) cy.endBatch(); };
+  }, [active, cytoscape.cy, cytoscape.ready]);
   const { urlState, saveToUrl, getShareableUrl, clearHistoricalUrl } = useUrlState(focusRequest);
   const restoredView = useRef(null);
 
@@ -283,7 +295,7 @@ function WorkspaceGraph({
     token: effectiveSseToken,
     auth,
     workspaceId,
-    enabled: sseEnabled,
+    enabled: active && sseEnabled,
     runId: replayRunId,
     clock,
     // VIS-PIPELINE-DAG-1 Phase 4 (Codex Round 1 MUST FIX 3):
@@ -475,6 +487,7 @@ function WorkspaceGraph({
     filters,
     incrementStats,
     layout: interaction.layout,
+    keepView,
     stream,
     onGroundingFlash: (nodeId) => {
       if (historicalRef.current) return;
@@ -491,13 +504,17 @@ function WorkspaceGraph({
     onStageChange: handleStageChange,
   });
   dripFeedRef.current = dripFeed;
+  useEffect(() => {
+    if (!active) dripFeed.resetDrip();
+  }, [active, dripFeed.resetDrip]);
 
+  const mergedData = useRef(null);
   const wasHistorical = useRef(false);
   const snapshotInCanvas = useRef(null);
 
   // Convert GraphNode/GraphEdge → Cytoscape elements and load into cy
   useEffect(() => {
-    if (!cytoscape.ready) return;
+    if (!active || !cytoscape.ready) return;
     const pendingView = restoredView.current !== urlState && Object.keys(urlState).length > 0;
     if (snapshot) {
       if (snapshotInCanvas.current !== snapshot) {
@@ -514,6 +531,7 @@ function WorkspaceGraph({
       return;
     }
     if (wasHistorical.current) {
+      mergedData.current = null;
       wasHistorical.current = false;
       snapshotInCanvas.current = null;
       setFilterSnapshot(null);
@@ -521,6 +539,8 @@ function WorkspaceGraph({
       cytoscape.setElements([]);
     }
     if (nodes.length > 0 || edges.length > 0) {
+      if (keepView && mergedData.current?.nodes === nodes && mergedData.current?.edges === edges && cytoscape.cy.current?.nodes().length) return;
+      mergedData.current = { nodes, edges };
       const cyElements = [
         ...nodes.map(graphNodeToCyElement),
         ...edges.map(graphEdgeToCyElement),
@@ -550,7 +570,7 @@ function WorkspaceGraph({
       cytoscape.setElements([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges, cytoscape.ready, loading, snapshot]);
+  }, [nodes, edges, cytoscape.ready, loading, snapshot, active]);
 
   // Apply filters whenever they change or Cytoscape becomes ready.
   // Only cytoscape.ready is included (not the whole cytoscape object) to avoid

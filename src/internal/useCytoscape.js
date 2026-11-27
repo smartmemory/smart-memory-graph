@@ -104,7 +104,7 @@ let warnedNoRing = false;
 export function _resetNoRingWarn() { warnedNoRing = false; }
 
 export function useCytoscape(containerRef, options = {}) {
-  const { theme = null, mode = null } = options;
+  const { theme = null, mode = null, keepView = false } = options;
   const cyRef = useRef(null);
   const [containerReady, setContainerReady] = useState(false);
   const [cyReady, setCyReady] = useState(false);
@@ -226,6 +226,10 @@ export function useCytoscape(containerRef, options = {}) {
     const resizeObserver = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       const hasArea = (rect?.width || 0) > 0 && (rect?.height || 0) > 0;
+      if (keepView && !hasArea) {
+        hadArea = false;
+        return;
+      }
       cy.resize();
       const action = planContainerResize({
         hadArea,
@@ -239,13 +243,13 @@ export function useCytoscape(containerRef, options = {}) {
         const pending = pendingLayoutRef.current;
         pendingLayoutRef.current = null;
         runLayoutRef.current?.(pending.layoutName, pending.options);
-      } else if (action === 'relayout') {
+      } else if (!keepView && action === 'relayout') {
         // Container went from hidden (0px) to visible — anything laid out before
         // now has degenerate positions. Re-run the layout the user chose instantly
         // (no entrance animation — that's for first load only).
         const { layoutName, options } = revealRelayoutRequest(lastLayoutNameRef.current);
         runLayoutRef.current?.(layoutName, options);
-      } else if (action === 'fit') {
+      } else if (!keepView && action === 'fit') {
         cy.fit(getFitElements(cy), getFitPadding(cy));
       }
       hadArea = hasArea;
@@ -262,7 +266,7 @@ export function useCytoscape(containerRef, options = {}) {
       cyRef.current = null;
       setCyReady(false);
     };
-  }, [containerReady, containerRef]);
+  }, [containerReady, containerRef, keepView]);
 
   // Restore filter/isolation dimming after element replacement or addition.
   // Reads from refs so it works regardless of declaration order.
@@ -329,9 +333,9 @@ export function useCytoscape(containerRef, options = {}) {
     const cy = cyRef.current;
     if (!cy) return { isInitial: true };
     const result = applyGraphMerge(cy, elements, { afterMerge: restoreDimmingState });
-    if (result.added.length || result.removed.length) countRelayoutRef.current.schedule();
+    if (!keepView && (result.added.length || result.removed.length)) countRelayoutRef.current.schedule();
     return result;
-  }, []);
+  }, [keepView]);
 
   const firstLayoutRef = useRef(true);
   const runLayoutRef = useRef(null);
