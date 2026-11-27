@@ -1,4 +1,5 @@
 import { useId, useMemo } from 'react';
+import EffectsViewport from './EffectsViewport';
 import dagre from 'dagre';
 
 const width = 204;
@@ -85,9 +86,7 @@ export default function EffectsCanvas({ nodes, links, effects, date, path, choic
   const graph = useMemo(() => layout(nodes, links, extras), [nodes, links, extras]);
   if (!nodes.length) return <p className="de-empty">No rules in force on this date.</p>;
   const { width: w, height: h } = graph.graph();
-  return <div className="de-scroll" tabIndex={0} role="region" aria-label="Scrollable decision graph">
-    <svg className="de-canvas" role="group" aria-label="Decision graph"
-      viewBox={'0 0 ' + w + ' ' + h} style={{ minWidth: w * 0.78, minHeight: h * 0.78, maxHeight: h + 20 }}>
+  return <EffectsViewport key={w + ':' + h} width={w} height={h}>
       <defs>{markers(id)}</defs>
       {links.map((edge, i) => {
         const marker = ['conflict', 'ripple', 'why', 'replaces'].includes(edge.kind) ? edge.kind : 'link';
@@ -121,6 +120,5 @@ export default function EffectsCanvas({ nodes, links, effects, date, path, choic
           </button>
         </foreignObject>;
       })}
-    </svg>
-  </div>;
+  </EffectsViewport>;
 }

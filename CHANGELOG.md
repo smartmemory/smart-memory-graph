@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decision effects supports zoom, background drag and fit-to-neighbourhood.
 - The conflict drawer labels the proposal and in-force date and accepts a user-entered scope.
 - Draft results show counts, a next step, and an explicit save action after resolving conflicts.
 - Decision effects now has a persistent sidebar, a bottom date bar and a detail drawer over the graph.

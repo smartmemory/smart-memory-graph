@@ -151,3 +151,8 @@
 .de-choices { display: grid; gap: 14px; width: 100%; min-width: 0; }
 .de-choices p { margin: 4px 0; font-size: 13px; color: var(--de-muted); }
 .de-choices input { min-width: 0; width: 100%; background: var(--de-bg); color: var(--de-ink); border: 1px solid var(--de-line); border-radius: 5px; padding: 5px; }
+.de-scroll { position: relative; overflow: hidden; }
+.de-canvas { position: absolute; inset: 0; height: 100%; touch-action: none; cursor: grab; user-select: none; }
+.de-canvas:active { cursor: grabbing; }
+.de-zoom { position: absolute; top: 10px; left: 12px; z-index: 1; display: flex; gap: 4px; }
+.de-zoom button { min-width: 34px; box-shadow: 0 1px 3px color-mix(in srgb, var(--de-ink) 12%, transparent); }
