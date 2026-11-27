@@ -29,6 +29,8 @@ Select a saved decision in the normal graph and choose **Show ripple**. You can 
 
 ### Controlled decision effects
 
+For a dedicated screen, render `DecisionEffects` with `data`, `effects`, `actions` and the optional `proposal` sidebar slot. Key the view by workspace, focus and snapshot revision so a new draft starts with fresh choices.
+
 Pass a focused graph and its effects snapshot to preview a draft, follow its
 dependencies, inspect the source path, or view rules on an earlier date.
 
