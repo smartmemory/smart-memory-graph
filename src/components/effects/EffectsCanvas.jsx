@@ -117,6 +117,7 @@ export default function EffectsCanvas({ nodes, links, effects, date, path, choic
         return <foreignObject key={node.id} x={p.x - size.width / 2} y={p.y - size.height / 2}
           width={size.width} height={size.height} data-node={node.id} data-kind={node.type} data-dimmed={path.length > 0 && step < 0 || undefined}>
           <button className="de-node" data-kind={node.type} onClick={() => onSelect(node.id)} title={node.label}
+            data-conflict={state.partner || undefined}
             data-ghost={state.ghost || undefined} data-retired={state.fading || undefined}
             data-review={state.review?.hop} style={{ '--hop': state.review?.hop || 0 }}>
             <span className="de-meta">{step >= 0 && <b className="de-step"> {step + 1} </b>}

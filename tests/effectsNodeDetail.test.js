@@ -78,3 +78,10 @@ it('row 14: a source note is a small grey chip, a decision stays a full card', (
     .map(m => [m[3], m[1] * m[2]]));
   expect(sizes.n1).toBeLessThan(sizes.d / 2);
 });
+
+it('row 17: the conflict partner card is filled red, not only tagged', () => {
+  const html = renderToStaticMarkup(createElement(EffectsCanvas, canvasProps([data.nodes[0], data.nodes[1]],
+    { conflicts: [{ id: 'old', why: 'clash', freshness: computed }] })));
+  expect(html).toMatch(/<button[^>]*class="de-node"[^>]*title="Email any day"[^>]*data-conflict="true"/);
+  expect(html).not.toMatch(/title="Email only on weekdays"[^>]*data-conflict/);
+});
