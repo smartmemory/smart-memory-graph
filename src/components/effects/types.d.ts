@@ -40,7 +40,7 @@ export interface Conflict {
 export interface Review {
   id: string
   via: string
-  hop: number
+  hop: number // shortest distance to the retired rule; no maximum (DEMO-1204-RIPPLE-NO-HOP-LIMIT-1)
   state: 'preview' | 'checking' | 'flagged' | 'reviewed'
   freshness: Freshness
 }

@@ -25,7 +25,8 @@ export function focusWindow(data, effects, date, showRetired, path) {
     if (node.id === effects.focus) kind = 'focus';
     else if (retire.has(node.id)) kind = 'retiring';
     else if (conflicts.has(node.id)) kind = 'conflict';
-    else if (reviews.has(node.id) && reviews.get(node.id).hop <= 3) {
+    // Ripples have no hop limit (DEMO-1204-RIPPLE-NO-HOP-LIMIT-1): a review node is drawn at any hop, within the caps.
+    else if (reviews.has(node.id)) {
       kind = 'review';
     } else if (why.has(node.id)) kind = 'why';
     else if (hop > 2) kind = 'outside';
@@ -74,7 +75,7 @@ export function graphLinks(data, effects, nodes, today, path, choices) {
         { partner: c.id, freshness: c.freshness });
     }
     for (const r of visibleReview(effects)) {
-      if (r.hop <= 3 && !hasSuggestedParent(r.id, r.via)) add(r.via, r.id, 'ripple', 'R' + r.hop);
+      if (!hasSuggestedParent(r.id, r.via)) add(r.via, r.id, 'ripple', 'R' + r.hop);
     }
   }
   const pair = (a, b) => JSON.stringify([a, b].sort());
