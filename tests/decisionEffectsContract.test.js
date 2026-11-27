@@ -21,6 +21,14 @@ it('validates the frozen-notes renderer snapshots and rejects stored marks on th
       expect(ajv.getSchema('#' + pointer)).toBeTypeOf('function');
     }
   }
+  const preview = ajv.getSchema('#/$defs/PreviewResponse');
+  const { conflict_check, ...legacy } = friday.decisionEffects;
+  expect(preview(legacy)).toBe(false);
+  expect(preview({ ...legacy, conflict_check })).toBe(true);
+  for (const invalid of [{ ...conflict_check, checked: 0 }, { ...conflict_check, omitted: 1 },
+    { ...conflict_check, state: 'nothing_to_check' }]) {
+    expect(preview({ ...legacy, conflict_check: invalid })).toBe(false);
+  }
   const commit = ajv.getSchema('#/$defs/CommitRequest');
   expect(commit({ text: 'A draft' })).toBe(false);
   for (const resolution of [{ choice: 'replace' }, { choice: 'keep_both_scoped', scope: 'marketing only' }, { choice: 'cancel' }]) {

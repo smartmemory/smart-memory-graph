@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { effectiveTheme } from '../../internal/useCytoscape';
 import EffectsCanvas, { FreshnessChip } from './EffectsCanvas';
-import { CommitBar, ConflictCard, DecisionCard, RulesSlider } from './EffectControls';
+import { checkAllowsSave, CommitBar, ConflictCard, DecisionCard, RulesSlider } from './EffectControls';
 import { focusWindow, graphLinks, visibleReview } from './focusGraph';
 import SuggestedLinkActions from './SuggestedLinkActions';
 import EffectsLegend from './EffectsLegend';
@@ -30,7 +30,7 @@ function useCommit(effects, actions, draft, policyKnown, panel, closePanel) {
   const pending = useRef(false);
   const cancel = actions.onCancel && (() => actions.onCancel(effects.focus));
   async function commit(resolutions) {
-    if (!actions.onCommit || pending.current || !draft || !policyKnown) return;
+    if (!actions.onCommit || pending.current || !draft || !policyKnown || !checkAllowsSave(effects.conflict_check)) return;
     const answers = Object.create(null);
     for (const c of effects.conflicts) {
       const answer = c.resolution || resolutions[c.id];
@@ -109,7 +109,7 @@ function DetailDrawer({ data, effects, actions, model }) {
         </li>)}</ul></section>}
       {panel.kind === 'conflict' && conflict && <ConflictCard key={panel.id} focus={focus} partner={selected || { label: conflict.id }}
         conflict={conflict} proposed={effects.phase === 'draft'} choice={conflict.resolution || choices[conflict.id]} busy={busy}
-        onResolve={!conflict.resolution && draft && policyKnown && actions.onCommit ? resolve : null} onCancel={cancel} />}
+        onResolve={!conflict.resolution && draft && policyKnown && checkAllowsSave(effects.conflict_check) && actions.onCommit ? resolve : null} onCancel={cancel} />}
       {panel.kind === 'overflow' && <section className="de-detail"><h3>Branches at hop {panel.id}</h3>
         <ul>{Array.from(branchesByHop.get(panel.id) || [], ([id, count]) =>
           <li key={id}><button disabled={!actions.onRefocus} onClick={() => actions.onRefocus(id)}>

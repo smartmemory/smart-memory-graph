@@ -59,6 +59,7 @@ export interface EffectsPresentation {
   freshness: Freshness
   // Ordered provenance, source first, up to five edges. Each pair has a graph edge.
   whyPaths?: Record<string, string[]>
+  conflict_check?: { state: 'checked' | 'nothing_to_check' | 'could_not_check', checked: number, omitted: number, cap: number }
   counts?: { conflicts: number, replaced: number, to_review: number }
   possibly_related?: { id: string, label: string }[]
   possiblyRelated?: { id: string, label: string }[]

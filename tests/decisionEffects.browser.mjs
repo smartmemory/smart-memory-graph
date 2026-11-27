@@ -164,11 +164,28 @@ test('multiple conflicts require every choice', async () => {
 test('B · safe Friday draft depends on Thursday and flags neither of its dependents', async () => {
   await show('friday');
   assert.match(await bar().innerText(), /0 conflicts · 0 replaced · 0 to review/);
-  assert.match(await bar().innerText(), /Save this decision to put it in force/);
+  assert.match(await bar().innerText(), /Checked against 2 rules/);
+  assert.match(await bar().innerText(), /Safe to save/);
   assert.equal(await button('Save decision').isEnabled(), true);
   assert.equal(await page.locator('[data-source="B"][data-target="release"]').count(), 1);
   assert.equal(await edge('ripple').count(), 0);
   assert.equal(await page.locator('[data-review]').count(), 0);
+});
+
+test('unchecked and partial previews explain their coverage', async () => {
+  for (const [name, message] of [
+    ['empty', /No rules in force to check against/],
+    ['failed', /Could not check for conflicts/],
+    ['partial', /Partial check.*10 rules.*2 left out/],
+    ['legacy', /Could not check for conflicts/],
+  ]) {
+    await show(name);
+    const text = await bar().innerText();
+    assert.match(text, message);
+    assert.doesNotMatch(text, /Safe to save/i);
+    if (name !== 'empty') assert.doesNotMatch(text, /0 conflicts/i);
+    assert.equal(await button('Save decision').isEnabled(), name === 'empty');
+  }
 });
 
 test('C · only the pilot billing decision needs review, plus human-review policy readback', async () => {

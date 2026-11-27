@@ -8,6 +8,13 @@ import { email, committedEmail, friday, pilots, refunds, standing, crowded, sugg
 import recordings from './standing-history.json';
 
 function fixture(name) {
+  const checks = {
+    empty: { state: 'nothing_to_check', checked: 0, cap: 10, omitted: 0 },
+    failed: { state: 'could_not_check', checked: 0, cap: 10, omitted: 0 },
+    partial: { state: 'could_not_check', checked: 10, cap: 10, omitted: 2 },
+    legacy: undefined,
+  };
+  if (Object.hasOwn(checks, name)) return { ...friday, decisionEffects: { ...friday.decisionEffects, conflict_check: checks[name] } };
   if (name === 'unknown-policy') return { ...email, decisionEffects: { ...email.decisionEffects, policy: undefined } };
   if (name === 'reject') return email;
   if (name === 'crowded') return crowded();
