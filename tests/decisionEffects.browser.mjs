@@ -507,3 +507,117 @@ test('R1 node list spacing stays inside the node detail', async () => {
   await node('vendor').getByRole('button').click();
   assert.notDeepEqual(await aside().getByRole('list').first().evaluate(spacing), overflow);
 });
+
+const weekly = 'dec_2a14b0292f45';
+const schedule = 'dec_f3af21529846';
+const dose = 'dec_f1c21dfeabdd';
+const amendment = 'db338299-af75-4e54-974f-bdd88e7ac4ce';
+const historyCases = [
+  ['T1', weekly, '2025-12-15', [schedule], [weekly]],
+  ['T2', 'dec_ced77a8a5a71', '2026-04-01', ['dec_44068cc92565'], ['dec_ced77a8a5a71']],
+  ['T3', 'dec_ca6e932d60f9', '2026-04-01', ['dec_dbe5a7046262'], ['dec_ca6e932d60f9']],
+  ['T4', weekly, '2026-02-15', [weekly, dose, amendment], [schedule]],
+];
+
+async function dragTo(page, day) {
+  await page.$eval('input[type=range]', (el, value) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, Date.parse(value) / 86400000);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, day);
+}
+
+for (const [name, id, day, visible, hidden] of historyCases) {
+  test(name + ' reads the selected date and draws the recorded ripple', async t => {
+    await show(id);
+    if (id === weekly) { await page.waitForFunction(() => Number(document.querySelector('input[type=range]')?.min) === Date.parse('2025-10-01') / 86400000); }
+    await dragTo(page, day);
+    for (const id of visible) await page.waitForSelector('[data-node="' + id + '"]');
+    assert.ok((await page.evaluate(() => window.historyReads)).some(o => o.as_of === day && o.show_retired === false));
+    for (const id of hidden) assert.equal(await page.$('[data-node="' + id + '"]'), null);
+  });
+}
+
+test('T5 and T6 show retired rules and restore the original today view', async t => {
+    const id = weekly;
+    await show(id);
+    await page.waitForFunction(() => Number(document.querySelector('input[type=range]')?.min) === Date.parse('2025-10-01') / 86400000);
+    const ids = () => page.$$eval('[data-node]', nodes => nodes.map(n => n.dataset.node).sort());
+    const initial = await ids();
+    assert.ok(initial.includes(weekly) && !initial.includes(schedule));
+    await page.click('.de-time input[type=checkbox]');
+    await page.waitForSelector('[data-node="' + schedule + '"]');
+    await page.click('.de-time input[type=checkbox]');
+    await page.waitForFunction(() => !document.querySelector('[data-node="dec_f3af21529846"]'));
+    await dragTo(page, '2025-12-15');
+    await page.waitForSelector('[data-node="' + schedule + '"]');
+    await page.click('.de-time button');
+    await page.waitForSelector('[data-node="' + weekly + '"]');
+    assert.deepEqual(await ids(), initial);
+    assert.deepEqual((await page.evaluate(() => window.historyReads)).slice(-4), [
+      { as_of: '2026-11-28', show_retired: true }, { as_of: '2026-11-28', show_retired: false },
+      { as_of: '2025-12-15', show_retired: false }, { as_of: '2026-11-28', show_retired: false },
+    ]);
+    const warnings = [];
+    page.on('console', msg => { if (['warning', 'warn'].includes(msg.type())) warnings.push(msg.text()); });
+    await dragTo(page, '2025-12-16');
+    await page.waitForSelector('[role=alert]');
+    assert.deepEqual(await ids(), initial);
+    assert.equal(warnings.length, 1);
+});
+
+test('held and superseded reads keep the date statement with the drawn rules', async () => {
+  await show(weekly);
+  await page.waitForSelector('input[type=range]:enabled');
+  await page.evaluate(() => {
+    window.holdHistory = (options, signal) => {
+      if (options.as_of === '2025-12-15') return new Promise(resolve => {
+        window.releaseEarlier = resolve;
+        window.earlierSignal = signal;
+      });
+    };
+  });
+  await dragTo(page, '2025-12-15');
+  await page.waitForFunction(() => Boolean(window.releaseEarlier));
+  const label = page.locator('.de-date-label strong');
+  const canvas = page.locator('.de-canvas');
+  const ids = () => page.$$eval('[data-node]', nodes => nodes.map(n => n.dataset.node).sort());
+  const original = await ids();
+  assert.ok(original.includes(weekly) && !original.includes(schedule));
+  assert.equal(await label.innerText(), '28 Nov 2026 (today)');
+  assert.equal(await page.locator('.de-date-label [role=status]').innerText(), 'Loading 15 Dec 2025…');
+  assert.equal(await canvas.getAttribute('aria-busy'), 'true');
+  assert.ok(await canvas.evaluate(el => Number(getComputedStyle(el).opacity) < 1));
+
+  await dragTo(page, '2026-02-15');
+  await page.waitForSelector('.de-canvas[aria-busy=false]');
+  assert.ok(await page.evaluate(() => window.earlierSignal.aborted));
+  const final = await ids();
+  assert.ok(final.includes(dose) && !final.includes(schedule));
+  await page.evaluate(async () => {
+    window.releaseEarlier();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  assert.deepEqual(await ids(), final);
+  assert.equal(await label.innerText(), '15 Feb 2026');
+  assert.equal(await page.locator('.de-date-label [role=status], [role=alert]').count(), 0);
+});
+
+test('a hung range read times out and the available slider dates still work', async () => {
+  await page.clock.install();
+  await page.evaluate(() => {
+    window.holdHistory = (options, signal) => {
+      if (options.show_retired) {
+        window.rangeSignal = signal;
+        return new Promise(() => {});
+      }
+    };
+  });
+  await show(weekly);
+  await page.waitForSelector('input[type=range]:disabled');
+  await page.clock.fastForward(10001);
+  await page.waitForSelector('input[type=range]:enabled');
+  assert.ok(await page.evaluate(() => window.rangeSignal.aborted));
+  assert.match(await page.locator('[role=alert]').innerText(), /full date range/);
+  await dragTo(page, '2026-02-15');
+  assert.equal(await page.locator('.de-date-label strong').innerText(), '15 Feb 2026');
+});

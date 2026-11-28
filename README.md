@@ -63,6 +63,8 @@ plus dated overflow counts for branches outside the supplied graph.
 
 Pass the current workspace ID so switching workspaces clears the draft and view state.
 Use `adapter.getDecisionEffects(id)` for a standing decision and `adapter.previewDecisionEffects(text)` for a draft.
+For a standing view, pass the SDK adapter's `getDecisionEffects` as `decisionEffectsActions.onReadHistory`.
+The slider reads the full range with retired rules included. A pointer drag reads on release. The date statement follows the displayed snapshot while the loading cue names the requested date. Custom readers receive a third argument, `{ signal }`, to cancel superseded requests.
 Pass the returned snapshot as `decisionEffects` and its `data` as the graph data.
 Supply `onConfirmLink(source, target)` and `onRemoveLink(source, target)` for hosts that allow suggested-link changes.
 After a successful change, reload the snapshot to update the graph.

@@ -91,12 +91,12 @@ export function formatDate(date) {
     .format(new Date(date + 'T00:00:00Z'));
 }
 
-export default function EffectsCanvas({ nodes, links, effects, date, path, choices, extras, onSelect, onConflict, onSuggestion }) {
+export default function EffectsCanvas({ loading, nodes, links, effects, date, path, choices, extras, onSelect, onConflict, onSuggestion }) {
   const id = 'de' + useId().replace(/[^a-zA-Z0-9_-]/g, '');
   const graph = useMemo(() => layout(nodes, links, extras), [nodes, links, extras]);
-  if (!nodes.length) return <p className="de-empty">No rules in force on this date.</p>;
+  if (!nodes.length) return <p className="de-empty" aria-busy={loading}>No rules in force on this date.</p>;
   const { width: w, height: h } = graph.graph();
-  return <EffectsViewport key={w + ':' + h} width={w} height={h}>
+  return <EffectsViewport loading={loading} key={w + ':' + h} width={w} height={h}>
       <defs>{markers(id)}</defs>
       {links.map((edge, i) => {
         const marker = ['conflict', 'ripple', 'why', 'replaces'].includes(edge.kind) ? edge.kind : 'link';

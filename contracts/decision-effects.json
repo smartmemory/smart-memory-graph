@@ -256,6 +256,14 @@
       "additionalProperties": false,
       "description": "Path parameters. No request body."
     },
+    "StandingEffectsOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "as_of": { "$ref": "#/$defs/Date" },
+        "show_retired": { "type": "boolean" }
+      }
+    },
     "PreviewRequest": {
       "type": "object",
       "properties": {

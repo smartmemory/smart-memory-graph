@@ -86,6 +86,8 @@ export interface DecisionEffectsSnapshot extends Omit<EffectsPresentation, 'poss
 }
 
 export interface EffectsActions {
+  onReadHistory?: (focus: string, options: { as_of: string, show_retired: boolean }, requestOptions?: { signal?: AbortSignal }) => Promise<DecisionEffectsSnapshot>
+  onHistoryWarning?: (reason: unknown) => void
   onConfirmLink?: (source: string, target: string) => void
   onRemoveLink?: (source: string, target: string) => void
   onCommit?: (focus: string, resolutions: Record<string, Resolution>) => void | Promise<void>

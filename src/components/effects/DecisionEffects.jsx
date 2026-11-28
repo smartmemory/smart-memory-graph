@@ -5,6 +5,7 @@ import { CommitBar, ConflictCard, DecisionCard, RulesSlider } from './EffectCont
 import { focusWindow, graphLinks, visibleReview } from './focusGraph';
 import SuggestedLinkActions from './SuggestedLinkActions';
 import EffectsLegend from './EffectsLegend';
+import useRulesHistory from './useRulesHistory';
 import './effects.css';
 
 
@@ -119,9 +120,8 @@ function DetailDrawer({ data, effects, actions, model }) {
 
 }
 
-function useEffectsModel(data, effects, actions) {
-  const [date, setDate] = useState(effects.today);
-  const [showRetired, setRetired] = useState(false);
+function useEffectsModel(data, effects, actions, history) {
+  const { date, retired: showRetired } = history.view;
   const [path, setPath] = useState([]);
   const panels = usePanel();
   const { setPanel, openPanel } = panels;
@@ -134,22 +134,21 @@ function useEffectsModel(data, effects, actions) {
   const { nodes, overflow } = useMemo(() => focusWindow(data, effects, date, showRetired, path),
     [data, effects, date, showRetired, path]);
   const links = useMemo(() => graphLinks(data, effects, nodes, today, path, choices), [data, effects, nodes, today, path, choices]);
-  const first = data.nodes.reduce((start, n) => n.validFrom < start ? n.validFrom : start, effects.today.slice(0, 4) + '-01-01');
   const focus = byId.get(effects.focus);
   const review = today ? visibleReview(effects) : [];
   const unsettled = effects.conflicts.filter(c => !choices[c.id] && !c.resolution);
   const hidden = overflow.reduce((sum, s) => sum + s.count, 0);
-  function changeDate(value) {
-    setDate(value);
+  function select(value, retired, dragging) {
+    history.select(value, retired, dragging);
     setPanel(null);
     setPath([]);
   }
   return { ...panels, ...state, ...canvasPills(overflow, byId, effects, today, openPanel),
-    byId, today, date, path, setPath, setRetired, showRetired, nodes, links, first, focus, draft,
-    policyKnown, review, unsettled, hidden, changeDate };
+    byId, today, date, path, setPath, nodes, links, focus, draft,
+    policyKnown, review, unsettled, hidden, select };
 }
 
-function EffectsFrame({ model, data, effects, actions }) {
+function EffectsFrame({ model, data, effects, actions, loading }) {
   const { today, hidden, path, links, setPath, nodes, date, choices, extras, openPanel } = model;
   return <div className="de-frame">
       <div className="de-frame-heading"><span>Decision neighbourhood{hidden > 0 && ` · ${hidden} more not shown`}</span>
@@ -160,7 +159,7 @@ function EffectsFrame({ model, data, effects, actions }) {
         {links.filter(link => link.kind === 'why' && link.freshness).map(link =>
           <span key={link.source + ':' + link.target}>Step {path.indexOf(link.target) + 1} <FreshnessChip result={link.freshness} /></span>)}
         <button onClick={() => setPath([])}>Clear path</button></div>}
-      <EffectsCanvas nodes={nodes} links={links} effects={effects} date={date} path={path} choices={choices}
+      <EffectsCanvas loading={loading} nodes={nodes} links={links} effects={effects} date={date} path={path} choices={choices}
         extras={extras} onSuggestion={link => openPanel('link', link.id)} onSelect={id => openPanel('node', id)} onConflict={id => openPanel('conflict', id)} />
 
     <DetailDrawer model={model} data={data} effects={effects} actions={actions} />
@@ -181,7 +180,7 @@ function Sidebar({ model, effects, actions, proposal }) {
   </div>;
 }
 
-export default function DecisionEffects({ data, effects, actions = {}, className = '', theme, mode, proposal }) {
+export default function DecisionEffects({ data: initialData, effects: initialEffects, actions = {}, className = '', theme, mode, proposal }) {
   const applyTheme = useCallback(container => {
     if (container) container.style.colorScheme = effectiveTheme(theme, mode, container).mode;
   }, [theme, mode]);
@@ -192,8 +191,10 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     '--de-label': palette?.label,
     '--de-selection': palette?.selectionBorder,
   };
-  const model = useEffectsModel(data, effects, actions);
-  const { focus, nodes, panel, closePanel, date, today, first, showRetired, changeDate, setRetired, setPanel, setPath } = model;
+  const history = useRulesHistory(initialData, initialEffects, actions.onReadHistory, actions.onHistoryWarning);
+  const { data, effects, selection } = history;
+  const model = useEffectsModel(data, effects, actions, history);
+  const { focus, nodes, panel, closePanel, today, select, setPath } = model;
   if (!focus) return <p role="status">Decision effects unavailable: the focus is missing.</p>;
   return <section ref={applyTheme} style={style} className={'de-view ' + className} aria-label="Decision effects" onKeyDown={e => {
     if (e.key === 'Escape') {
@@ -204,8 +205,9 @@ export default function DecisionEffects({ data, effects, actions = {}, className
     <header className="de-header"><div><h2>Decision effects</h2>{(today || nodes.some(n => n.id === focus.id)) && <p>{focus.label}</p>}</div>
       {today && <FreshnessChip result={effects.freshness} />}</header>
     <Sidebar model={model} effects={effects} actions={actions} proposal={proposal} />
-    <EffectsFrame model={model} effects={effects} data={data} actions={actions} />
-    <RulesSlider first={first} today={effects.today} date={date} showRetired={showRetired}
-      onDate={changeDate} onRetired={value => { setRetired(value); setPanel(null); setPath([]); }} />
+    <EffectsFrame loading={Boolean(history.pending)} model={model} effects={effects} data={data} actions={actions} />
+    {history.error && <p role="alert">{history.error}</p>}
+    <RulesSlider first={history.first} loadingRange={history.loadingRange} today={effects.today} drawnDate={history.view.date} pending={history.pending} date={selection.date} showRetired={selection.retired}
+      onDate={(date, dragging) => select(date, selection.retired, dragging)} onRetired={retired => select(selection.date, retired)} />
   </section>;
 }
