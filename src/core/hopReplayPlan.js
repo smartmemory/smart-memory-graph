@@ -109,3 +109,47 @@ export function buildBfsHopNodeSets({ startNodeId, adjacency, reachable, hopCoun
 
   return { hopNodeSets, visited };
 }
+
+/**
+ * Hop groups for a stepped explore, by graph distance from `seedId`, until nothing new is reachable
+ * (no depth limit: a node is visited once, so it always ends).
+ *
+ * `forced[h]` lists ids that MUST be in hop h: what a fetch for the hop before brought in (Expand
+ * Neighbors puts its whole result in hop 1). They come first and never count against `maxPerHop`,
+ * which caps only the other loaded neighbours a hop may add; `capped` says that cap cut something.
+ *
+ * @param {Object} params
+ * @param {string} params.seedId
+ * @param {Map<string, Array<{id: string}>>} params.adjacency - from `buildAdjacency`, visible links only
+ * @param {(id: string) => boolean} [params.isVisible] - a forced id the filters hide is left out
+ * @param {Array<Array<string>>} [params.forced]
+ * @param {number} [params.maxPerHop]
+ * @returns {{hopNodeSets: Array<Array<string>>, capped: boolean}}
+ */
+export function planSteppedHops({ seedId, adjacency, isVisible = () => true, forced = [], maxPerHop = 50 }) {
+  const hopNodeSets = [];
+  const visited = new Set([seedId]);
+  let frontier = [seedId];
+  let capped = false;
+  for (let hop = 1; frontier.length; hop++) {
+    const hopNodes = [];
+    for (const id of forced[hop] || []) {
+      if (visited.has(id) || !isVisible(id)) continue;
+      visited.add(id);
+      hopNodes.push(id);
+    }
+    let room = maxPerHop;
+    for (const fid of frontier) {
+      for (const { id } of adjacency.get(fid) || []) {
+        if (visited.has(id)) continue;
+        if (room === 0) { capped = true; continue; }
+        visited.add(id);
+        hopNodes.push(id);
+        room--;
+      }
+    }
+    if (hopNodes.length) hopNodeSets.push(hopNodes);
+    frontier = hopNodes;
+  }
+  return { hopNodeSets, capped };
+}

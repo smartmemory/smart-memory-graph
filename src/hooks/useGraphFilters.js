@@ -148,6 +148,8 @@ export function useGraphFilters(nodes, edges, persistKey) {
   // Streamed types/nodes (not in the initial arrays)
   const [streamedTypes, setStreamedTypes] = useState({ memory: new Set(), entity: new Set(), relation: new Set() });
   const [streamedNodeMap, setStreamedNodeMap] = useState(new Map());
+  // Streamed links by `source->target:type`, so the filter counts include them once (L1).
+  const [streamedEdgeMap, setStreamedEdgeMap] = useState(new Map());
   const [cascadeEdgeFilter, setCascadeEdgeFilter] = useState(() => {
     try {
       const stored = localStorage.getItem('graph:cascadeEdgeFilter');
@@ -190,6 +192,14 @@ export function useGraphFilters(nodes, edges, persistKey) {
         }
       }
       return changed ? next : prev;
+    });
+
+    setStreamedEdgeMap((prev) => {
+      const fresh = els.filter((el) => 'source' in el && !prev.has(`${el.source}->${el.target}:${el.type}`));
+      if (!fresh.length) return prev;
+      const next = new Map(prev);
+      for (const el of fresh) next.set(`${el.source}->${el.target}:${el.type}`, el.type);
+      return next;
     });
   }, []);
 
@@ -301,6 +311,8 @@ export function useGraphFilters(nodes, edges, persistKey) {
     selectAllRelationTypes,
     deselectAllRelationTypes,
     registerStreamedElements,
+    streamedNodeMap,
+    streamedEdgeMap,
     revealTypes,
     cascadeEdgeFilter,
     toggleCascadeEdgeFilter: () =>

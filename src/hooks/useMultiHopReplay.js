@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { isEditableTarget } from '../core/graphKeyboard';
-import { buildAdjacency, bfsExpand } from '../core/multiHopBfs';
+import { buildAdjacency } from '../core/multiHopBfs';
 import {
-  buildBfsHopNodeSets,
+  planSteppedHops,
   buildReplayPlan,
   HOP_COLORS,
   HOP_DELAY_MS,
@@ -16,8 +16,11 @@ import {
  */
 const REPLAY_OWNED_STYLES = 'opacity border-width border-color line-color width';
 
-/** Hops a stepped explore may lay out. "No hop limit, just no loops" (OWNER 2026-11-27): BFS never revisits. */
-const MAX_STEPPED_HOPS = 200;
+/**
+ * "Next hop" past the loaded graph fetches one request per frontier node, at most this many nodes;
+ * a wider step asks the user to expand one node. Default by s1-chat, not owner-set.
+ */
+export const FETCH_FRONTIER_LIMIT = 10;
 
 /** Reset the canvas and dim everything, ready for a reveal. `stop(true)` first: see `playPlan`. */
 function dimAll(cy) {
@@ -51,24 +54,28 @@ function revealFrame(cy, frame, revealed) {
 }
 
 /**
- * Hop groups by graph distance from `seedId` over what the canvas holds RIGHT NOW (nodes added by
- * an expand included), skipping anything a left-hand filter hides. Trailing empty hops are cut so
- * "hop N of M" counts steps that add something.
+ * Stepped-explore frames from what the canvas holds RIGHT NOW (nodes an expand or fetch added
+ * included), skipping anything a left-hand filter hides. "No hop limit, just no loops" (OWNER
+ * 2026-11-27): the planner runs until nothing new is reachable and never revisits a node.
  */
-function hopSetsFromCanvas(cy, seedId) {
+function planFromCanvas(cy, explore) {
   const edges = [];
   cy.edges().forEach((e) => {
     if (e.hasClass('dimmed') || e.source().hasClass('dimmed') || e.target().hasClass('dimmed')) return;
     edges.push({ id: e.id(), source: e.source().id(), target: e.target().id() });
   });
-  const adjacency = buildAdjacency(edges);
-  const result = bfsExpand({ startId: seedId, adjacency, maxHops: MAX_STEPPED_HOPS, maxNodesPerHop: 50 });
-  const { hopNodeSets } = buildBfsHopNodeSets({
-    startNodeId: seedId, adjacency, reachable: result.nodes, hopCount: result.hops.length,
+  const isVisible = (id) => {
+    const node = cy.getElementById(id);
+    return node.length > 0 && !node.hasClass('dimmed');
+  };
+  const { hopNodeSets, capped } = planSteppedHops({
+    seedId: explore.seedId, adjacency: buildAdjacency(edges), isVisible, forced: explore.forced,
   });
-  while (hopNodeSets.length && hopNodeSets[hopNodeSets.length - 1].length === 0) hopNodeSets.pop();
-  return { hopNodeSets, capped: result.truncated };
+  return { frames: buildReplayPlan(hopNodeSets, { seedNodeId: explore.seedId }).frames, capped };
 }
+
+const frameKey = (frame) => (frame ? frame.nodeIds.join('\n') : '');
+const sameFrames = (a, b) => a.length === b.length && a.every((f, i) => frameKey(f) === frameKey(b[i]));
 
 /**
  * Orchestrates a hop-by-hop reveal animation on the Cytoscape canvas.
@@ -87,12 +94,17 @@ function hopSetsFromCanvas(cy, seedId) {
  * or unconnected in the loaded subgraph). Keeping the grouping outside the hook is
  * what lets both drive the same animation.
  *
- * Makes no API calls: it reads the canvas.
+ * It reads the canvas. Its one network use is the stepped view's "Next hop" past the loaded
+ * graph, through the host's `fetchNeighbors` (the call Expand Neighbors uses).
  *
  * @param {Object} options
  * @param {Object} options.cytoscape - useCytoscape return value (cy ref + helpers)
+ * @param {function} [options.fetchNeighbors] - async (nodeId) => neighbour rows; null = no fetch past the loaded graph
+ * @param {function} [options.addNeighbors] - (nodeId, rows) => ids, puts fetched rows on the canvas
+ * @param {Object} [options.rootRef] - the explorer's root element: Escape counts only from inside it (or from the page)
+ * @param {boolean} [options.active] - false while the explorer's tab is hidden: Escape is ignored
  */
-export function useMultiHopReplay({ cytoscape }) {
+export function useMultiHopReplay({ cytoscape, fetchNeighbors = null, addNeighbors = null, rootRef = null, active = true }) {
   const [replayState, setReplayState] = useState('idle');
   const [replayMode, setReplayMode] = useState(null); // 'step' | 'retrieval' | null
   const [activeHop, setActiveHop] = useState(-1);
@@ -100,6 +112,15 @@ export function useMultiHopReplay({ cytoscape }) {
   const [frameCount, setFrameCount] = useState(0);
   const [step, setStep] = useState(null); // stepped explore: { seedId, active, total, added, capped }
   const stepFramesRef = useRef([]);
+  const stepRef = useRef(null); // the step state as of now, for handlers called between renders
+  // The current stepped exploration: seed, ids forced into a hop by a fetch, nodes already fetched
+  // (never fetched again), and fetched rows waiting for the user's "Next hop".
+  const exploreRef = useRef(null);
+  // Bumped by every new view (explore, retrieval replay, Show all): a pending fetch for an older one
+  // adds its data but draws nothing.
+  const generationRef = useRef(0);
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const revealedRef = useRef(new Set());
   const cancelRef = useRef(false);
   const timersRef = useRef([]);
@@ -169,55 +190,156 @@ export function useMultiHopReplay({ cytoscape }) {
   }, [cytoscape, clearTimers]);
 
   /**
-   * Stepped explore: dim the graph and show only `seedId`, then the user walks outward with
-   * `nextHop` / `prevHop`. `toHop` reveals that many steps at once (Expand Neighbors shows its one
-   * hop with `toHop: 1`). Nothing plays by itself.
+   * Show `frames` at step `active`. `redraw` repaints from scratch (dim all, reveal 0..active);
+   * otherwise the caller has revealed the new frame itself. What the server may hold beyond the
+   * last step (`more`) is kept only while the step and its frontier are unchanged.
    */
-  const startReplay = useCallback((seedId, { toHop = 0 } = {}) => {
+  const applyStep = useCallback((frames, active, capped, redraw) => {
     const cy = cytoscape?.cy?.current;
-    if (!cy || !seedId || !cy.getElementById(seedId).length) return;
-    clearTimers();
-    cancelRef.current = false;
-    const { hopNodeSets, capped } = hopSetsFromCanvas(cy, seedId);
-    const plan = buildReplayPlan(hopNodeSets, { seedNodeId: seedId });
-    stepFramesRef.current = plan.frames;
-    revealedRef.current = new Set();
-    dimAll(cy);
-    const active = Math.min(toHop, plan.frames.length - 1);
-    for (let i = 0; i <= active; i++) revealFrame(cy, plan.frames[i], revealedRef.current);
-    setHopStats(null);
-    setReplayMode('step');
-    setFrameCount(plan.frames.length);
-    setStep({ seedId, active, total: plan.frames.length - 1, added: plan.frames[active].nodeIds.length, capped });
+    const explore = exploreRef.current;
+    if (!cy || !explore) return;
+    stepFramesRef.current = frames;
+    if (redraw) {
+      revealedRef.current = new Set();
+      dimAll(cy);
+      for (let i = 0; i <= active; i++) revealFrame(cy, frames[i], revealedRef.current);
+    }
+    const prev = stepRef.current;
+    const total = frames.length - 1;
+    const same = prev && prev.active === active && prev.total === total && prev.frontier === frameKey(frames[active]);
+    const next = {
+      seedId: explore.seedId, active, total, added: frames[active].nodeIds.length, capped,
+      frontier: frameKey(frames[active]), more: same ? prev.more : (active === total ? 'idle' : null),
+    };
+    stepRef.current = next;
+    setStep(next);
+    setFrameCount(frames.length);
     setActiveHop(active);
-    setReplayState('stepping');
-  }, [cytoscape, clearTimers]);
+  }, [cytoscape]);
 
-  const showStep = useCallback((active) => {
-    const frames = stepFramesRef.current;
-    setStep((prev) => prev && { ...prev, active, added: frames[active].nodeIds.length });
-    setActiveHop(active);
+  const setMore = useCallback((more) => {
+    if (!stepRef.current) return;
+    stepRef.current = { ...stepRef.current, more };
+    setStep(stepRef.current);
   }, []);
 
-  /** One more step outward. */
+  /**
+   * Stepped explore: dim the graph and show only `seedId`, then the user walks outward with
+   * `nextHop` / `prevHop`. `toHop` reveals that many steps at once. Expand Neighbors passes
+   * `firstHop`, the ids its fetch returned: they are hop 1 whatever the node's neighbour count, and
+   * the seed counts as fetched. Nothing plays by itself.
+   */
+  const startReplay = useCallback((seedId, { toHop = 0, firstHop = null } = {}) => {
+    const cy = cytoscape?.cy?.current;
+    if (!cy || !seedId || !cy.getElementById(seedId).length) return;
+    generationRef.current++;
+    clearTimers();
+    cancelRef.current = false;
+    exploreRef.current = {
+      seedId,
+      forced: firstHop ? [[], firstHop] : [],
+      fetched: new Set(firstHop ? [seedId] : []),
+      pending: new Map(),
+    };
+    stepRef.current = null;
+    const { frames, capped } = planFromCanvas(cy, exploreRef.current);
+    setHopStats(null);
+    setReplayMode('step');
+    setReplayState('stepping');
+    applyStep(frames, Math.min(toHop, frames.length - 1), capped, true);
+  }, [cytoscape, clearTimers, applyStep]);
+
+  /**
+   * Re-plan the stepped view after the left-hand filters changed (the host calls this right after
+   * applying them), so "hop N of M" and "+k nodes" describe what the canvas shows. No-op when the
+   * steps are unchanged.
+   */
+  const refreshStep = useCallback(() => {
+    const cy = cytoscape?.cy?.current;
+    const s = stepRef.current;
+    const explore = exploreRef.current;
+    if (!cy || !s || !explore || !cy.getElementById(explore.seedId).length) return;
+    const { frames, capped } = planFromCanvas(cy, explore);
+    if (capped === s.capped && sameFrames(frames, stepFramesRef.current)) return;
+    applyStep(frames, Math.min(s.active, frames.length - 1), capped, true);
+  }, [cytoscape, applyStep]);
+
+  /** Ids the fetched rows would add: not yet in any step of this exploration. */
+  const pendingNewIds = useCallback(() => {
+    const shown = new Set(stepFramesRef.current.flatMap((f) => f.nodeIds));
+    const ids = [...exploreRef.current.pending.values()].flat().map((r) => r?.item_id);
+    return ids.filter((id) => id && !shown.has(id));
+  }, []);
+
+  /**
+   * At the last loaded step, ask the server what lies one step further: one request per frontier
+   * node not fetched before, at most FETCH_FRONTIER_LIMIT. The rows are held until "Next hop".
+   */
+  const probeMore = useCallback(async () => {
+    const explore = exploreRef.current;
+    const s = stepRef.current;
+    if (!explore || !s) return;
+    if (!fetchNeighbors || !addNeighbors) { setMore('off'); return; }
+    const frontier = stepFramesRef.current[s.active].nodeIds.filter((id) => !explore.fetched.has(id));
+    if (!frontier.length) { setMore(pendingNewIds().length ? 'available' : 'none'); return; }
+    if (frontier.length > FETCH_FRONTIER_LIMIT) { setMore('tooMany'); return; }
+    const generation = generationRef.current;
+    setMore('checking');
+    frontier.forEach((id) => explore.fetched.add(id));
+    try {
+      const results = await Promise.all(frontier.map(async (id) => [id, await fetchNeighbors(id)]));
+      if (generation !== generationRef.current) return;
+      for (const [id, rows] of results) if (rows.length) explore.pending.set(id, rows);
+      setMore(pendingNewIds().length ? 'available' : 'none');
+    } catch {
+      if (generation === generationRef.current) setMore('error');
+    }
+  }, [fetchNeighbors, addNeighbors, setMore, pendingNewIds]);
+
+  useEffect(() => {
+    if (step?.more === 'idle') probeMore();
+  }, [step, probeMore]);
+
+  /** Put the held rows on the canvas as the next hop and show it. */
+  const revealFetched = useCallback(() => {
+    const cy = cytoscape?.cy?.current;
+    const explore = exploreRef.current;
+    const s = stepRef.current;
+    const ids = [];
+    for (const [nodeId, rows] of explore.pending) ids.push(...addNeighbors(nodeId, rows));
+    explore.pending.clear();
+    const hop = s.active + 1;
+    explore.forced[hop] = [...(explore.forced[hop] || []), ...ids];
+    const { frames, capped } = planFromCanvas(cy, explore);
+    applyStep(frames, Math.min(hop, frames.length - 1), capped, true);
+  }, [cytoscape, addNeighbors, applyStep]);
+
+  /** One more step outward; past the loaded graph, the step the server sent. */
   const nextHop = useCallback(() => {
     const cy = cytoscape?.cy?.current;
-    const frames = stepFramesRef.current;
-    if (!cy || !step || step.active >= step.total) return;
-    revealFrame(cy, frames[step.active + 1], revealedRef.current);
-    showStep(step.active + 1);
-  }, [cytoscape, step, showStep]);
+    const s = stepRef.current;
+    if (!cy || !s) return;
+    if (s.active < s.total) {
+      revealFrame(cy, stepFramesRef.current[s.active + 1], revealedRef.current);
+      applyStep(stepFramesRef.current, s.active + 1, s.capped, false);
+    } else if (s.more === 'available') {
+      revealFetched();
+    }
+  }, [cytoscape, applyStep, revealFetched]);
 
   /** Hide the last step: rebuild the view one step shorter. */
   const prevHop = useCallback(() => {
-    const cy = cytoscape?.cy?.current;
-    const frames = stepFramesRef.current;
-    if (!cy || !step || step.active <= 0) return;
-    revealedRef.current = new Set();
-    dimAll(cy);
-    for (let i = 0; i < step.active; i++) revealFrame(cy, frames[i], revealedRef.current);
-    showStep(step.active - 1);
-  }, [cytoscape, step, showStep]);
+    const s = stepRef.current;
+    if (!s || s.active <= 0) return;
+    applyStep(stepFramesRef.current, s.active - 1, s.capped, true);
+  }, [applyStep]);
+
+  /** A new view or none: forget the exploration; a pending fetch for it draws nothing. */
+  const endExploration = useCallback(() => {
+    generationRef.current++;
+    exploreRef.current = null;
+    stepRef.current = null;
+  }, []);
 
   /**
    * Retrieval replay: reveal precomputed hop groups from a search result set.
@@ -233,9 +355,10 @@ export function useMultiHopReplay({ cytoscape }) {
     if (!cy) return;
     if (!Array.isArray(hopNodeSets) || hopNodeSets.length === 0) return;
 
+    endExploration();
     setHopStats(null);
     playPlan(buildReplayPlan(hopNodeSets), 'retrieval');
-  }, [cytoscape, playPlan]);
+  }, [cytoscape, playPlan, endExploration]);
 
   /**
    * Abandon a running replay WITHOUT the restore animation.
@@ -247,6 +370,7 @@ export function useMultiHopReplay({ cytoscape }) {
    * indicator — and if B never starts a replay of its own, nothing ever clears them.
    */
   const cancelReplay = useCallback(() => {
+    endExploration();
     cancelRef.current = true;
     clearTimers();
     setReplayState('idle');
@@ -263,9 +387,10 @@ export function useMultiHopReplay({ cytoscape }) {
         cy.elements().removeStyle(REPLAY_OWNED_STYLES);
       } catch (_) { /* canvas already gone */ }
     }
-  }, [cytoscape, clearTimers]);
+  }, [cytoscape, clearTimers, endExploration]);
 
   const stopReplay = useCallback(() => {
+    endExploration();
     cancelRef.current = true;
     clearTimers();
     setReplayState('idle');
@@ -303,7 +428,7 @@ export function useMultiHopReplay({ cytoscape }) {
         },
       );
     }
-  }, [cytoscape, clearTimers]);
+  }, [cytoscape, clearTimers, endExploration]);
 
   // While a stepped view is on, a click outside the lit set (empty canvas, a dimmed node or link) or
   // Escape brings back the full graph. Local to this hook: the shared canvas store is untouched.
@@ -318,8 +443,15 @@ export function useMultiHopReplay({ cytoscape }) {
       if (evt.target !== cy && lit(evt.target)) return;
       stopReplay();
     };
+    // Escape is this explorer's only while its tab is shown, and only from inside it or from no
+    // control at all (the page itself); a control elsewhere on the page keeps its own Escape.
     const onKey = (e) => {
       if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
+      if (!activeRef.current) return;
+      const root = rootRef?.current;
+      const doc = root?.ownerDocument;
+      const fromPage = !e.target || e.target === doc || e.target === doc?.body || e.target === doc?.documentElement;
+      if (root && !fromPage && !root.contains(e.target)) return;
       stopReplay();
     };
     cy.on('tap', onTap);
@@ -346,6 +478,9 @@ export function useMultiHopReplay({ cytoscape }) {
     frameCount,
     step,
     startReplay,
+    refreshStep,
+    viewGeneration: () => generationRef.current,
+    fetchFrontierLimit: FETCH_FRONTIER_LIMIT,
     nextHop,
     prevHop,
     showAll: stopReplay,

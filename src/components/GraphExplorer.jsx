@@ -216,18 +216,16 @@ function WorkspaceGraph({
   const [filterSnapshot, setFilterSnapshot] = useState(null);
   const filters = useGraphFilters(filterSnapshot?.nodes ?? nodes, filterSnapshot?.edges ?? edges, workspaceId);
 
+  // Counts cover every loaded item once: the graph's own plus what an expand or the stream added.
   const typeCounts = useMemo(() => {
     const counts = {};
-    for (const node of (nodes || [])) {
-      const t = node.type;
-      if (t) counts[t] = (counts[t] || 0) + 1;
-    }
-    for (const edge of (edges || [])) {
-      const t = edge.type;
-      if (t) counts[t] = (counts[t] || 0) + 1;
-    }
+    const add = (t) => { if (t) counts[t] = (counts[t] || 0) + 1; };
+    const nodeIds = new Set((nodes || []).map((node) => { add(node.type); return node.id; }));
+    for (const [id, { type }] of filters.streamedNodeMap) if (!nodeIds.has(id)) add(type);
+    const edgeKeys = new Set((edges || []).map((edge) => { add(edge.type); return `${edge.source}->${edge.target}:${edge.type}`; }));
+    for (const [key, type] of filters.streamedEdgeMap) if (!edgeKeys.has(key)) add(type);
     return counts;
-  }, [nodes, edges]);
+  }, [nodes, edges, filters.streamedNodeMap, filters.streamedEdgeMap]);
 
   const containerRef = useRef(null);
   const rootRef = useRef(null);
@@ -410,7 +408,8 @@ function WorkspaceGraph({
     onNodeOpen,
     manageCanvas: false,
     temporalUnavailable: daemon,
-    onNeighborsLoaded: (id) => multiHopRef.current?.startReplay(id, { toHop: 1 }),
+    onNeighborsLoaded: (id, ids) => multiHopRef.current?.startReplay(id, { toHop: 1, firstHop: ids }),
+    getViewToken: () => multiHopRef.current?.viewGeneration(),
   });
   const { snapshot, asOfTime, handleTimeTravel } = interaction;
   historicalRef.current = !!snapshot;
@@ -430,7 +429,13 @@ function WorkspaceGraph({
     lastTimeHash.current = urlState;
   }, [urlState, daemon, adapter?.getTemporalSnapshot, interaction.setTimeTravelOpen]);
 
-  const multiHop = useMultiHopReplay({ cytoscape });
+  const multiHop = useMultiHopReplay({
+    cytoscape,
+    fetchNeighbors: !snapshot ? interaction.fetchNeighborRows : null,
+    addNeighbors: interaction.addFetchedRows,
+    rootRef,
+    active,
+  });
   multiHopRef.current = multiHop;
 
   // Retrieval-hop replay (GRAPH-MULTIHOP-VIZ-1 G3).
@@ -579,6 +584,7 @@ function WorkspaceGraph({
   useEffect(() => {
     if (filterSnapshot !== snapshot) return;
     cytoscape.applyFilter(filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter);
+    multiHop.refreshStep(); // a stepped view re-plans on what the filters now show
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter, cytoscape.ready, filterSnapshot, snapshot]);
 

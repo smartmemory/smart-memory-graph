@@ -5,9 +5,19 @@
  */
 const BTN = 'px-2 py-0.5 text-xs rounded border border-cyan-300 dark:border-cyan-600 hover:bg-cyan-200 dark:hover:bg-cyan-800 disabled:opacity-40 disabled:cursor-not-allowed';
 
+/** What lies past the last loaded step, once the server was asked (or why it was not). */
+function moreText(more, limit) {
+  if (more === 'checking') return 'checking for more…';
+  if (more === 'none') return 'nothing further';
+  if (more === 'tooMany') return `more than ${limit} nodes at this step, expand one of them`;
+  if (more === 'error') return 'could not load the next step';
+  return null;
+}
+
 export default function HopStepper({ multiHop }) {
-  const { replayState, step, nextHop, prevHop, showAll, HOP_COLORS } = multiHop;
+  const { replayState, step, nextHop, prevHop, showAll, HOP_COLORS, fetchFrontierLimit } = multiHop;
   if (replayState !== 'stepping' || !step) return null;
+  const more = moreText(step.more, fetchFrontierLimit);
   const color = HOP_COLORS[step.active % HOP_COLORS.length];
   const added = step.active === 0
     ? (step.total === 0 ? 'start node, no connections' : 'start node')
@@ -24,7 +34,8 @@ export default function HopStepper({ multiHop }) {
         <span role="status" className="text-xs">hop {step.active} of {step.total}</span>
         <span className="text-xs opacity-80">{added}{step.capped ? ' (capped)' : ''}</span>
       </span>
-      <button type="button" onClick={nextHop} disabled={step.active >= step.total} className={BTN}>Next hop</button>
+      {more && <span className="text-xs opacity-80">{more}</span>}
+      <button type="button" onClick={nextHop} disabled={step.active >= step.total && step.more !== 'available'} className={BTN}>Next hop</button>
       <button type="button" onClick={showAll} className={`${BTN} font-medium`}>Show all</button>
     </div>
   );
