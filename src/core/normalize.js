@@ -3,6 +3,18 @@
  */
 
 /**
+ * The graph reader's one classifier: which left-hand filter family and type a raw item belongs to.
+ * The service's `node_category` (or an `entity_type`) marks an entity; otherwise it is a memory.
+ */
+export function classifyNode(item) {
+  const isEntity = item.node_category === 'entity' || item.category === 'entity' || !!item.entity_type;
+  const type = isEntity
+    ? (item.entity_type || item.memory_type || item.type || 'concept')
+    : (item.memory_type || item.type || 'semantic');
+  return { type, category: isEntity ? 'entity' : 'memory' };
+}
+
+/**
  * Convert /memory/graph/full API response to canonical GraphData.
  * Matches the logic from useGraphData.js:transformFullGraph (lines 9-66).
  */
@@ -73,11 +85,7 @@ export function normalizeAPIResponse(apiData) {
       groundedIds.add(id);
     }
 
-    const isEntity = item.node_category === 'entity' || item.category === 'entity' || !!item.entity_type;
-    const type = isEntity
-      ? (item.entity_type || item.memory_type || item.type || 'concept')
-      : (item.memory_type || item.type || 'semantic');
-    const category = isEntity ? 'entity' : 'memory';
+    const { type, category } = classifyNode(item);
 
     const origin = item.origin || item.properties?.origin || item.metadata?.origin || 'unknown';
 

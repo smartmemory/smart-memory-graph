@@ -2,7 +2,100 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { LAYOUT_OPTIONS } from '../core/constants';
 import { MEMORY_TYPE_SET } from '../core/graphColors';
 import { graphNodeToCyElement } from '../internal/cytoscapeConvert';
-import { normalizeAPIResponse } from '../core/normalize';
+import { normalizeAPIResponse, classifyNode } from '../core/normalize';
+
+/**
+ * Filter family and type of one neighbour row. An id the canvas already holds keeps the type the
+ * graph reader gave it; a new row is classified by the reader's own classifier when the service sent
+ * its category (`node_category`). Only a row with no category at all (an older service) falls back
+ * to the memory colour registry.
+ */
+function classifyNeighbor(item, cy) {
+  const loaded = cy?.getElementById(item.item_id);
+  if (loaded?.length && loaded.data('category')) {
+    return { type: loaded.data('type'), category: loaded.data('category') };
+  }
+  if (item.node_category || item.category || item.entity_type) return classifyNode(item);
+  const type = item.memory_type || 'semantic';
+  return { type, category: MEMORY_TYPE_SET.has(type) ? 'memory' : 'entity' };
+}
+
+/**
+ * Cytoscape elements for a neighbour response, plus the same items as plain nodes and edges for the
+ * left-hand filters (type, category, ids). A link the canvas already draws is left out of the elements.
+ */
+function neighborElements(nodeId, neighbors, cy) {
+  const cyElements = [];
+  const filterEls = [];
+  for (const item of neighbors) {
+    const id = item.item_id;
+    if (!id) continue;
+    const { type, category } = classifyNeighbor(item, cy);
+    const label = item.entity_name || item.content?.substring(0, 40) || id.substring(0, 12);
+    cyElements.push({ group: 'nodes', data: { id, label, type, category, content: item.content || '' } });
+
+    const edgeType = item.link_type || 'RELATES_TO';
+    const [source, target] = item.direction === 'incoming' ? [id, nodeId] : [nodeId, id];
+    filterEls.push({ id, type, category }, { source, target, type: edgeType });
+    // The loaded graph may already draw this link under its own id: a second copy would double the
+    // connection list and the highlight.
+    if (cy?.edges(`[source = "${source}"][target = "${target}"][type = "${edgeType}"]`).length) continue;
+    cyElements.push({
+      group: 'edges',
+      data: { id: `${source}->${target}:${edgeType}`, source, target, label: edgeType, type: edgeType },
+    });
+  }
+  return { cyElements, filterEls };
+}
+
+/**
+ * A fetch must never leave its result hidden by a left-hand filter: register the items, switch their
+ * types on (nothing else changes), and un-hide them now rather than after the next render, so the
+ * hop view drawn right after can see them. A link is matched by its type too: a parallel link of a
+ * type the user switched off stays hidden.
+ */
+function showFetchedNeighbors(cytoscape, filters, filterEls) {
+  filters?.revealTypes?.(filterEls);
+  const cy = cytoscape.cy?.current;
+  if (!cy) return;
+  for (const el of filterEls) {
+    const found = 'source' in el
+      ? cy.edges(`[source = "${el.source}"][target = "${el.target}"][type = "${el.type}"]`)
+      : cy.getElementById(el.id);
+    found.removeClass('dimmed');
+  }
+}
+
+/** New neighbours start on a circle around the node they were fetched for; placed ones stay put. */
+function placeRadially(cy, nodeId, ids) {
+  const origin = cy?.getElementById(nodeId);
+  if (!origin?.length) return;
+  const pos = origin.position();
+  const angle = (2 * Math.PI) / (ids.length || 1);
+  ids.forEach((nid, i) => {
+    const node = cy.getElementById(nid);
+    if (!node.length) return;
+    const nodePos = node.position();
+    if (nodePos.x !== 0 || nodePos.y !== 0) return;
+    node.position({ x: pos.x + 120 * Math.cos(angle * i), y: pos.y + 120 * Math.sin(angle * i) });
+  });
+}
+
+/**
+ * Put a neighbour response on the canvas: add what is new, switch its filter types on, place it.
+ * Returns the ids the response named (already-loaded ones included). Shared by Expand Neighbors and
+ * the hop view's "Next hop" at the end of the loaded graph: one call, one way of adding.
+ */
+export function addNeighborRows(cytoscape, filters, nodeId, rows) {
+  const { cyElements: newCyElements, filterEls } = neighborElements(nodeId, rows, cytoscape.cy?.current);
+  // The radial placement is the layout for an expand: opt out of the count re-layout, which would
+  // re-run the whole layout ~250 ms later and replace it.
+  cytoscape.addElements(newCyElements, { relayout: false });
+  showFetchedNeighbors(cytoscape, filters, filterEls);
+  const ids = [...new Set(rows.map((n) => n.item_id).filter(Boolean))];
+  placeRadially(cytoscape.cy?.current, nodeId, ids);
+  return ids;
+}
 
 /**
  * Node interaction logic extracted from GraphExplorer.jsx:307-586 (R1).
@@ -19,6 +112,8 @@ import { normalizeAPIResponse } from '../core/normalize';
  * @param {function} options.refresh - from useGraphData
  * @param {function} options.getShareableUrl - from useUrlState
  * @param {function} options.saveToUrl - from useUrlState
+ * @param {function} [options.onNeighborsLoaded] - (nodeId, ids) after an expand landed on the canvas; the host shows that one hop
+ * @param {function} [options.getViewToken] - the host's exploration generation; a change while an expand is pending drops its view
  */
 export function useGraphInteraction({
   cytoscape,
@@ -34,6 +129,8 @@ export function useGraphInteraction({
   onNodeOpen,
   manageCanvas = true,
   temporalUnavailable = false,
+  onNeighborsLoaded,
+  getViewToken,
 }) {
   // Time travel is hidden until fully built: with it off, a past time in the URL is ignored (live graph).
   const urlState = enableTimeTravel ? rawUrlState : (rawUrlState ? { ...rawUrlState, asOfTime: undefined } : rawUrlState);
@@ -48,6 +145,13 @@ export function useGraphInteraction({
   const [snapshot, setSnapshot] = useState(null);
   const [timeTravelError, setTimeTravelError] = useState(null);
   const snapshotRequest = useRef(0);
+  // Bumped whenever the selected node changes: a pending Expand draws its view only if it has not.
+  const viewRef = useRef(0);
+  const selectedIdRef = useRef(null);
+  const noteSelection = (id) => {
+    if (selectedIdRef.current !== id) viewRef.current++;
+    selectedIdRef.current = id;
+  };
   useEffect(() => () => { snapshotRequest.current++; }, [adapter]);
   const [timeTravelOpen, setTimeTravelOpen] = useState(!!urlState?.asOfTime);
   const [asOfTime, setAsOfTime] = useState(null);
@@ -59,6 +163,7 @@ export function useGraphInteraction({
 
   // Single click: select node + highlight neighbors + open detail panel
   const selectNode = useCallback((nodeData) => {
+    noteSelection(nodeData.id);
     setExpandStatus(null);
     setSelectedNode(nodeData);
     setDetailPanelOpen(true);
@@ -94,6 +199,7 @@ export function useGraphInteraction({
       onNodeOpen(nodeData);
       return;
     }
+    noteSelection(nodeData.id);
     setExpandStatus(null);
     setSelectedNode(nodeData);
     setDetailPanelOpen(true);
@@ -124,10 +230,13 @@ export function useGraphInteraction({
     cytoscape.setOnNodeDblClick(handleNodeDblClick);
   }, [handleNodeDblClick, cytoscape]);
 
-  // Expand neighbors
+  // Expand neighbors. The data always lands; the one-hop view is drawn only if the user is still on
+  // the view they asked from (same selection, no newer exploration), so a late response never
+  // replaces what they moved on to.
   const handleExpand = useCallback(async (nodeId) => {
     if (!adapter?.getNeighbors) return;
     const context = snapshotRequest.current;
+    const view = [viewRef.current, getViewToken?.()];
     setExpanding(true);
     setExpandStatus(null);
     try {
@@ -139,57 +248,9 @@ export function useGraphInteraction({
         setExpandStatus({ nodeId, message: 'No neighbors found.' });
         return;
       }
-
-      const newCyElements = [];
-      for (const item of neighbors) {
-        const id = item.item_id;
-        if (!id) continue;
-        const type = item.memory_type || 'semantic';
-        const label = item.content?.substring(0, 40) || id.substring(0, 12);
-        const category = MEMORY_TYPE_SET.has(type) ? 'memory' : 'entity';
-
-        newCyElements.push({
-          group: 'nodes',
-          data: { id, label, type, category, content: item.content || '' },
-        });
-
-        const edgeType = item.link_type || 'RELATES_TO';
-        const [source, target] = item.direction === 'incoming' ? [id, nodeId] : [nodeId, id];
-        newCyElements.push({
-          group: 'edges',
-          data: { id: `${source}->${target}:${edgeType}`, source, target, label: edgeType, type: edgeType },
-        });
-      }
-
-      // The radial placement below is the layout for an expand: opt out of the count re-layout,
-      // which would re-run the whole layout ~250 ms later and replace it.
-      cytoscape.addElements(newCyElements, { relayout: false });
-
-      // Position new nodes radially
-      const cy = cytoscape.cy.current;
-      if (cy) {
-        const origin = cy.getElementById(nodeId);
-        if (origin.length) {
-          const pos = origin.position();
-          const newNodeIds = neighbors.map((n) => n.item_id).filter(Boolean);
-          const count = newNodeIds.length || 1;
-          const angle = (2 * Math.PI) / count;
-          newNodeIds.forEach((nid, i) => {
-            const node = cy.getElementById(nid);
-            if (node.length) {
-              const nodePos = node.position();
-              if (nodePos.x === 0 && nodePos.y === 0) {
-                node.position({
-                  x: pos.x + 120 * Math.cos(angle * i),
-                  y: pos.y + 120 * Math.sin(angle * i),
-                });
-              }
-            }
-          });
-        }
-      }
-
+      const ids = addNeighborRows(cytoscape, filters, nodeId, neighbors);
       setExpandStatus({ nodeId, message: `Loaded ${neighbors.length} neighbor links.` });
+      if (view[0] === viewRef.current && view[1] === getViewToken?.()) onNeighborsLoaded?.(nodeId, ids);
     } catch {
       if (context === snapshotRequest.current) {
         setExpandStatus({ nodeId, error: true, message: 'Could not expand neighbors.' });
@@ -197,7 +258,19 @@ export function useGraphInteraction({
     } finally {
       setExpanding(false);
     }
-  }, [adapter, cytoscape]);
+  }, [adapter, cytoscape, filters, onNeighborsLoaded, getViewToken]);
+
+  // The hop view's "Next hop" past the loaded graph: the same fetch as Expand, read now, added later.
+  const fetchNeighborRows = useCallback(async (nodeId) => {
+    const res = await adapter.getNeighbors(nodeId);
+    const rows = res?.neighbors || [];
+    if (!Array.isArray(rows)) throw new Error('Invalid neighbor response.');
+    return rows;
+  }, [adapter]);
+  const addFetchedRows = useCallback(
+    (nodeId, rows) => addNeighborRows(cytoscape, filters, nodeId, rows),
+    [cytoscape, filters],
+  );
 
   useEffect(() => {
     if (!expandStatus?.error && selectedNode?.id && expandStatus?.nodeId === selectedNode.id) {
@@ -320,6 +393,7 @@ export function useGraphInteraction({
   }, [data?.nodes?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const closeDetailPanel = useCallback(() => {
+    noteSelection(null);
     setDetailPanelOpen(false);
     setSelectedNode(null);
     setConnectedEdges([]);
@@ -347,6 +421,8 @@ export function useGraphInteraction({
     handleNodeDblClick,
     handleNodeUpdate,
     handleExpand,
+    fetchNeighborRows: adapter?.getNeighbors ? fetchNeighborRows : null,
+    addFetchedRows,
     handleRefresh,
     handleLayoutChange,
     handleSearch,

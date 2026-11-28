@@ -12,6 +12,19 @@ function resolveActiveTypes(state, available) {
   return new Set(available.filter((t) => !state.hidden.has(t)));
 }
 
+// Switch types ON without touching any other choice: `null` (all on) stays, `{ hidden }` drops them,
+// `{ only }` gains them.
+function enableTypesState(state, types) {
+  if (state === null || types.length === 0) return state;
+  const key = state.only ? 'only' : 'hidden';
+  const next = new Set(state[key]);
+  for (const type of types) {
+    if (state.only) next.add(type);
+    else next.delete(type);
+  }
+  return { [key]: next };
+}
+
 function toggleTypeState(state, type) {
   if (state === null) return { hidden: new Set([type]) };
   const key = state.only ? 'only' : 'hidden';
@@ -135,6 +148,8 @@ export function useGraphFilters(nodes, edges, persistKey) {
   // Streamed types/nodes (not in the initial arrays)
   const [streamedTypes, setStreamedTypes] = useState({ memory: new Set(), entity: new Set(), relation: new Set() });
   const [streamedNodeMap, setStreamedNodeMap] = useState(new Map());
+  // Streamed links by `source->target:type`, so the filter counts include them once (L1).
+  const [streamedEdgeMap, setStreamedEdgeMap] = useState(new Map());
   const [cascadeEdgeFilter, setCascadeEdgeFilter] = useState(() => {
     try {
       const stored = localStorage.getItem('graph:cascadeEdgeFilter');
@@ -177,6 +192,14 @@ export function useGraphFilters(nodes, edges, persistKey) {
         }
       }
       return changed ? next : prev;
+    });
+
+    setStreamedEdgeMap((prev) => {
+      const fresh = els.filter((el) => 'source' in el && !prev.has(`${el.source}->${el.target}:${el.type}`));
+      if (!fresh.length) return prev;
+      const next = new Map(prev);
+      for (const el of fresh) next.set(`${el.source}->${el.target}:${el.type}`, el.type);
+      return next;
     });
   }, []);
 
@@ -244,6 +267,16 @@ export function useGraphFilters(nodes, edges, persistKey) {
   const toggleEntityType = useCallback((type) => setEntityTypeState((prev) => toggleTypeState(prev, type)), []);
   const toggleRelationType = useCallback((type) => setRelationTypeState((prev) => toggleTypeState(prev, type)), []);
 
+  // Expand Neighbors: what a fetch brought in must be visible. Register it (so it counts as a
+  // known node) and switch its types on; every other choice the user made stays as it was.
+  const revealTypes = useCallback((els) => {
+    const typesOf = (pick) => [...new Set(els.filter(pick).map((el) => el.type))];
+    registerStreamedElements(els);
+    setMemoryTypeState((prev) => enableTypesState(prev, typesOf((el) => !('source' in el) && el.category === 'memory')));
+    setEntityTypeState((prev) => enableTypesState(prev, typesOf((el) => !('source' in el) && el.category === 'entity')));
+    setRelationTypeState((prev) => enableTypesState(prev, typesOf((el) => 'source' in el)));
+  }, [registerStreamedElements]);
+
   const selectAllMemoryTypes = useCallback(() => setMemoryTypeState(() => null), []);
   const deselectAllMemoryTypes = useCallback(() => setMemoryTypeState(() => ({ only: new Set() })), []);
   const selectAllEntityTypes = useCallback(() => setEntityTypeState(() => null), []);
@@ -278,6 +311,9 @@ export function useGraphFilters(nodes, edges, persistKey) {
     selectAllRelationTypes,
     deselectAllRelationTypes,
     registerStreamedElements,
+    streamedNodeMap,
+    streamedEdgeMap,
+    revealTypes,
     cascadeEdgeFilter,
     toggleCascadeEdgeFilter: () =>
       setCascadeEdgeFilter((prev) => {

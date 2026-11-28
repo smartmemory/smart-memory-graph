@@ -230,32 +230,6 @@ export default function DetailPanel({ node, rippleCanvas, edges = [], onClose, o
           />
         )}
 
-        {/* Expand neighbors button */}
-        {(onExpand || readOnlyReason) && (
-          <button
-            onClick={() => onExpand(node.id)}
-            disabled={expanding || !!readOnlyReason}
-            title={readOnlyReason || undefined}
-            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-blue-600/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-600/30 rounded-lg hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            {expanding ? (
-              <>
-                <div className="w-3 h-3 border-2 border-blue-300 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
-                Expanding...
-              </>
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                </svg>
-                Expand Neighbors
-              </>
-            )}
-          </button>
-        )}
-
-        {expandStatus && <p role={expandStatus.error ? 'alert' : 'status'} className="text-xs">{expandStatus.message}</p>}
-
         {/* Multi-hop replay button */}
         {onHopReplay && (
           <button
@@ -317,6 +291,32 @@ export default function DetailPanel({ node, rippleCanvas, edges = [], onClose, o
             toolsEnabled={enableDecisionTools}
           />
         )}
+
+        {/* Expand neighbors button */}
+        {(onExpand || readOnlyReason) && (
+          <button
+            onClick={() => onExpand(node.id)}
+            disabled={expanding || !!readOnlyReason}
+            title={readOnlyReason || undefined}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium bg-blue-600/20 text-blue-700 dark:text-blue-400 border border-blue-300 dark:border-blue-600/30 rounded-lg hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {expanding ? (
+              <>
+                <div className="w-3 h-3 border-2 border-blue-300 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
+                Expanding...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                </svg>
+                Expand Neighbors
+              </>
+            )}
+          </button>
+        )}
+
+        {expandStatus && <p role={expandStatus.error ? 'alert' : 'status'} className="text-xs">{expandStatus.message}</p>}
 
         {/* Connected Edges */}
         {edges.length > 0 && (

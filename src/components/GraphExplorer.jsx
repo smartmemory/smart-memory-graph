@@ -9,6 +9,7 @@ import SearchBar from './SearchBar';
 import TimeTravelSlider from './TimeTravelSlider';
 import OperationsBar from './OperationsBar';
 import ReplayButton from './ReplayButton';
+import HopStepper from './HopStepper';
 import OriginLegend from './OriginLegend';
 import { useCytoscape } from '../internal/useCytoscape';
 import { useDaemonCapabilities } from '../hooks/useDaemonCapabilities';
@@ -215,18 +216,16 @@ function WorkspaceGraph({
   const [filterSnapshot, setFilterSnapshot] = useState(null);
   const filters = useGraphFilters(filterSnapshot?.nodes ?? nodes, filterSnapshot?.edges ?? edges, workspaceId);
 
+  // Counts cover every loaded item once: the graph's own plus what an expand or the stream added.
   const typeCounts = useMemo(() => {
     const counts = {};
-    for (const node of (nodes || [])) {
-      const t = node.type;
-      if (t) counts[t] = (counts[t] || 0) + 1;
-    }
-    for (const edge of (edges || [])) {
-      const t = edge.type;
-      if (t) counts[t] = (counts[t] || 0) + 1;
-    }
+    const add = (t) => { if (t) counts[t] = (counts[t] || 0) + 1; };
+    const nodeIds = new Set((nodes || []).map((node) => { add(node.type); return node.id; }));
+    for (const [id, { type }] of filters.streamedNodeMap) if (!nodeIds.has(id)) add(type);
+    const edgeKeys = new Set((edges || []).map((edge) => { add(edge.type); return `${edge.source}->${edge.target}:${edge.type}`; }));
+    for (const [key, type] of filters.streamedEdgeMap) if (!edgeKeys.has(key)) add(type);
     return counts;
-  }, [nodes, edges]);
+  }, [nodes, edges, filters.streamedNodeMap, filters.streamedEdgeMap]);
 
   const containerRef = useRef(null);
   const rootRef = useRef(null);
@@ -394,6 +393,7 @@ function WorkspaceGraph({
   streamRef.current = stream;
 
   // Drip-feed animation
+  const multiHopRef = useRef(null); // Expand Neighbors shows its hop through the hop view, built just below
   const interaction = useGraphInteraction({
     cytoscape,
     adapter,
@@ -408,6 +408,8 @@ function WorkspaceGraph({
     onNodeOpen,
     manageCanvas: false,
     temporalUnavailable: daemon,
+    onNeighborsLoaded: (id, ids) => multiHopRef.current?.startReplay(id, { toHop: 1, firstHop: ids }),
+    getViewToken: () => multiHopRef.current?.viewGeneration(),
   });
   const { snapshot, asOfTime, handleTimeTravel } = interaction;
   historicalRef.current = !!snapshot;
@@ -429,8 +431,12 @@ function WorkspaceGraph({
 
   const multiHop = useMultiHopReplay({
     cytoscape,
-    graphData: { nodes, edges },
+    fetchNeighbors: !snapshot ? interaction.fetchNeighborRows : null,
+    addNeighbors: interaction.addFetchedRows,
+    rootRef,
+    active,
   });
+  multiHopRef.current = multiHop;
 
   // Retrieval-hop replay (GRAPH-MULTIHOP-VIZ-1 G3).
   // Held in a ref so the autoplay effect below depends only on `autoReplayKey` —
@@ -578,6 +584,7 @@ function WorkspaceGraph({
   useEffect(() => {
     if (filterSnapshot !== snapshot) return;
     cytoscape.applyFilter(filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter);
+    multiHop.refreshStep(); // a stepped view re-plans on what the filters now show
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.visibleNodeIds, filters.activeEdgeTypes, filters.cascadeEdgeFilter, cytoscape.ready, filterSnapshot, snapshot]);
 
@@ -951,7 +958,7 @@ function WorkspaceGraph({
               onExpand={!snapshot && adapter?.getNeighbors ? interaction.handleExpand : undefined}
               expandStatus={interaction.expandStatus}
               expanding={interaction.expanding}
-              onHopReplay={!snapshot ? (nodeId) => multiHop.replayState === 'playing' ? multiHop.stopReplay() : multiHop.startReplay(nodeId) : undefined}
+              onHopReplay={!snapshot ? (nodeId) => multiHop.startReplay(nodeId) : undefined}
               hopReplayState={multiHop.replayState}
               onNodeUpdate={interaction.handleNodeUpdate}
               onDelete={!snapshot && adapter && !deleteUnavailable ? handleDeleteNode : undefined}
@@ -992,8 +999,10 @@ function WorkspaceGraph({
         </p>
       )}
 
-      {/* Multi-hop replay indicator */}
-      {multiHop.replayState !== 'idle' && (
+      <HopStepper multiHop={multiHop} />
+
+      {/* Retrieval replay indicator */}
+      {multiHop.replayState !== 'idle' && multiHop.replayState !== 'stepping' && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-100 dark:bg-cyan-900/90 border border-cyan-300 dark:border-cyan-600 text-cyan-700 dark:text-cyan-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-3">
           {multiHop.replayState === 'playing' && (
             <div className="w-3 h-3 border-2 border-cyan-300 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
@@ -1014,7 +1023,7 @@ function WorkspaceGraph({
                   style={{ backgroundColor: multiHop.HOP_COLORS[i % multiHop.HOP_COLORS.length] }}
                 />
                 <span className="text-xs">
-                  {multiHop.replayMode === 'bfs' && i === 0 ? 'start' : `hop ${i}`}
+                  {`hop ${i}`}
                 </span>
               </div>
             ))}
