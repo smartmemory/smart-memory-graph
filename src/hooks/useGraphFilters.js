@@ -12,6 +12,19 @@ function resolveActiveTypes(state, available) {
   return new Set(available.filter((t) => !state.hidden.has(t)));
 }
 
+// Switch types ON without touching any other choice: `null` (all on) stays, `{ hidden }` drops them,
+// `{ only }` gains them.
+function enableTypesState(state, types) {
+  if (state === null || types.length === 0) return state;
+  const key = state.only ? 'only' : 'hidden';
+  const next = new Set(state[key]);
+  for (const type of types) {
+    if (state.only) next.add(type);
+    else next.delete(type);
+  }
+  return { [key]: next };
+}
+
 function toggleTypeState(state, type) {
   if (state === null) return { hidden: new Set([type]) };
   const key = state.only ? 'only' : 'hidden';
@@ -244,6 +257,16 @@ export function useGraphFilters(nodes, edges, persistKey) {
   const toggleEntityType = useCallback((type) => setEntityTypeState((prev) => toggleTypeState(prev, type)), []);
   const toggleRelationType = useCallback((type) => setRelationTypeState((prev) => toggleTypeState(prev, type)), []);
 
+  // Expand Neighbors: what a fetch brought in must be visible. Register it (so it counts as a
+  // known node) and switch its types on; every other choice the user made stays as it was.
+  const revealTypes = useCallback((els) => {
+    const typesOf = (pick) => [...new Set(els.filter(pick).map((el) => el.type))];
+    registerStreamedElements(els);
+    setMemoryTypeState((prev) => enableTypesState(prev, typesOf((el) => !('source' in el) && el.category === 'memory')));
+    setEntityTypeState((prev) => enableTypesState(prev, typesOf((el) => !('source' in el) && el.category === 'entity')));
+    setRelationTypeState((prev) => enableTypesState(prev, typesOf((el) => 'source' in el)));
+  }, [registerStreamedElements]);
+
   const selectAllMemoryTypes = useCallback(() => setMemoryTypeState(() => null), []);
   const deselectAllMemoryTypes = useCallback(() => setMemoryTypeState(() => ({ only: new Set() })), []);
   const selectAllEntityTypes = useCallback(() => setEntityTypeState(() => null), []);
@@ -278,6 +301,7 @@ export function useGraphFilters(nodes, edges, persistKey) {
     selectAllRelationTypes,
     deselectAllRelationTypes,
     registerStreamedElements,
+    revealTypes,
     cascadeEdgeFilter,
     toggleCascadeEdgeFilter: () =>
       setCascadeEdgeFilter((prev) => {

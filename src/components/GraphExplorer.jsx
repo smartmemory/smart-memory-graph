@@ -395,6 +395,7 @@ function WorkspaceGraph({
   streamRef.current = stream;
 
   // Drip-feed animation
+  const multiHopRef = useRef(null); // Expand Neighbors shows its hop through the hop view, built just below
   const interaction = useGraphInteraction({
     cytoscape,
     adapter,
@@ -409,6 +410,7 @@ function WorkspaceGraph({
     onNodeOpen,
     manageCanvas: false,
     temporalUnavailable: daemon,
+    onNeighborsLoaded: (id) => multiHopRef.current?.startReplay(id, { toHop: 1 }),
   });
   const { snapshot, asOfTime, handleTimeTravel } = interaction;
   historicalRef.current = !!snapshot;
@@ -429,6 +431,7 @@ function WorkspaceGraph({
   }, [urlState, daemon, adapter?.getTemporalSnapshot, interaction.setTimeTravelOpen]);
 
   const multiHop = useMultiHopReplay({ cytoscape });
+  multiHopRef.current = multiHop;
 
   // Retrieval-hop replay (GRAPH-MULTIHOP-VIZ-1 G3).
   // Held in a ref so the autoplay effect below depends only on `autoReplayKey` —

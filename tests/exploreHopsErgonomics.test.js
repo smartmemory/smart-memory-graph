@@ -223,18 +223,21 @@ describe('1. Expand Neighbors is one hop, shown on the graph', () => {
     const nodesBefore = cy().nodes().length;
     await click(btn('Expand Neighbors'));
     expect(cy().nodes().length).toBe(nodesBefore + 1); // x1 only, c is not duplicated
+    // the link b-c is already drawn: the response's copy of it is not added again
+    expect(cy().edges().filter((e) => [e.source().id(), e.target().id()].sort().join() === 'b,c').length).toBe(1);
+    expect(panelText()).toContain('Connections (4)'); // a, c, p1 and the new x1
     expect(cy().getElementById('b-x1:LOCATED_AT').length + cy().edges('[target = "x1"]').length).toBeGreaterThan(0);
     expect(lit('x1')).toBe(true);
     expect(lit('b')).toBe(true);
     expect(lit('c')).toBe(true);
     expect(lit('d')).toBe(false);
     expect(lit('ep')).toBe(false);
-    // the same reveal code: hop 1 border colour from the shared hop palette
-    expect(cy().getElementById('x1').style('border-color')).toBe(
-      cy().getElementById('p1').style('border-color'),
-    );
-    expect(cy().getElementById('x1').style('border-color').toLowerCase()).not.toBe('');
-    expect(HOP_COLORS.length).toBeGreaterThan(1);
+    // the same reveal code as Explore Hops: hop 1 takes the hop palette's second colour
+    await wait(1500); // jsdom steps animations slowly; let the fade finish
+    const rgb = (hex) => `rgb(${[1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).join(',')})`;
+    expect(cy().getElementById('x1').style('border-color')).toBe(rgb(HOP_COLORS[1]));
+    expect(cy().getElementById('p1').style('border-color')).toBe(rgb(HOP_COLORS[1]));
+    expect(cy().getElementById('b').style('border-color')).toBe(rgb(HOP_COLORS[0]));
     expect(btn('Show all')).toBeDefined();
   });
 

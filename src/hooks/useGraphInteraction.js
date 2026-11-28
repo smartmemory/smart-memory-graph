@@ -5,6 +5,50 @@ import { graphNodeToCyElement } from '../internal/cytoscapeConvert';
 import { normalizeAPIResponse } from '../core/normalize';
 
 /**
+ * Cytoscape elements for a neighbour response, plus the same items as plain nodes and edges for the
+ * left-hand filters (type, category, ids). A link the canvas already draws is left out of the elements.
+ */
+function neighborElements(nodeId, neighbors, cy) {
+  const cyElements = [];
+  const filterEls = [];
+  for (const item of neighbors) {
+    const id = item.item_id;
+    if (!id) continue;
+    const type = item.memory_type || 'semantic';
+    const label = item.content?.substring(0, 40) || id.substring(0, 12);
+    const category = MEMORY_TYPE_SET.has(type) ? 'memory' : 'entity';
+    cyElements.push({ group: 'nodes', data: { id, label, type, category, content: item.content || '' } });
+
+    const edgeType = item.link_type || 'RELATES_TO';
+    const [source, target] = item.direction === 'incoming' ? [id, nodeId] : [nodeId, id];
+    filterEls.push({ id, type, category }, { source, target, type: edgeType });
+    // The loaded graph may already draw this link under its own id: a second copy would double the
+    // connection list and the highlight.
+    if (cy?.edges(`[source = "${source}"][target = "${target}"][type = "${edgeType}"]`).length) continue;
+    cyElements.push({
+      group: 'edges',
+      data: { id: `${source}->${target}:${edgeType}`, source, target, label: edgeType, type: edgeType },
+    });
+  }
+  return { cyElements, filterEls };
+}
+
+/**
+ * A fetch must never leave its result hidden by a left-hand filter: register the items, switch their
+ * types on (nothing else changes), and un-hide them now rather than after the next render, so the
+ * hop view drawn right after can see them.
+ */
+function showFetchedNeighbors(cytoscape, filters, filterEls) {
+  filters?.revealTypes?.(filterEls);
+  const cy = cytoscape.cy?.current;
+  if (!cy) return;
+  for (const el of filterEls) {
+    const found = 'source' in el ? cy.edges(`[source = "${el.source}"][target = "${el.target}"]`) : cy.getElementById(el.id);
+    found.removeClass('dimmed');
+  }
+}
+
+/**
  * Node interaction logic extracted from GraphExplorer.jsx:307-586 (R1).
  * Handles selection, path finding, neighbor expansion, time travel, LOD clustering,
  * clipboard, and URL state restoration.
@@ -19,6 +63,7 @@ import { normalizeAPIResponse } from '../core/normalize';
  * @param {function} options.refresh - from useGraphData
  * @param {function} options.getShareableUrl - from useUrlState
  * @param {function} options.saveToUrl - from useUrlState
+ * @param {function} [options.onNeighborsLoaded] - (nodeId) after an expand landed on the canvas; the host shows that one hop
  */
 export function useGraphInteraction({
   cytoscape,
@@ -34,6 +79,7 @@ export function useGraphInteraction({
   onNodeOpen,
   manageCanvas = true,
   temporalUnavailable = false,
+  onNeighborsLoaded,
 }) {
   // Time travel is hidden until fully built: with it off, a past time in the URL is ignored (live graph).
   const urlState = enableTimeTravel ? rawUrlState : (rawUrlState ? { ...rawUrlState, asOfTime: undefined } : rawUrlState);
@@ -140,30 +186,12 @@ export function useGraphInteraction({
         return;
       }
 
-      const newCyElements = [];
-      for (const item of neighbors) {
-        const id = item.item_id;
-        if (!id) continue;
-        const type = item.memory_type || 'semantic';
-        const label = item.content?.substring(0, 40) || id.substring(0, 12);
-        const category = MEMORY_TYPE_SET.has(type) ? 'memory' : 'entity';
-
-        newCyElements.push({
-          group: 'nodes',
-          data: { id, label, type, category, content: item.content || '' },
-        });
-
-        const edgeType = item.link_type || 'RELATES_TO';
-        const [source, target] = item.direction === 'incoming' ? [id, nodeId] : [nodeId, id];
-        newCyElements.push({
-          group: 'edges',
-          data: { id: `${source}->${target}:${edgeType}`, source, target, label: edgeType, type: edgeType },
-        });
-      }
+      const { cyElements: newCyElements, filterEls } = neighborElements(nodeId, neighbors, cytoscape.cy?.current);
 
       // The radial placement below is the layout for an expand: opt out of the count re-layout,
       // which would re-run the whole layout ~250 ms later and replace it.
       cytoscape.addElements(newCyElements, { relayout: false });
+      showFetchedNeighbors(cytoscape, filters, filterEls);
 
       // Position new nodes radially
       const cy = cytoscape.cy.current;
@@ -190,6 +218,7 @@ export function useGraphInteraction({
       }
 
       setExpandStatus({ nodeId, message: `Loaded ${neighbors.length} neighbor links.` });
+      onNeighborsLoaded?.(nodeId);
     } catch {
       if (context === snapshotRequest.current) {
         setExpandStatus({ nodeId, error: true, message: 'Could not expand neighbors.' });
@@ -197,7 +226,7 @@ export function useGraphInteraction({
     } finally {
       setExpanding(false);
     }
-  }, [adapter, cytoscape]);
+  }, [adapter, cytoscape, filters, onNeighborsLoaded]);
 
   useEffect(() => {
     if (!expandStatus?.error && selectedNode?.id && expandStatus?.nodeId === selectedNode.id) {
