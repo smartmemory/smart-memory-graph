@@ -117,27 +117,76 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy, onSele
   </section>;
 }
 
-function nextStep(effects, unsettled, review, onSave) {
+export function DropCard({ drop, label, chosen, onReplace, onCancel, busy }) {
+  return <section className="de-detail de-drop-card" aria-label="Requirement dropped">
+    <p><b>Replaces {label}.</b> Drops: {drop.dropped}</p>
+    {chosen ? <p>Replacing anyway.</p> : <div className="de-actions">
+      {onReplace && <button className="de-primary" disabled={busy} onClick={() => onReplace(drop.id)}>Replace anyway</button>}
+      <button disabled={busy || !onCancel} onClick={onCancel}>Cancel</button>
+    </div>}
+  </section>;
+}
+
+export function checkAllowsSave(check) {
+  if (!check) return false;
+  if (check.state === 'checked') return check.checked > 0 && check.omitted === 0;
+  if (check.state === 'nothing_to_check' || check.state === 'no_related_rule') return check.checked === 0 && check.omitted === 0;
+  if (check.state === 'partial') return check.save_allowed === true && check.checked > 0;
+  return false;
+}
+
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
+function coverageMessage(check, hasReplacements) {
+  const checked = check?.checked || 0;
+  if (check?.state === 'nothing_to_check' && checkAllowsSave(check)) {
+    return hasReplacements ? 'No other rules in force to check against.' : 'No rules in force to check against.';
+  }
+  if (check?.state === 'no_related_rule' && checkAllowsSave(check)) return 'No related rule found among the rules in force.';
+  if (check?.state === 'checked' && checkAllowsSave(check)) return 'Checked against ' + plural(checked, 'rule') + '.';
+  if (check?.state === 'partial' && checked > 0 && check.omitted > 0) {
+    const more = (check.omitted_at_least ? 'at least ' : '') + plural(check.omitted, 'related rule');
+    return 'Partial check: checked the ' + plural(checked, 'closest related rule') + ', ' + more + ' not checked. '
+      + (check.save_allowed ? 'This workspace allows saving after a partial check.' : 'This workspace saves only after a full check.');
+  }
+  if (checked > 0) return 'Could not finish checking (' + plural(checked, 'rule') + ' checked). Try again.';
+  return 'Could not check for conflicts. Try again.';
+}
+
+function nextStep(effects, unsettled, review, onSave, canSave, dropsOpen) {
   if (!onSave) return 'Saving is unavailable for this preview.';
+  if (!canSave && effects.conflict_check?.state === 'partial') return 'Saving waits for a full check of every related rule.';
+  if (!canSave) return 'Saving waits for a complete conflict check. Refresh the preview to check again.';
   if (unsettled.length) return 'Resolve the conflict with the rule in force before saving.';
+  if (dropsOpen) return 'This draft drops a requirement of the rule it replaces. Choose Replace anyway or Cancel.';
   if (effects.policy === 'propose') return 'Send the proposal for review to request approval.';
   if (effects.conflicts.length) return 'Save the decision to apply your conflict choices.';
   if (effects.replaces.length && review.length) return 'Saving replaces the old rules and marks the affected decisions for review.';
   if (effects.replaces.length) return 'Saving replaces the rules shown in the preview.';
   if (review.length) return 'Saving marks the affected decisions for review.';
+  if (['checked', 'no_related_rule'].includes(effects.conflict_check?.state)) return 'Safe to save. Save this decision to put it in force.';
   return 'Save this decision to put it in force.';
 }
 
-export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCancel, busy }) {
+export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCancel, busy, drops = [], dropChoices = {}, onReplaceAnyway }) {
   const conflicts = unsettled.length;
+  const check = effects.conflict_check;
+  const canSave = checkAllowsSave(check);
+  const dropsOpen = drops.filter(d => !dropChoices[d.id]).length;
+  const partial = check?.state === 'partial';
+  const summary = !(conflicts || effects.conflicts.length || canSave || (partial && check.checked > 0)) ? 'Conflicts not checked'
+    : plural(conflicts, 'conflict') + (partial ? ' among ' + check.checked + ' checked' : '');
   return <footer className="de-commit" aria-label="Commit bar">
     <h3>What would change</h3>
-    <strong>{conflicts} conflict{conflicts === 1 ? '' : 's'} · {effects.replaces.length} replaced · {review.length} to review</strong>
-    <p>{nextStep(effects, unsettled, review, onSave)}</p>
+    <strong>{summary} · {effects.replaces.length} replaced · {review.length} to review</strong>
+    <p className="de-coverage">{coverageMessage(check, effects.replaces.length > 0)}</p>
+    {drops.map(d => <DropCard key={d.id} drop={d} label={d.label} chosen={!!dropChoices[d.id]}
+      onReplace={onSave && canSave ? onReplaceAnyway : null} onCancel={onCancel} busy={busy} />)}
+    <p>{nextStep(effects, unsettled, review, onSave, canSave, dropsOpen)}</p>
     <div className="de-actions">
       {conflicts > 0 && <button className="de-primary" disabled={busy}
         onClick={() => onConflict(unsettled[0].id)}>Resolve conflict</button>}
-      {onSave && <button className={conflicts ? '' : 'de-primary'} disabled={busy || !!conflicts} onClick={onSave}>
+      {onSave && <button className={conflicts ? '' : 'de-primary'} disabled={busy || !!conflicts || !canSave || !!dropsOpen} onClick={onSave}>
         {effects.policy === 'propose' ? 'Send for review' : 'Save decision'}</button>}
       <button onClick={onCancel} disabled={busy || !onCancel}>Discard</button>
     </div>

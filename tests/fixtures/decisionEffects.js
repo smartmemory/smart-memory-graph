@@ -45,6 +45,7 @@ function snapshot(focus, phase, distances, extras = {}) {
     data,
     decisionEffects: {
       data, focus, phase, today, policy: 'save', freshness: computed, replaces: [], conflicts: [], review: [],
+      ...(phase === 'draft' && { conflict_check: { state: 'checked', checked: 2, cap: 10, omitted: 0 } }),
       counts: { conflicts: 0, replaced: 0, to_review: 0 }, possibly_related: [], overflow: [], whyPaths, ...extras,
     },
   };

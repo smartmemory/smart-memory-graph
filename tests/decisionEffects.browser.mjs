@@ -164,11 +164,63 @@ test('multiple conflicts require every choice', async () => {
 test('B · safe Friday draft depends on Thursday and flags neither of its dependents', async () => {
   await show('friday');
   assert.match(await bar().innerText(), /0 conflicts · 0 replaced · 0 to review/);
-  assert.match(await bar().innerText(), /Save this decision to put it in force/);
+  assert.match(await bar().innerText(), /Checked against 2 rules/);
+  assert.match(await bar().innerText(), /Safe to save/);
   assert.equal(await button('Save decision').isEnabled(), true);
   assert.equal(await page.locator('[data-source="B"][data-target="release"]').count(), 1);
   assert.equal(await edge('ripple').count(), 0);
   assert.equal(await page.locator('[data-review]').count(), 0);
+});
+
+test('a dropped requirement keeps Save off until Replace anyway, which commits a replace', async () => {
+  await show('drop');
+  const text = await bar().innerText();
+  assert.match(text, /Replaces .+\. Drops: stop dosing when ALT is above 5 times ULN/);
+  assert.match(text, /drops a requirement of the rule it replaces/);
+  assert.equal(await button('Save decision').isEnabled(), false);
+  await bar().getByRole('button', { name: 'Replace anyway', exact: true }).click();
+  assert.equal(await readCommit(), null);
+  assert.equal(await button('Save decision').isEnabled(), true);
+  await button('Save decision').click();
+  assert.deepEqual((await readCommit()).answers, { pilot: { choice: 'replace' } });
+});
+
+test('Cancel on a dropped requirement changes nothing', async () => {
+  await show('drop');
+  await bar().getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.equal(await readCommit(), null);
+  assert.equal(await node('C').count(), 0);
+  for (const kind of ['replaces', 'ripple']) assert.equal(await edge(kind).count(), 0);
+});
+
+test('a known drop on a partial check shows its card; only Replace anyway waits for saving', async () => {
+  await show('drop-partial');
+  const text = await bar().innerText();
+  assert.match(text, /Replaces .+\. Drops: stop dosing when ALT is above 5 times ULN/);
+  assert.match(text, /Partial check: checked the 100 closest related rules, 2 related rules not checked/);
+  assert.equal(await bar().getByRole('button', { name: 'Replace anyway', exact: true }).count(), 0);
+  assert.equal(await bar().getByRole('button', { name: 'Cancel', exact: true }).isEnabled(), true);
+  assert.equal(await button('Save decision').isEnabled(), false);
+});
+
+test('unchecked and partial previews explain their coverage', async () => {
+  for (const [name, message, saves] of [
+    ['empty', /No rules in force to check against/, true],
+    ['norelated', /No related rule found among the rules in force/, true],
+    ['failed', /Could not check for conflicts\. Try again/, false],
+    ['unfinished', /Could not finish checking \(10 rules checked\)/, false],
+    ['partial', /Partial check: checked the 100 closest related rules, 2 related rules not checked\. This workspace saves only after a full check/, false],
+    ['partial-allowed', /checked the 100 closest related rules, at least 7 related rules not checked\. This workspace allows saving after a partial check/, true],
+    ['legacy', /Could not check for conflicts/, false],
+  ]) {
+    await show(name);
+    const text = await bar().innerText();
+    assert.match(text, message, name);
+    if (name.startsWith('partial')) assert.match(text, /0 conflicts among 100 checked/, name);
+    else if (!saves) assert.doesNotMatch(text, /0 conflicts/i, name);
+    if (name !== 'norelated') assert.doesNotMatch(text, /Safe to save/i, name);
+    assert.equal(await button('Save decision').isEnabled(), saves, name);
+  }
 });
 
 test('C · only the pilot billing decision needs review, plus human-review policy readback', async () => {

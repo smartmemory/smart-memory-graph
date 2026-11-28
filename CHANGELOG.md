@@ -8,7 +8,9 @@
 - GRAPH-EXPLORE-HOPS-ERGONOMICS-1 fix 4 (2026-11-28, user-visible): in the node panel "Expand Neighbors" now sits directly above the connections list, the only place new items appear.
 - Keep the drawn date visible while loading a selection, read once on drag release and cancel superseded requests. A range timeout enables the slider with the available dates.
 - Read standing rules for the selected date and keep the last successful graph when a read fails.
-
+- A known dropped requirement is shown on a partial check too: the card "Replaces <rule>. Drops: <requirement>." and its Cancel stay visible next to the coverage warning, and only "Replace anyway" waits until saving is possible (BUG-EFFECTS-CONFLICT-CHECK-INCONSISTENT-1 recheck M7).
+- A draft that replaces a rule and drops one of its requirements shows "Replaces <rule>. Drops: <requirement>." in the commit bar with Replace anyway and Cancel. Save stays off until Replace anyway is chosen; the commit then sends `replace` for the old rule. Cancel discards the proposal. Contract: `Drop`, snapshot `drops`.
+- Conflict check has five states (checked, partial, nothing to check, no related rule, failed); the commit bar says plainly what was covered, shows "N conflicts among M checked" on a partial check, and enables Save only when the check allows it.
 - Node detail list and subsection spacing stays within the selected node.
 - Conflict partners keep the red fill and border alongside their review tag.
 - Node details omit empty fields and unnamed related buttons and trim visible text.
@@ -24,6 +26,8 @@
 - DEMO-1204-RIPPLE-VIEW-FRAME-1 row 14 (2026-11-27, user-visible): in the effects view a source note is drawn as a small grey chip, visibly secondary to a decision card.
 - DEMO-1204-RIPPLE-VIEW-FRAME-1 row 21 (2026-11-27, user-visible): a decision's detail in the effects view now reads title, decided date, status pill, reason, options rejected, replaced, replaced by, depends on, depended on by, comes from. Related decisions and notes are links that open that node, and a field with no data is left out. No new API fields.
 - Hosts can retain a graph view in memory. A background browser tab pauses the stream and canvas until visible again. Returning from another app view merges fresh data without moving existing nodes or the camera. Workspace type filters survive reloads.
+- Draft conflict cards show checked and omitted rule counts. Incomplete and legacy previews cannot report clearance or save.
+- The hosted preview response requires coverage. Draft effects report how many readable rules the conflict judge checked and how many were omitted.
 
 - DEMO-1204-RIPPLE-NO-HOP-LIMIT-1 (2026-11-27, user-visible): ripples have no hop limit (OWNER 2026-11-27, verbatim: "no hop limit just no loops"). Contract: `decision-effects.json` `Review.hop` loses its `maximum` of 3 (still an integer of at least 1). The effects view draws, links (`R<hop>`) and tags ("R6 · needs review") a review mark at any hop; before, a mark past hop 3 was dropped in `focusWindow`, `graphLinks` and `nodeState`. The drawing caps stay (40 nodes, 12 per hop, with counts of the rest). Pairs with core `effects.py` on the same branch. Test: `tests/effectsNoHopLimit.test.js` (a six-hop chain). Consumers take the graph by `file:` link: rebuild or redeploy them to pick it up.
 - The graph detail panel shows the selected decision’s lifecycle status. A decision without a status shows one neutral “Status not set” badge.

@@ -37,6 +37,12 @@ export interface Conflict {
   freshness: Freshness
   resolution?: Resolution | Settlement
 }
+
+/** A rule the draft replaces and the requirement of it the draft drops; settled by 'replace' (Replace anyway) or cancel. */
+export interface Drop {
+  id: string // the replaced rule, also in `replaces`
+  dropped: string
+}
 export interface Review {
   id: string
   via: string
@@ -54,11 +60,14 @@ export interface EffectsPresentation {
   phase: 'draft' | 'standing' | 'held'
   policy?: 'save' | 'propose'
   replaces: string[]
+  drops?: Drop[]
   conflicts: Conflict[]
   review: Review[]
   freshness: Freshness
   // Ordered provenance, source first, up to five edges. Each pair has a graph edge.
   whyPaths?: Record<string, string[]>
+  conflict_check?: { state: 'checked' | 'no_related_rule' | 'nothing_to_check' | 'partial' | 'could_not_check', checked: number, omitted: number, cap: number,
+    ceiling?: number, save_allowed?: boolean, omitted_at_least?: boolean }
   counts?: { conflicts: number, replaced: number, to_review: number }
   possibly_related?: { id: string, label: string }[]
   possiblyRelated?: { id: string, label: string }[]

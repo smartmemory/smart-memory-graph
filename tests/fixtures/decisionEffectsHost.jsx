@@ -8,6 +8,16 @@ import { email, committedEmail, friday, pilots, refunds, standing, crowded, sugg
 import recordings from './standing-history.json';
 
 function fixture(name) {
+  const checks = {
+    empty: { state: 'nothing_to_check', checked: 0, cap: 10, omitted: 0 },
+    failed: { state: 'could_not_check', checked: 0, cap: 10, omitted: 0 },
+    partial: { state: 'partial', checked: 100, cap: 10, omitted: 2, ceiling: 100, save_allowed: false, omitted_at_least: false },
+    'partial-allowed': { state: 'partial', checked: 100, cap: 10, omitted: 7, ceiling: 100, save_allowed: true, omitted_at_least: true },
+    unfinished: { state: 'could_not_check', checked: 10, cap: 10, omitted: 0 },
+    norelated: { state: 'no_related_rule', checked: 0, cap: 10, omitted: 0 },
+    legacy: undefined,
+  };
+  if (Object.hasOwn(checks, name)) return { ...friday, decisionEffects: { ...friday.decisionEffects, conflict_check: checks[name] } };
   if (name === 'unknown-policy') return { ...email, decisionEffects: { ...email.decisionEffects, policy: undefined } };
   if (name === 'reject') return email;
   if (name === 'crowded') return crowded();
@@ -18,6 +28,10 @@ function fixture(name) {
       ...r, state: 'checking', freshness: { kind: 'stored', checked_as_of: '2026-11-20T03:00:00Z', stale: true },
     }),
   } };
+  if (name === 'drop') return { ...pilots, decisionEffects: { ...pilots.decisionEffects,
+    drops: [{ id: 'pilot', dropped: 'stop dosing when ALT is above 5 times ULN' }] } };
+  if (name === 'drop-partial') return { ...pilots, decisionEffects: { ...pilots.decisionEffects,
+    drops: [{ id: 'pilot', dropped: 'stop dosing when ALT is above 5 times ULN' }], conflict_check: checks.partial } };
   if (name === 'propose') return { ...pilots, decisionEffects: { ...pilots.decisionEffects, policy: 'propose' } };
   if (name === 'multi') return { ...email, decisionEffects: { ...email.decisionEffects,
     conflicts: [...email.decisionEffects.conflicts, { ...email.decisionEffects.conflicts[0], id: 'growth' }] } };

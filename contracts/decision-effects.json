@@ -125,6 +125,16 @@
       "required": ["id", "why", "freshness"],
       "additionalProperties": false
     },
+    "Drop": {
+      "type": "object",
+      "description": "A rule the draft replaces, and the requirement of it the draft drops (the judge's words, plain). Settled at commit by a resolution keyed by `id`: replace (Replace anyway) or cancel.",
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "dropped": { "$ref": "#/$defs/Text" }
+      },
+      "required": ["id", "dropped"],
+      "additionalProperties": false
+    },
     "Review": {
       "type": "object",
       "properties": {
@@ -139,6 +149,39 @@
       },
       "required": ["id", "via", "hop", "state", "freshness"],
       "additionalProperties": false
+    },
+    "ConflictCheck": {
+      "type": "object",
+      "description": "Scope of the conflict check of a draft. Every related rule is judged, in calls of up to `cap` rules, up to the workspace ceiling. checked: every related rule judged. no_related_rule: the lookup proved it finished and found no related rule while rules are in force. nothing_to_check: no other rule in force. partial: more related rules than the ceiling; the closest `ceiling` were judged, `omitted` were not (a lower bound when `omitted_at_least`), and `save_allowed` is the workspace setting decisions.effects.save_on_partial_check. could_not_check: a lookup step or a judge call did not finish; never cleared, try again.",
+      "properties": {
+        "state": { "enum": ["checked", "no_related_rule", "nothing_to_check", "partial", "could_not_check"] },
+        "checked": { "type": "integer", "minimum": 0 },
+        "cap": { "const": 10 },
+        "omitted": { "type": "integer", "minimum": 0 },
+        "ceiling": { "type": "integer", "minimum": 10, "maximum": 1000 },
+        "save_allowed": { "type": "boolean" },
+        "omitted_at_least": { "type": "boolean" }
+      },
+      "required": ["state", "checked", "cap", "omitted"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "const": "checked" } } },
+          "then": { "properties": { "checked": { "minimum": 1 }, "omitted": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "state": { "enum": ["nothing_to_check", "no_related_rule"] } } },
+          "then": { "properties": { "checked": { "const": 0 }, "omitted": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "state": { "const": "partial" } } },
+          "then": {
+            "properties": { "checked": { "minimum": 1 }, "omitted": { "minimum": 1 } },
+            "required": ["ceiling", "save_allowed", "omitted_at_least"]
+          },
+          "else": { "not": { "anyOf": [{ "required": ["ceiling"] }, { "required": ["save_allowed"] }, { "required": ["omitted_at_least"] }] } }
+        }
+      ]
     },
     "Counts": {
       "type": "object",
@@ -215,6 +258,11 @@
           "items": { "$ref": "#/$defs/Id" },
           "uniqueItems": true
         },
+        "drops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Drop" },
+          "description": "Draft only. The replaced rules (each also in `replaces`) the draft drops a requirement of. Absent when the workspace setting decisions.effects.replacement_drop_check is off, or on a host without the check."
+        },
         "conflicts": {
           "type": "array",
           "items": { "$ref": "#/$defs/Conflict" }
@@ -234,6 +282,7 @@
             "maxItems": 6
           }
         },
+        "conflict_check": { "$ref": "#/$defs/ConflictCheck" },
         "counts": { "$ref": "#/$defs/Counts" },
         "possibly_related": {
           "type": "array",
@@ -264,6 +313,12 @@
         "show_retired": { "type": "boolean" }
       }
     },
+    "PreviewResponse": {
+      "$ref": "#/$defs/DecisionEffectsSnapshot",
+      "type": "object",
+      "properties": { "phase": { "const": "draft" }, "conflict_check": { "$ref": "#/$defs/ConflictCheck" } },
+      "required": ["phase", "conflict_check"]
+    },
     "PreviewRequest": {
       "type": "object",
       "properties": {
@@ -288,7 +343,7 @@
       },
       "required": ["text", "resolutions"],
       "additionalProperties": false,
-      "description": "Recompute the authoritative conflict set under the caller scope before writing. Require exactly one entry for each conflict id. For missing entries return 409 naming the missing ids and write nothing. An empty map settles a conflict-free draft. Any cancel aborts the whole write."
+      "description": "Recompute the authoritative conflict set under the caller scope before writing. Require exactly one entry for each conflict id. For missing entries return 409 naming the missing ids and write nothing. An empty map settles a conflict-free draft. Any cancel aborts the whole write. A draft with `drops` also needs one entry per drop, keyed by the replaced rule's id: replace (Replace anyway) or cancel; a missing one is named in the same 409. An entry keyed by a replaced rule with no drop is accepted."
     },
     "UnsettledConflict": {
       "type": "object",
@@ -297,7 +352,8 @@
           "type": "array",
           "items": { "$ref": "#/$defs/Id" },
           "minItems": 1,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Conflict ids, and the ids of replaced rules whose drop has no resolution."
         }
       },
       "required": ["conflict_ids"],

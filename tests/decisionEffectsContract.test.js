@@ -21,6 +21,21 @@ it('validates the frozen-notes renderer snapshots and rejects stored marks on th
       expect(ajv.getSchema('#' + pointer)).toBeTypeOf('function');
     }
   }
+  const preview = ajv.getSchema('#/$defs/PreviewResponse');
+  const { conflict_check, ...legacy } = friday.decisionEffects;
+  expect(preview(legacy)).toBe(false);
+  expect(preview({ ...legacy, conflict_check })).toBe(true);
+  const partial = { state: 'partial', checked: 100, cap: 10, omitted: 3, ceiling: 100, save_allowed: false, omitted_at_least: false };
+  for (const valid of [{ ...conflict_check, checked: 55 }, { state: 'no_related_rule', checked: 0, cap: 10, omitted: 0 },
+    partial, { ...partial, save_allowed: true, omitted_at_least: true }, { state: 'could_not_check', checked: 20, cap: 10, omitted: 0 }]) {
+    expect(preview({ ...legacy, conflict_check: valid }), JSON.stringify(valid)).toBe(true);
+  }
+  const { ceiling, ...noCeiling } = partial;
+  for (const invalid of [{ ...conflict_check, checked: 0 }, { ...conflict_check, omitted: 1 },
+    { ...conflict_check, state: 'nothing_to_check' }, { ...conflict_check, state: 'no_related_rule' }, noCeiling,
+    { ...partial, omitted: 0 }, { ...conflict_check, save_allowed: true }, { ...partial, ceiling: ceiling + 1000 }]) {
+    expect(preview({ ...legacy, conflict_check: invalid }), JSON.stringify(invalid)).toBe(false);
+  }
   const commit = ajv.getSchema('#/$defs/CommitRequest');
   expect(commit({ text: 'A draft' })).toBe(false);
   for (const resolution of [{ choice: 'replace' }, { choice: 'keep_both_scoped', scope: 'marketing only' }, { choice: 'cancel' }]) {
