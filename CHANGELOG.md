@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Read standing rules for the selected date and keep the last successful graph when a read fails.
+
 - Node detail list and subsection spacing stays within the selected node.
 - Conflict partners keep the red fill and border alongside their review tag.
 - Node details omit empty fields and unnamed related buttons and trim visible text.

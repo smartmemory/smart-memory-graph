@@ -19,11 +19,11 @@ function monthTicks(first, today) {
   return ticks;
 }
 
-export function RulesSlider({ first, today, date, showRetired, onDate, onRetired }) {
+export function RulesSlider({ first, loadingRange, today, date, showRetired, onDate, onRetired }) {
   return <div className="de-time">
     <div className="de-date-label">Rules in force on<strong>{formatDate(date)} {date.slice(0, 4)}{date === today && ' (today)'}</strong></div>
     <div className="de-date-track">
-      <input type="range" min={day(first)} max={day(today)} value={day(date)}
+      <input type="range" disabled={loadingRange} min={day(first)} max={day(today)} value={day(date)}
         aria-label="Rules in force on" aria-valuetext={date}
         onChange={e => onDate(new Date(e.target.valueAsNumber * dayMs).toISOString().slice(0, 10))} />
       <div className="de-months" aria-hidden="true">{monthTicks(first, today).map(tick =>
