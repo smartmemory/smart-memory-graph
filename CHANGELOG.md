@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GRAPH-EXPLORE-HOPS-ERGONOMICS-1 fix 4 (2026-11-28, user-visible): in the node panel "Expand Neighbors" now sits directly above the connections list, the only place new items appear.
 - Keep the drawn date visible while loading a selection, read once on drag release and cancel superseded requests. A range timeout enables the slider with the available dates.
 - Read standing rules for the selected date and keep the last successful graph when a read fails.
 
