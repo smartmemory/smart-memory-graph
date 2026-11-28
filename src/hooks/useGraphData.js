@@ -19,7 +19,7 @@ import { useRefreshScheduler } from './useRefreshScheduler';
  *   background fetch starts while the tab is hidden, it runs once when the tab is visible again.
  * @returns {{ nodes, edges, loading, error, stats, refresh, incrementStats }}
  */
-export function useGraphData(adapter, { refreshSignal } = {}) {
+export function useGraphData(adapter, { refreshSignal, active = true } = {}) {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +30,7 @@ export function useGraphData(adapter, { refreshSignal } = {}) {
   const lastDataRef = useRef(null);
   // The only way to start a background fetch: signals become triggers, never direct calls.
   const fetchRef = useRef(null);
-  const refreshScheduler = useRefreshScheduler(() => fetchRef.current?.({ background: true }));
+  const refreshScheduler = useRefreshScheduler(() => active && fetchRef.current?.({ background: true }));
 
   const fetchGraph = useCallback(async (options) => {
     if (!adapter) return;
@@ -161,15 +161,19 @@ export function useGraphData(adapter, { refreshSignal } = {}) {
 
   useEffect(() => {
     fetchGraph();
+    return () => { seqRef.current++; };
   }, [fetchGraph]);
 
   // Background refetch when the host's signal changes (not on mount: the effect above loads).
+  const lastActiveRef = useRef(active);
   const lastSignalRef = useRef(refreshSignal);
   useEffect(() => {
-    if (Object.is(lastSignalRef.current, refreshSignal)) return;
+    const returning = active && !lastActiveRef.current;
+    lastActiveRef.current = active;
+    if (!active || (!returning && Object.is(lastSignalRef.current, refreshSignal))) return;
     lastSignalRef.current = refreshSignal;
     refreshScheduler.trigger('signal');
-  }, [refreshSignal, refreshScheduler]);
+  }, [active, refreshSignal, refreshScheduler]);
 
   const incrementStats = useCallback((addedNodes, addedEdges) => {
     const nodeArr = Array.isArray(addedNodes) ? addedNodes : [];

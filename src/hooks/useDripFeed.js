@@ -83,7 +83,7 @@ function pulseStreamingNode(node) {
  * @param {Object} options.stream - useGraphStream return value
  * @param {string} [options.speedMultiplier='1x'] - replay speed: '1x' | '2x' | '4x' | 'fast'
  */
-export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream, onGroundingFlash, onStageChange, speedMultiplier = '1x' }) {
+export function useDripFeed({ cytoscape, filters, incrementStats, layout, keepView = false, stream, onGroundingFlash, onStageChange, speedMultiplier = '1x' }) {
   const [dripInterval, setDripInterval] = useState(() => {
     const stored = localStorage.getItem('graph:dripInterval');
     return stored ? Number(stored) : 200;
@@ -222,7 +222,7 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
       }
       // No layout on a hidden (0x0) container: the container ResizeObserver in
       // useCytoscape re-lays out the whole graph when it is sized again.
-      if (!containerHasArea(cy)) return;
+      if (keepView || !containerHasArea(cy)) return;
       // Gentle full settle, then frame it once it's stable (fit AFTER the
       // settle, not racing it — avoids a mid-settle viewport jump). The settle is cola, which
       // moves nodes only in animation frames: a run that stops before its first frame (hidden or
@@ -239,7 +239,7 @@ export function useDripFeed({ cytoscape, filters, incrementStats, layout, stream
         },
       });
     }, 800);
-  }, [cytoscape, addNodeAnimated]);
+  }, [cytoscape, addNodeAnimated, keepView]);
 
   // Process next element from the drip queue
   const processNextDrip = useCallback(() => {

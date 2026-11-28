@@ -1,6 +1,6 @@
 /**
  * UI-REFRESH-1 — the graph fetched once on mount and never again, so a memory saved from the CLI
- * or MCP stayed invisible until a page reload. `useGraphData(adapter, { refreshSignal })` now
+ * or MCP stayed invisible until a page reload. `useGraphData(adapter, { refreshSignal, active })` now
  * refetches in the background whenever the host changes the signal (the console bumps it on
  * window focus, on a visible-tab interval, and after its own writes).
  *
@@ -19,15 +19,15 @@ let root;
 let latest;
 const loadingSeen = [];
 
-function Harness({ adapter, refreshSignal }) {
-  latest = useGraphData(adapter, { refreshSignal });
+function Harness({ adapter, refreshSignal, active }) {
+  latest = useGraphData(adapter, { refreshSignal, active });
   loadingSeen.push(latest.loading);
   return null;
 }
 
-async function render(adapter, refreshSignal) {
+async function render(adapter, refreshSignal, active = true) {
   await act(async () => {
-    root.render(createElement(Harness, { adapter, refreshSignal }));
+    root.render(createElement(Harness, { adapter, refreshSignal, active }));
   });
   await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 }
@@ -80,4 +80,16 @@ describe('useGraphData background refresh', () => {
     expect(adapter.getFullGraph).toHaveBeenCalledTimes(4);
     expect(latest.nodes).toBe(before);
   });
+});
+
+it('defers refreshes while away and revalidates on return with the settled graph visible', async () => {
+  const adapter = { getFullGraph: vi.fn(async () => ({ nodes: [apiNode('a')], edges: [] })) };
+  await render(adapter, 0);
+  const settled = latest.nodes;
+  await render(adapter, 1, false);
+  expect(adapter.getFullGraph).toHaveBeenCalledTimes(1);
+  await render(adapter, 1);
+  expect(adapter.getFullGraph).toHaveBeenCalledTimes(2);
+  expect(latest.loading).toBe(false);
+  expect(latest.nodes).toBe(settled);
 });
