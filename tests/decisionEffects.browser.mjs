@@ -371,6 +371,14 @@ test('rejected direct save shows a pending link and retries the preserved scope'
   assert.equal((await readCommit()).answers.eu.scope, 'Billing only');
 });
 
+test('standing dependencies render suggested dashed and confirmed solid by default', async () => {
+  await show('standing-marks');
+  const stroke = source => page.locator(`[data-edge="depends_on"][data-source="${source}"][data-target="vendor"] path`)
+    .evaluate(el => getComputedStyle(el).strokeDasharray);
+  assert.notEqual(await stroke('growth'), 'none');
+  assert.equal(await stroke('support'), 'none');
+});
+
 for (const mode of ['dashed', 'treat_as_real', 'suggest_only']) {
   test('A10 pilot preview through the adapter: ' + mode, async () => {
     await show(mode);

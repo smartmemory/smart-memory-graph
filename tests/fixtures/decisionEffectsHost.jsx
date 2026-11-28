@@ -18,6 +18,12 @@ function fixture(name) {
     legacy: undefined,
   };
   if (Object.hasOwn(checks, name)) return { ...friday, decisionEffects: { ...friday.decisionEffects, conflict_check: checks[name] } };
+  if (name === 'standing-marks') {
+    const edges = standing.data.edges.map(edge => edge.type === 'depends_on'
+      ? { ...edge, suggested: edge.source === 'growth' } : edge);
+    const data = { ...standing.data, edges };
+    return { data, decisionEffects: { ...standing.decisionEffects, data } };
+  }
   if (name === 'unknown-policy') return { ...email, decisionEffects: { ...email.decisionEffects, policy: undefined } };
   if (name === 'reject') return email;
   if (name === 'crowded') return crowded();
