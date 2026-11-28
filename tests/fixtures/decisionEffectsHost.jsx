@@ -28,6 +28,8 @@ function fixture(name) {
       ...r, state: 'checking', freshness: { kind: 'stored', checked_as_of: '2026-11-20T03:00:00Z', stale: true },
     }),
   } };
+  if (name === 'drop') return { ...pilots, decisionEffects: { ...pilots.decisionEffects,
+    drops: [{ id: 'pilot', dropped: 'stop dosing when ALT is above 5 times ULN' }] } };
   if (name === 'propose') return { ...pilots, decisionEffects: { ...pilots.decisionEffects, policy: 'propose' } };
   if (name === 'multi') return { ...email, decisionEffects: { ...email.decisionEffects,
     conflicts: [...email.decisionEffects.conflicts, { ...email.decisionEffects.conflicts[0], id: 'growth' }] } };

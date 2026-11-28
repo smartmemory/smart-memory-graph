@@ -117,6 +117,16 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy, onSele
   </section>;
 }
 
+export function DropCard({ drop, label, chosen, onReplace, onCancel, busy }) {
+  return <section className="de-detail de-drop-card" aria-label="Requirement dropped">
+    <p><b>Replaces {label}.</b> Drops: {drop.dropped}</p>
+    {chosen ? <p>Replacing anyway.</p> : <div className="de-actions">
+      <button className="de-primary" disabled={busy || !onReplace} onClick={() => onReplace(drop.id)}>Replace anyway</button>
+      <button disabled={busy || !onCancel} onClick={onCancel}>Cancel</button>
+    </div>}
+  </section>;
+}
+
 export function checkAllowsSave(check) {
   if (!check) return false;
   if (check.state === 'checked') return check.checked > 0 && check.omitted === 0;
@@ -143,11 +153,12 @@ function coverageMessage(check, hasReplacements) {
   return 'Could not check for conflicts. Try again.';
 }
 
-function nextStep(effects, unsettled, review, onSave, canSave) {
+function nextStep(effects, unsettled, review, onSave, canSave, dropsOpen) {
   if (!onSave) return 'Saving is unavailable for this preview.';
   if (!canSave && effects.conflict_check?.state === 'partial') return 'Saving waits for a full check of every related rule.';
   if (!canSave) return 'Saving waits for a complete conflict check. Refresh the preview to check again.';
   if (unsettled.length) return 'Resolve the conflict with the rule in force before saving.';
+  if (dropsOpen) return 'This draft drops a requirement of the rule it replaces. Choose Replace anyway or Cancel.';
   if (effects.policy === 'propose') return 'Send the proposal for review to request approval.';
   if (effects.conflicts.length) return 'Save the decision to apply your conflict choices.';
   if (effects.replaces.length && review.length) return 'Saving replaces the old rules and marks the affected decisions for review.';
@@ -157,10 +168,11 @@ function nextStep(effects, unsettled, review, onSave, canSave) {
   return 'Save this decision to put it in force.';
 }
 
-export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCancel, busy }) {
+export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCancel, busy, drops = [], dropChoices = {}, onReplaceAnyway }) {
   const conflicts = unsettled.length;
   const check = effects.conflict_check;
   const canSave = checkAllowsSave(check);
+  const dropsOpen = drops.filter(d => !dropChoices[d.id]).length;
   const partial = check?.state === 'partial';
   const summary = !(conflicts || effects.conflicts.length || canSave || (partial && check.checked > 0)) ? 'Conflicts not checked'
     : plural(conflicts, 'conflict') + (partial ? ' among ' + check.checked + ' checked' : '');
@@ -168,11 +180,13 @@ export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCa
     <h3>What would change</h3>
     <strong>{summary} · {effects.replaces.length} replaced · {review.length} to review</strong>
     <p className="de-coverage">{coverageMessage(check, effects.replaces.length > 0)}</p>
-    <p>{nextStep(effects, unsettled, review, onSave, canSave)}</p>
+    {canSave && drops.map(d => <DropCard key={d.id} drop={d} label={d.label} chosen={!!dropChoices[d.id]}
+      onReplace={onSave ? onReplaceAnyway : null} onCancel={onCancel} busy={busy} />)}
+    <p>{nextStep(effects, unsettled, review, onSave, canSave, dropsOpen)}</p>
     <div className="de-actions">
       {conflicts > 0 && <button className="de-primary" disabled={busy}
         onClick={() => onConflict(unsettled[0].id)}>Resolve conflict</button>}
-      {onSave && <button className={conflicts ? '' : 'de-primary'} disabled={busy || !!conflicts || !canSave} onClick={onSave}>
+      {onSave && <button className={conflicts ? '' : 'de-primary'} disabled={busy || !!conflicts || !canSave || !!dropsOpen} onClick={onSave}>
         {effects.policy === 'propose' ? 'Send for review' : 'Save decision'}</button>}
       <button onClick={onCancel} disabled={busy || !onCancel}>Discard</button>
     </div>

@@ -172,6 +172,27 @@ test('B · safe Friday draft depends on Thursday and flags neither of its depend
   assert.equal(await page.locator('[data-review]').count(), 0);
 });
 
+test('a dropped requirement keeps Save off until Replace anyway, which commits a replace', async () => {
+  await show('drop');
+  const text = await bar().innerText();
+  assert.match(text, /Replaces .+\. Drops: stop dosing when ALT is above 5 times ULN/);
+  assert.match(text, /drops a requirement of the rule it replaces/);
+  assert.equal(await button('Save decision').isEnabled(), false);
+  await bar().getByRole('button', { name: 'Replace anyway', exact: true }).click();
+  assert.equal(await readCommit(), null);
+  assert.equal(await button('Save decision').isEnabled(), true);
+  await button('Save decision').click();
+  assert.deepEqual((await readCommit()).answers, { pilot: { choice: 'replace' } });
+});
+
+test('Cancel on a dropped requirement changes nothing', async () => {
+  await show('drop');
+  await bar().getByRole('button', { name: 'Cancel', exact: true }).click();
+  assert.equal(await readCommit(), null);
+  assert.equal(await node('C').count(), 0);
+  for (const kind of ['replaces', 'ripple']) assert.equal(await edge(kind).count(), 0);
+});
+
 test('unchecked and partial previews explain their coverage', async () => {
   for (const [name, message, saves] of [
     ['empty', /No rules in force to check against/, true],

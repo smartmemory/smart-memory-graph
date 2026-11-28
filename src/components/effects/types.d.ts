@@ -37,6 +37,12 @@ export interface Conflict {
   freshness: Freshness
   resolution?: Resolution | Settlement
 }
+
+/** A rule the draft replaces and the requirement of it the draft drops; settled by 'replace' (Replace anyway) or cancel. */
+export interface Drop {
+  id: string // the replaced rule, also in `replaces`
+  dropped: string
+}
 export interface Review {
   id: string
   via: string
@@ -54,6 +60,7 @@ export interface EffectsPresentation {
   phase: 'draft' | 'standing' | 'held'
   policy?: 'save' | 'propose'
   replaces: string[]
+  drops?: Drop[]
   conflicts: Conflict[]
   review: Review[]
   freshness: Freshness

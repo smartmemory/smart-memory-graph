@@ -25,6 +25,7 @@ function usePanel() {
 
 function useCommit(effects, actions, draft, policyKnown, panel, closePanel) {
   const [choices, setChoices] = useState(() => Object.create(null));
+  const [dropChoices, setDropChoices] = useState(() => Object.create(null));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const pending = useRef(false);
@@ -36,6 +37,11 @@ function useCommit(effects, actions, draft, policyKnown, panel, closePanel) {
       const answer = c.resolution || resolutions[c.id];
       if (!answer) return;
       answers[c.id] = answer;
+    }
+    for (const d of effects.drops || []) {
+      // A drop is settled only by Replace anyway; Cancel discards the proposal and sends nothing.
+      if (!dropChoices[d.id]) return;
+      answers[d.id] = { choice: 'replace' };
     }
     pending.current = true;
     setBusy(true);
@@ -54,7 +60,10 @@ function useCommit(effects, actions, draft, policyKnown, panel, closePanel) {
     setChoices(next);
     closePanel();
   }
-  return { choices, busy, error, cancel, resolve, commit };
+  function replaceAnyway(id) {
+    setDropChoices(Object.assign(Object.create(null), dropChoices, { [id]: true }));
+  }
+  return { choices, dropChoices, busy, error, cancel, resolve, commit, replaceAnyway };
 }
 
 function canvasPills(overflow, byId, effects, today, openPanel) {
@@ -137,6 +146,7 @@ function useEffectsModel(data, effects, actions, history) {
   const focus = byId.get(effects.focus);
   const review = today ? visibleReview(effects) : [];
   const unsettled = effects.conflicts.filter(c => !choices[c.id] && !c.resolution);
+  const drops = (effects.drops || []).map(d => ({ ...d, label: byId.get(d.id)?.label || d.id }));
   const hidden = overflow.reduce((sum, s) => sum + s.count, 0);
   function select(value, retired, dragging) {
     history.select(value, retired, dragging);
@@ -145,7 +155,7 @@ function useEffectsModel(data, effects, actions, history) {
   }
   return { ...panels, ...state, ...canvasPills(overflow, byId, effects, today, openPanel),
     byId, today, date, path, setPath, nodes, links, focus, draft,
-    policyKnown, review, unsettled, hidden, select };
+    policyKnown, review, unsettled, drops, hidden, select };
 }
 
 function EffectsFrame({ model, data, effects, actions, loading }) {
@@ -167,7 +177,8 @@ function EffectsFrame({ model, data, effects, actions, loading }) {
 }
 
 function Sidebar({ model, effects, actions, proposal }) {
-  const { today, review, openPanel, byId, error, draft, unsettled, busy, cancel, policyKnown, commit, choices } = model;
+  const { today, review, openPanel, byId, error, draft, unsettled, busy, cancel, policyKnown, commit, choices,
+    drops, dropChoices, replaceAnyway } = model;
   return <div className="de-sidebar">
     {typeof proposal === 'function' ? proposal({ today }) : proposal}
     {today && effects.phase === 'standing' && !!review.length && <section className="de-review-list"><h3>Needs review</h3>
@@ -175,7 +186,8 @@ function Sidebar({ model, effects, actions, proposal }) {
         R{r.hop} · {byId.get(r.id)?.label || r.id}</button></li>)}</ul></section>}
     {error && <p role="alert">{error}</p>}
     {draft && <CommitBar effects={effects} unsettled={unsettled} review={review} busy={busy} onCancel={cancel}
-      onConflict={id => openPanel('conflict', id)} onSave={policyKnown && actions.onCommit && (() => commit(choices))} />}
+      onConflict={id => openPanel('conflict', id)} onSave={policyKnown && actions.onCommit && (() => commit(choices))}
+      drops={drops} dropChoices={dropChoices} onReplaceAnyway={replaceAnyway} />}
     <EffectsLegend />
   </div>;
 }
