@@ -8,7 +8,7 @@
 - GRAPH-EXPLORE-HOPS-ERGONOMICS-1 fix 4 (2026-11-28, user-visible): in the node panel "Expand Neighbors" now sits directly above the connections list, the only place new items appear.
 - Keep the drawn date visible while loading a selection, read once on drag release and cancel superseded requests. A range timeout enables the slider with the available dates.
 - Read standing rules for the selected date and keep the last successful graph when a read fails.
-
+- Conflict check has five states (checked, partial, nothing to check, no related rule, failed); the commit bar says plainly what was covered, shows "N conflicts among M checked" on a partial check, and enables Save only when the check allows it.
 - Node detail list and subsection spacing stays within the selected node.
 - Conflict partners keep the red fill and border alongside their review tag.
 - Node details omit empty fields and unnamed related buttons and trim visible text.

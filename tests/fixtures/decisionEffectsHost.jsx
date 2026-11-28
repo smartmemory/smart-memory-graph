@@ -11,7 +11,10 @@ function fixture(name) {
   const checks = {
     empty: { state: 'nothing_to_check', checked: 0, cap: 10, omitted: 0 },
     failed: { state: 'could_not_check', checked: 0, cap: 10, omitted: 0 },
-    partial: { state: 'could_not_check', checked: 10, cap: 10, omitted: 2 },
+    partial: { state: 'partial', checked: 100, cap: 10, omitted: 2, ceiling: 100, save_allowed: false, omitted_at_least: false },
+    'partial-allowed': { state: 'partial', checked: 100, cap: 10, omitted: 7, ceiling: 100, save_allowed: true, omitted_at_least: true },
+    unfinished: { state: 'could_not_check', checked: 10, cap: 10, omitted: 0 },
+    norelated: { state: 'no_related_rule', checked: 0, cap: 10, omitted: 0 },
     legacy: undefined,
   };
   if (Object.hasOwn(checks, name)) return { ...friday, decisionEffects: { ...friday.decisionEffects, conflict_check: checks[name] } };

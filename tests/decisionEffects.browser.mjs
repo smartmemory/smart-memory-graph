@@ -173,18 +173,22 @@ test('B · safe Friday draft depends on Thursday and flags neither of its depend
 });
 
 test('unchecked and partial previews explain their coverage', async () => {
-  for (const [name, message] of [
-    ['empty', /No rules in force to check against/],
-    ['failed', /Could not check for conflicts/],
-    ['partial', /Partial check.*10 rules.*2 left out/],
-    ['legacy', /Could not check for conflicts/],
+  for (const [name, message, saves] of [
+    ['empty', /No rules in force to check against/, true],
+    ['norelated', /No related rule found among the rules in force/, true],
+    ['failed', /Could not check for conflicts\. Try again/, false],
+    ['unfinished', /Could not finish checking \(10 rules checked\)/, false],
+    ['partial', /Partial check: checked the 100 closest related rules, 2 related rules not checked\. This workspace saves only after a full check/, false],
+    ['partial-allowed', /checked the 100 closest related rules, at least 7 related rules not checked\. This workspace allows saving after a partial check/, true],
+    ['legacy', /Could not check for conflicts/, false],
   ]) {
     await show(name);
     const text = await bar().innerText();
-    assert.match(text, message);
-    assert.doesNotMatch(text, /Safe to save/i);
-    if (name !== 'empty') assert.doesNotMatch(text, /0 conflicts/i);
-    assert.equal(await button('Save decision').isEnabled(), name === 'empty');
+    assert.match(text, message, name);
+    if (name.startsWith('partial')) assert.match(text, /0 conflicts among 100 checked/, name);
+    else if (!saves) assert.doesNotMatch(text, /0 conflicts/i, name);
+    if (name !== 'norelated') assert.doesNotMatch(text, /Safe to save/i, name);
+    assert.equal(await button('Save decision').isEnabled(), saves, name);
   }
 });
 

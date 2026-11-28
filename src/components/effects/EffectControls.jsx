@@ -118,37 +118,42 @@ export function DecisionCard({ node, data, effects, date, choices, onWhy, onSele
 }
 
 export function checkAllowsSave(check) {
-  if (!check || check.omitted !== 0) return false;
-  return (check.state === 'checked' && check.checked > 0)
-    || (check.state === 'nothing_to_check' && check.checked === 0);
+  if (!check) return false;
+  if (check.state === 'checked') return check.checked > 0 && check.omitted === 0;
+  if (check.state === 'nothing_to_check' || check.state === 'no_related_rule') return check.checked === 0 && check.omitted === 0;
+  if (check.state === 'partial') return check.save_allowed === true && check.checked > 0;
+  return false;
 }
 
+const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+
 function coverageMessage(check, hasReplacements) {
+  const checked = check?.checked || 0;
   if (check?.state === 'nothing_to_check' && checkAllowsSave(check)) {
     return hasReplacements ? 'No other rules in force to check against.' : 'No rules in force to check against.';
   }
-  const checked = check?.checked || 0;
-  const counted = checked + (checked === 1 ? ' rule' : ' rules');
-  if (checkAllowsSave(check)) return 'Checked against ' + counted + '.';
-  if (check?.omitted > 0) {
-    const outcome = checked ? 'Partial check. Checked ' + counted : 'Could not check for conflicts';
-    return outcome + '. ' + check.omitted
-      + ' left out of the single judge call (up to ' + check.cap + ' rules within the text limit).';
+  if (check?.state === 'no_related_rule' && checkAllowsSave(check)) return 'No related rule found among the rules in force.';
+  if (check?.state === 'checked' && checkAllowsSave(check)) return 'Checked against ' + plural(checked, 'rule') + '.';
+  if (check?.state === 'partial' && checked > 0 && check.omitted > 0) {
+    const more = (check.omitted_at_least ? 'at least ' : '') + plural(check.omitted, 'related rule');
+    return 'Partial check: checked the ' + plural(checked, 'closest related rule') + ', ' + more + ' not checked. '
+      + (check.save_allowed ? 'This workspace allows saving after a partial check.' : 'This workspace saves only after a full check.');
   }
-  if (checked > 0) return 'Partial check. Checked ' + counted + '. Could not finish checking.';
+  if (checked > 0) return 'Could not finish checking (' + plural(checked, 'rule') + ' checked). Try again.';
   return 'Could not check for conflicts. Try again.';
 }
 
 function nextStep(effects, unsettled, review, onSave, canSave) {
   if (!onSave) return 'Saving is unavailable for this preview.';
-  if (!canSave) return 'Saving waits for a complete conflict check.';
+  if (!canSave && effects.conflict_check?.state === 'partial') return 'Saving waits for a full check of every related rule.';
+  if (!canSave) return 'Saving waits for a complete conflict check. Refresh the preview to check again.';
   if (unsettled.length) return 'Resolve the conflict with the rule in force before saving.';
   if (effects.policy === 'propose') return 'Send the proposal for review to request approval.';
   if (effects.conflicts.length) return 'Save the decision to apply your conflict choices.';
   if (effects.replaces.length && review.length) return 'Saving replaces the old rules and marks the affected decisions for review.';
   if (effects.replaces.length) return 'Saving replaces the rules shown in the preview.';
   if (review.length) return 'Saving marks the affected decisions for review.';
-  if (effects.conflict_check?.state === 'checked') return 'Safe to save. Save this decision to put it in force.';
+  if (['checked', 'no_related_rule'].includes(effects.conflict_check?.state)) return 'Safe to save. Save this decision to put it in force.';
   return 'Save this decision to put it in force.';
 }
 
@@ -156,8 +161,9 @@ export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCa
   const conflicts = unsettled.length;
   const check = effects.conflict_check;
   const canSave = checkAllowsSave(check);
-  const summary = conflicts || effects.conflicts.length || canSave
-    ? conflicts + ' conflict' + (conflicts === 1 ? '' : 's') : 'Conflicts not checked';
+  const partial = check?.state === 'partial';
+  const summary = !(conflicts || effects.conflicts.length || canSave || (partial && check.checked > 0)) ? 'Conflicts not checked'
+    : plural(conflicts, 'conflict') + (partial ? ' among ' + check.checked + ' checked' : '');
   return <footer className="de-commit" aria-label="Commit bar">
     <h3>What would change</h3>
     <strong>{summary} · {effects.replaces.length} replaced · {review.length} to review</strong>
