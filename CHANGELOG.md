@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- GRAPH-EXPLORE-HOPS-ERGONOMICS-1 fixes 2 and 3 (2026-11-28, user-visible): Explore Hops is stepped by the user. It starts at the node, "Next hop" reveals one more step and "Back" hides it, with "hop N of M" and the count each step added. Nothing auto-plays, and a node is never revealed twice. "Show all" (also a click on empty canvas or on a dimmed node or link, and Escape) clears the dimming and shows the whole graph, node still selected, layout untouched. `useMultiHopReplay` loses its `graphData` option (it reads the canvas) and gains `step`, `nextHop`, `prevHop`, `showAll`; new `HopStepper` component. The search retrieval replay is unchanged.
 - GRAPH-EXPLORE-HOPS-ERGONOMICS-1 fix 4 (2026-11-28, user-visible): in the node panel "Expand Neighbors" now sits directly above the connections list, the only place new items appear.
 - Keep the drawn date visible while loading a selection, read once on drag release and cancel superseded requests. A range timeout enables the slider with the available dates.
 - Read standing rules for the selected date and keep the last successful graph when a read fails.

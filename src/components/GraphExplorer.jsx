@@ -9,6 +9,7 @@ import SearchBar from './SearchBar';
 import TimeTravelSlider from './TimeTravelSlider';
 import OperationsBar from './OperationsBar';
 import ReplayButton from './ReplayButton';
+import HopStepper from './HopStepper';
 import OriginLegend from './OriginLegend';
 import { useCytoscape } from '../internal/useCytoscape';
 import { useDaemonCapabilities } from '../hooks/useDaemonCapabilities';
@@ -427,10 +428,7 @@ function WorkspaceGraph({
     lastTimeHash.current = urlState;
   }, [urlState, daemon, adapter?.getTemporalSnapshot, interaction.setTimeTravelOpen]);
 
-  const multiHop = useMultiHopReplay({
-    cytoscape,
-    graphData: { nodes, edges },
-  });
+  const multiHop = useMultiHopReplay({ cytoscape });
 
   // Retrieval-hop replay (GRAPH-MULTIHOP-VIZ-1 G3).
   // Held in a ref so the autoplay effect below depends only on `autoReplayKey` —
@@ -951,7 +949,7 @@ function WorkspaceGraph({
               onExpand={!snapshot && adapter?.getNeighbors ? interaction.handleExpand : undefined}
               expandStatus={interaction.expandStatus}
               expanding={interaction.expanding}
-              onHopReplay={!snapshot ? (nodeId) => multiHop.replayState === 'playing' ? multiHop.stopReplay() : multiHop.startReplay(nodeId) : undefined}
+              onHopReplay={!snapshot ? (nodeId) => multiHop.startReplay(nodeId) : undefined}
               hopReplayState={multiHop.replayState}
               onNodeUpdate={interaction.handleNodeUpdate}
               onDelete={!snapshot && adapter && !deleteUnavailable ? handleDeleteNode : undefined}
@@ -992,8 +990,10 @@ function WorkspaceGraph({
         </p>
       )}
 
-      {/* Multi-hop replay indicator */}
-      {multiHop.replayState !== 'idle' && (
+      <HopStepper multiHop={multiHop} />
+
+      {/* Retrieval replay indicator */}
+      {multiHop.replayState !== 'idle' && multiHop.replayState !== 'stepping' && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-cyan-100 dark:bg-cyan-900/90 border border-cyan-300 dark:border-cyan-600 text-cyan-700 dark:text-cyan-200 px-4 py-2 rounded-lg text-sm z-50 flex items-center gap-3">
           {multiHop.replayState === 'playing' && (
             <div className="w-3 h-3 border-2 border-cyan-300 dark:border-cyan-400 border-t-transparent rounded-full animate-spin" />
@@ -1014,7 +1014,7 @@ function WorkspaceGraph({
                   style={{ backgroundColor: multiHop.HOP_COLORS[i % multiHop.HOP_COLORS.length] }}
                 />
                 <span className="text-xs">
-                  {multiHop.replayMode === 'bfs' && i === 0 ? 'start' : `hop ${i}`}
+                  {`hop ${i}`}
                 </span>
               </div>
             ))}

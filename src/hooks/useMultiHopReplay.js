@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { isEditableTarget } from '../core/graphKeyboard';
 import { buildAdjacency, bfsExpand } from '../core/multiHopBfs';
 import {
   buildBfsHopNodeSets,
@@ -15,6 +16,60 @@ import {
  */
 const REPLAY_OWNED_STYLES = 'opacity border-width border-color line-color width';
 
+/** Hops a stepped explore may lay out. "No hop limit, just no loops" (OWNER 2026-11-27): BFS never revisits. */
+const MAX_STEPPED_HOPS = 200;
+
+/** Reset the canvas and dim everything, ready for a reveal. `stop(true)` first: see `playPlan`. */
+function dimAll(cy) {
+  cy.elements().stop(true);
+  cy.elements().removeStyle(REPLAY_OWNED_STYLES);
+  cy.elements().animate({ style: { opacity: 0.08 } }, { duration: FADE_DURATION_MS });
+}
+
+/**
+ * Reveal one frame. THE reveal code: Explore Hops, Expand Neighbors and the search replay all
+ * draw a hop through this. An edge lights only once both endpoints are in `revealed`, and the
+ * whole frame is marked revealed first so edges WITHIN a hop are drawn too.
+ */
+function revealFrame(cy, frame, revealed) {
+  for (const nid of frame.nodeIds) revealed.add(nid);
+  for (const nid of frame.nodeIds) {
+    const node = cy.getElementById(nid);
+    if (!node.length) continue;
+    node.animate(
+      { style: { opacity: 1, 'border-width': frame.borderWidth, 'border-color': frame.color } },
+      { duration: FADE_DURATION_MS },
+    );
+    node.connectedEdges().forEach((edge) => {
+      if (!revealed.has(edge.source().id()) || !revealed.has(edge.target().id())) return;
+      edge.animate(
+        { style: { opacity: 0.7, 'line-color': frame.color, width: 2 } },
+        { duration: FADE_DURATION_MS },
+      );
+    });
+  }
+}
+
+/**
+ * Hop groups by graph distance from `seedId` over what the canvas holds RIGHT NOW (nodes added by
+ * an expand included), skipping anything a left-hand filter hides. Trailing empty hops are cut so
+ * "hop N of M" counts steps that add something.
+ */
+function hopSetsFromCanvas(cy, seedId) {
+  const edges = [];
+  cy.edges().forEach((e) => {
+    if (e.hasClass('dimmed') || e.source().hasClass('dimmed') || e.target().hasClass('dimmed')) return;
+    edges.push({ id: e.id(), source: e.source().id(), target: e.target().id() });
+  });
+  const adjacency = buildAdjacency(edges);
+  const result = bfsExpand({ startId: seedId, adjacency, maxHops: MAX_STEPPED_HOPS, maxNodesPerHop: 50 });
+  const { hopNodeSets } = buildBfsHopNodeSets({
+    startNodeId: seedId, adjacency, reachable: result.nodes, hopCount: result.hops.length,
+  });
+  while (hopNodeSets.length && hopNodeSets[hopNodeSets.length - 1].length === 0) hopNodeSets.pop();
+  return { hopNodeSets, capped: result.truncated };
+}
+
 /**
  * Orchestrates a hop-by-hop reveal animation on the Cytoscape canvas.
  *
@@ -22,8 +77,8 @@ const REPLAY_OWNED_STYLES = 'opacity border-width border-color line-color width'
  * distinct colour. The hook owns only the canvas side of that — WHICH nodes belong
  * to which hop comes from one of two independent sources (GRAPH-MULTIHOP-VIZ-1):
  *
- *   • `startReplay(nodeId)` — GRAPH DISTANCE. BFS out from a clicked node over the
- *     already-loaded edges. Answers "what is near this?"
+ *   • `startReplay(nodeId)` — GRAPH DISTANCE, stepped by the user (`nextHop`/`prevHop`). BFS out
+ *     from a clicked node over the edges the canvas holds. Answers "what is near this?"
  *   • `startRetrievalReplay(hopNodeSets)` — RETRIEVAL PROVENANCE. Precomputed groups
  *     from `groupByRetrievalHop(results)`, i.e. which hop of a multi-hop search first
  *     surfaced each result. Answers "how did the search get here?"
@@ -32,18 +87,20 @@ const REPLAY_OWNED_STYLES = 'opacity border-width border-color line-color width'
  * or unconnected in the loaded subgraph). Keeping the grouping outside the hook is
  * what lets both drive the same animation.
  *
- * Uses already-loaded graph data — no API calls.
+ * Makes no API calls: it reads the canvas.
  *
  * @param {Object} options
  * @param {Object} options.cytoscape - useCytoscape return value (cy ref + helpers)
- * @param {Object} options.graphData - useGraphData return value ({ nodes, edges })
  */
-export function useMultiHopReplay({ cytoscape, graphData }) {
+export function useMultiHopReplay({ cytoscape }) {
   const [replayState, setReplayState] = useState('idle');
-  const [replayMode, setReplayMode] = useState(null); // 'bfs' | 'retrieval' | null
+  const [replayMode, setReplayMode] = useState(null); // 'step' | 'retrieval' | null
   const [activeHop, setActiveHop] = useState(-1);
   const [hopStats, setHopStats] = useState(null);
   const [frameCount, setFrameCount] = useState(0);
+  const [step, setStep] = useState(null); // stepped explore: { seedId, active, total, added, capped }
+  const stepFramesRef = useRef([]);
+  const revealedRef = useRef(new Set());
   const cancelRef = useRef(false);
   const timersRef = useRef([]);
 
@@ -74,24 +131,7 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
     setReplayState('playing');
     setActiveHop(0);
 
-    // Reset the canvas before dimming, so a re-run starts clean rather than
-    // inheriting the last run's hop hues.
-    //
-    // `stop(true)` FIRST, and it is not optional: `removeStyle` does not cancel an
-    // in-flight animation. An element still mid-reveal simply finishes and reapplies
-    // its old hop colour on top of the new run, and the new dim/reveal work queues
-    // behind whatever is still playing. Clearing the queue is what makes the reset real.
-    //
-    // Colours are then REMOVED, never animated to null: Cytoscape lowercases every
-    // animated value as a colour string, so a null in an animate() payload throws.
-    cy.elements().stop(true);
-    cy.elements().removeStyle(REPLAY_OWNED_STYLES);
-
-    // Dim everything first
-    cy.elements().animate(
-      { style: { opacity: 0.08 } },
-      { duration: FADE_DURATION_MS },
-    );
+    dimAll(cy);
 
     const revealed = new Set();
 
@@ -99,27 +139,7 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
       if (cancelRef.current) return;
       setActiveHop(frame.hop);
 
-      // Mark the whole frame revealed before drawing edges, so edges WITHIN a
-      // single hop (two hop-1 results linked to each other) are drawn too.
-      for (const nid of frame.nodeIds) revealed.add(nid);
-
-      for (const nid of frame.nodeIds) {
-        const node = cy.getElementById(nid);
-        if (!node.length) continue;
-        node.animate(
-          { style: { opacity: 1, 'border-width': frame.borderWidth, 'border-color': frame.color } },
-          { duration: FADE_DURATION_MS },
-        );
-
-        node.connectedEdges().forEach((edge) => {
-          if (!revealed.has(edge.source().id())) return;
-          if (!revealed.has(edge.target().id())) return;
-          edge.animate(
-            { style: { opacity: 0.7, 'line-color': frame.color, width: 2 } },
-            { duration: FADE_DURATION_MS },
-          );
-        });
-      }
+      revealFrame(cy, frame, revealed);
     };
 
     plan.frames.forEach((frame, idx) => {
@@ -148,31 +168,56 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
     });
   }, [cytoscape, clearTimers]);
 
-  /** BFS replay: group by graph distance from a clicked start node. */
-  const startReplay = useCallback((startNodeId, maxHops = 3) => {
+  /**
+   * Stepped explore: dim the graph and show only `seedId`, then the user walks outward with
+   * `nextHop` / `prevHop`. `toHop` reveals that many steps at once (Expand Neighbors shows its one
+   * hop with `toHop: 1`). Nothing plays by itself.
+   */
+  const startReplay = useCallback((seedId, { toHop = 0 } = {}) => {
     const cy = cytoscape?.cy?.current;
-    if (!cy || !startNodeId) return;
-    if (!graphData?.edges?.length) return;
+    if (!cy || !seedId || !cy.getElementById(seedId).length) return;
+    clearTimers();
+    cancelRef.current = false;
+    const { hopNodeSets, capped } = hopSetsFromCanvas(cy, seedId);
+    const plan = buildReplayPlan(hopNodeSets, { seedNodeId: seedId });
+    stepFramesRef.current = plan.frames;
+    revealedRef.current = new Set();
+    dimAll(cy);
+    const active = Math.min(toHop, plan.frames.length - 1);
+    for (let i = 0; i <= active; i++) revealFrame(cy, plan.frames[i], revealedRef.current);
+    setHopStats(null);
+    setReplayMode('step');
+    setFrameCount(plan.frames.length);
+    setStep({ seedId, active, total: plan.frames.length - 1, added: plan.frames[active].nodeIds.length, capped });
+    setActiveHop(active);
+    setReplayState('stepping');
+  }, [cytoscape, clearTimers]);
 
-    const adjacency = buildAdjacency(graphData.edges);
-    const result = bfsExpand({
-      startId: startNodeId,
-      adjacency,
-      maxHops,
-      maxNodesPerHop: 50,
-    });
+  const showStep = useCallback((active) => {
+    const frames = stepFramesRef.current;
+    setStep((prev) => prev && { ...prev, active, added: frames[active].nodeIds.length });
+    setActiveHop(active);
+  }, []);
 
-    setHopStats(result.hops);
+  /** One more step outward. */
+  const nextHop = useCallback(() => {
+    const cy = cytoscape?.cy?.current;
+    const frames = stepFramesRef.current;
+    if (!cy || !step || step.active >= step.total) return;
+    revealFrame(cy, frames[step.active + 1], revealedRef.current);
+    showStep(step.active + 1);
+  }, [cytoscape, step, showStep]);
 
-    const { hopNodeSets } = buildBfsHopNodeSets({
-      startNodeId,
-      adjacency,
-      reachable: result.nodes,
-      hopCount: result.hops.length,
-    });
-
-    playPlan(buildReplayPlan(hopNodeSets, { seedNodeId: startNodeId }), 'bfs');
-  }, [cytoscape, graphData, playPlan]);
+  /** Hide the last step: rebuild the view one step shorter. */
+  const prevHop = useCallback(() => {
+    const cy = cytoscape?.cy?.current;
+    const frames = stepFramesRef.current;
+    if (!cy || !step || step.active <= 0) return;
+    revealedRef.current = new Set();
+    dimAll(cy);
+    for (let i = 0; i < step.active; i++) revealFrame(cy, frames[i], revealedRef.current);
+    showStep(step.active - 1);
+  }, [cytoscape, step, showStep]);
 
   /**
    * Retrieval replay: reveal precomputed hop groups from a search result set.
@@ -209,6 +254,8 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
     setActiveHop(-1);
     setHopStats(null);
     setFrameCount(0);
+    setStep(null);
+    revealedRef.current = new Set();
     const cy = cytoscape?.cy?.current;
     if (cy) {
       try {
@@ -226,6 +273,8 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
     setActiveHop(-1);
     setHopStats(null);
     setFrameCount(0);
+    setStep(null);
+    revealedRef.current = new Set();
 
     const cy = cytoscape?.cy?.current;
     if (cy) {
@@ -256,6 +305,31 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
     }
   }, [cytoscape, clearTimers]);
 
+  // While a stepped view is on, a click outside the lit set (empty canvas, a dimmed node or link) or
+  // Escape brings back the full graph. Local to this hook: the shared canvas store is untouched.
+  const stepping = replayState === 'stepping';
+  useEffect(() => {
+    const cy = cytoscape?.cy?.current;
+    if (!stepping || !cy) return undefined;
+    const lit = (el) => (el.isNode()
+      ? revealedRef.current.has(el.id())
+      : revealedRef.current.has(el.source().id()) && revealedRef.current.has(el.target().id()));
+    const onTap = (evt) => {
+      if (evt.target !== cy && lit(evt.target)) return;
+      stopReplay();
+    };
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || isEditableTarget(e.target)) return;
+      stopReplay();
+    };
+    cy.on('tap', onTap);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      cy.off('tap', onTap);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [stepping, cytoscape, stopReplay]);
+
   // Timers outlive the component without this — a replay started just before a
   // route change kept firing into a destroyed canvas.
   useEffect(() => () => {
@@ -270,7 +344,11 @@ export function useMultiHopReplay({ cytoscape, graphData }) {
     activeHop,
     hopStats,
     frameCount,
+    step,
     startReplay,
+    nextHop,
+    prevHop,
+    showAll: stopReplay,
     startRetrievalReplay,
     stopReplay,
     cancelReplay,

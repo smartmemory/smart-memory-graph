@@ -31,6 +31,7 @@ import GraphExplorer from '../src/components/GraphExplorer.jsx';
 function installCanvasStub() {
   const ctx = new Proxy(function () {}, {
     get: (_t, prop) => {
+      if (prop === 'globalAlpha') return 1; // drawn faded elements multiply by it
       if (typeof prop === 'symbol') return undefined;
       if (prop === 'canvas') return document.createElement('canvas');
       if (/PixelRatio$/.test(prop)) return 1;
@@ -121,12 +122,16 @@ describe('2. Explore Hops is stepped by the user', () => {
 
     await click(btn('Next hop'));
     expect(panelText()).toContain('hop 1 of 3');
-    expect(panelText()).toContain('+2'); // b and p1
+    expect(panelText()).toContain('+1 node'); // b only
     expect(lit('b')).toBe(true);
-    expect(lit('p1')).toBe(true);
+    expect(lit('p1')).toBe(false);
     expect(lit('c')).toBe(false);
 
     await click(btn('Next hop'));
+    expect(panelText()).toContain('hop 2 of 3');
+    expect(panelText()).toContain('+2 nodes'); // c and p1
+    expect(lit('p1')).toBe(true);
+    expect(lit('d')).toBe(false);
     await click(btn('Next hop'));
     expect(panelText()).toContain('hop 3 of 3');
     expect(lit('d')).toBe(true);
