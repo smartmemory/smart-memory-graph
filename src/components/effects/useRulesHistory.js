@@ -8,31 +8,38 @@ export default function useRulesHistory(data, effects, read, warn = defaultWarni
   const [view, setView] = useState({ date: today, retired: false });
   const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
-  const request = useRef(0);
+  const cancelRead = useRef(null);
   const history = useHistoryStart(read, focus, today, warn);
-  useEffect(() => () => { request.current++; }, []);
-  async function select(date, retired) {
-    const version = ++request.current;
+  useEffect(() => () => cancelRead.current?.(), []);
+  async function select(date, retired, dragging) {
+    cancelRead.current?.();
     const selection = { date, retired };
     setError('');
     if (!read) { setView(selection); return; }
     setPending(selection);
+    if (dragging) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    cancelRead.current = () => controller.abort();
     try {
-      const snapshot = await read(focus, { as_of: date, show_retired: retired });
-      if (version === request.current) setView({ ...selection, snapshot });
+      const snapshot = await read(focus, { as_of: date, show_retired: retired }, { signal });
+      if (!signal.aborted) setView({ ...selection, snapshot });
     } catch (reason) {
-      if (version === request.current) {
+      if (!signal.aborted) {
         warn(reason);
         setError('Could not load the selected rules. Showing the last successful view.');
       }
     } finally {
-      if (version === request.current) setPending(null);
+      if (!signal.aborted) {
+        setPending(null);
+        cancelRead.current = null;
+      }
     }
   }
   const snapshot = view.snapshot;
   const first = history.first || initialStart(data, effects);
   const loadingRange = Boolean(read && !history.first && !history.error);
-  return { view, selection: pending || view, select, first, loadingRange, error: error || history.error,
+  return { view, pending, selection: pending || view, select, first, loadingRange, error: error || history.error,
     data: snapshot?.data || data, effects: snapshot ? { ...snapshot, today } : effects };
 }
 
@@ -57,16 +64,23 @@ function useHistoryStart(read, focus, today, warn) {
   const [history, setHistory] = useState({});
   useEffect(() => {
     if (!read) return;
-    let active = true;
-    read(focus, { as_of: today, show_retired: true }).then(snapshot => {
-      if (active) setHistory({ first: earliestRule(snapshot.data, today) });
+    const controller = new AbortController();
+    const { signal } = controller;
+    const rangeError = { error: 'Could not load the full date range for this decision.' };
+    const timer = setTimeout(() => {
+      controller.abort();
+      setHistory(rangeError);
+      warn(new Error('Decision date range timed out'));
+    }, 10000);
+    read(focus, { as_of: today, show_retired: true }, { signal }).then(snapshot => {
+      if (!signal.aborted) setHistory({ first: earliestRule(snapshot.data, today) });
     }).catch(reason => {
-      if (active) {
+      if (!signal.aborted) {
         warn(reason);
-        setHistory({ error: 'Could not load the full date range for this decision.' });
+        setHistory(rangeError);
       }
-    });
-    return () => { active = false; };
+    }).finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [focus, read, today, warn]);
   return history;
 }

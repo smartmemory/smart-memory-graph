@@ -564,3 +564,60 @@ test('T5 and T6 show retired rules and restore the original today view', async t
     assert.deepEqual(await ids(), initial);
     assert.equal(warnings.length, 1);
 });
+
+test('held and superseded reads keep the date statement with the drawn rules', async () => {
+  await show(weekly);
+  await page.waitForSelector('input[type=range]:enabled');
+  await page.evaluate(() => {
+    window.holdHistory = (options, signal) => {
+      if (options.as_of === '2025-12-15') return new Promise(resolve => {
+        window.releaseEarlier = resolve;
+        window.earlierSignal = signal;
+      });
+    };
+  });
+  await dragTo(page, '2025-12-15');
+  await page.waitForFunction(() => Boolean(window.releaseEarlier));
+  const label = page.locator('.de-date-label strong');
+  const canvas = page.locator('.de-canvas');
+  const ids = () => page.$$eval('[data-node]', nodes => nodes.map(n => n.dataset.node).sort());
+  const original = await ids();
+  assert.ok(original.includes(weekly) && !original.includes(schedule));
+  assert.equal(await label.innerText(), '28 Nov 2026 (today)');
+  assert.equal(await page.locator('.de-date-label [role=status]').innerText(), 'Loading 15 Dec 2025…');
+  assert.equal(await canvas.getAttribute('aria-busy'), 'true');
+  assert.ok(await canvas.evaluate(el => Number(getComputedStyle(el).opacity) < 1));
+
+  await dragTo(page, '2026-02-15');
+  await page.waitForSelector('.de-canvas[aria-busy=false]');
+  assert.ok(await page.evaluate(() => window.earlierSignal.aborted));
+  const final = await ids();
+  assert.ok(final.includes(dose) && !final.includes(schedule));
+  await page.evaluate(async () => {
+    window.releaseEarlier();
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  assert.deepEqual(await ids(), final);
+  assert.equal(await label.innerText(), '15 Feb 2026');
+  assert.equal(await page.locator('.de-date-label [role=status], [role=alert]').count(), 0);
+});
+
+test('a hung range read times out and the available slider dates still work', async () => {
+  await page.clock.install();
+  await page.evaluate(() => {
+    window.holdHistory = (options, signal) => {
+      if (options.show_retired) {
+        window.rangeSignal = signal;
+        return new Promise(() => {});
+      }
+    };
+  });
+  await show(weekly);
+  await page.waitForSelector('input[type=range]:disabled');
+  await page.clock.fastForward(10001);
+  await page.waitForSelector('input[type=range]:enabled');
+  assert.ok(await page.evaluate(() => window.rangeSignal.aborted));
+  assert.match(await page.locator('[role=alert]').innerText(), /full date range/);
+  await dragTo(page, '2026-02-15');
+  assert.equal(await page.locator('.de-date-label strong').innerText(), '15 Feb 2026');
+});

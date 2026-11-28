@@ -138,8 +138,8 @@ function useEffectsModel(data, effects, actions, history) {
   const review = today ? visibleReview(effects) : [];
   const unsettled = effects.conflicts.filter(c => !choices[c.id] && !c.resolution);
   const hidden = overflow.reduce((sum, s) => sum + s.count, 0);
-  function select(value, retired) {
-    history.select(value, retired);
+  function select(value, retired, dragging) {
+    history.select(value, retired, dragging);
     setPanel(null);
     setPath([]);
   }
@@ -148,7 +148,7 @@ function useEffectsModel(data, effects, actions, history) {
     policyKnown, review, unsettled, hidden, select };
 }
 
-function EffectsFrame({ model, data, effects, actions }) {
+function EffectsFrame({ model, data, effects, actions, loading }) {
   const { today, hidden, path, links, setPath, nodes, date, choices, extras, openPanel } = model;
   return <div className="de-frame">
       <div className="de-frame-heading"><span>Decision neighbourhood{hidden > 0 && ` · ${hidden} more not shown`}</span>
@@ -159,7 +159,7 @@ function EffectsFrame({ model, data, effects, actions }) {
         {links.filter(link => link.kind === 'why' && link.freshness).map(link =>
           <span key={link.source + ':' + link.target}>Step {path.indexOf(link.target) + 1} <FreshnessChip result={link.freshness} /></span>)}
         <button onClick={() => setPath([])}>Clear path</button></div>}
-      <EffectsCanvas nodes={nodes} links={links} effects={effects} date={date} path={path} choices={choices}
+      <EffectsCanvas loading={loading} nodes={nodes} links={links} effects={effects} date={date} path={path} choices={choices}
         extras={extras} onSuggestion={link => openPanel('link', link.id)} onSelect={id => openPanel('node', id)} onConflict={id => openPanel('conflict', id)} />
 
     <DetailDrawer model={model} data={data} effects={effects} actions={actions} />
@@ -205,9 +205,9 @@ export default function DecisionEffects({ data: initialData, effects: initialEff
     <header className="de-header"><div><h2>Decision effects</h2>{(today || nodes.some(n => n.id === focus.id)) && <p>{focus.label}</p>}</div>
       {today && <FreshnessChip result={effects.freshness} />}</header>
     <Sidebar model={model} effects={effects} actions={actions} proposal={proposal} />
-    <EffectsFrame model={model} effects={effects} data={data} actions={actions} />
+    <EffectsFrame loading={Boolean(history.pending)} model={model} effects={effects} data={data} actions={actions} />
     {history.error && <p role="alert">{history.error}</p>}
-    <RulesSlider first={history.first} loadingRange={history.loadingRange} today={effects.today} date={selection.date} showRetired={selection.retired}
-      onDate={date => select(date, selection.retired)} onRetired={retired => select(selection.date, retired)} />
+    <RulesSlider first={history.first} loadingRange={history.loadingRange} today={effects.today} drawnDate={history.view.date} pending={history.pending} date={selection.date} showRetired={selection.retired}
+      onDate={(date, dragging) => select(date, selection.retired, dragging)} onRetired={retired => select(selection.date, retired)} />
   </section>;
 }

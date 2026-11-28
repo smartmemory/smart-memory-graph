@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep the drawn date visible while loading a selection, read once on drag release and cancel superseded requests. A range timeout enables the slider with the available dates.
 - Read standing rules for the selected date and keep the last successful graph when a read fails.
 
 - Node detail list and subsection spacing stays within the selected node.

@@ -54,7 +54,7 @@ function useDrag(pan) {
   };
 }
 
-export default function EffectsViewport({ width, height, children }) {
+export default function EffectsViewport({ loading, width, height, children }) {
   const element = useRef(null);
   const { size, camera, pan, zoomAt, fit } = useViewport(element);
   const drag = useDrag(pan);
@@ -68,7 +68,7 @@ export default function EffectsViewport({ width, height, children }) {
       <button aria-label="Zoom out" onClick={() => zoomAt(1 / 1.25)}>−</button>
       <button onClick={fit}>Fit</button>
     </div>
-    <svg ref={element} className="de-canvas" role="group" aria-label="Decision graph"
+    <svg aria-busy={loading} ref={element} className="de-canvas" role="group" aria-label="Decision graph"
       viewBox={box.join(' ')} {...drag}>{children}</svg>
   </div>;
 }

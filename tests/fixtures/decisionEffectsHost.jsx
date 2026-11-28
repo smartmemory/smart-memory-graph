@@ -31,8 +31,9 @@ function Host({ name, workspaceId, loading, reply, graphTheme }) {
   if (name === 'missing') return <GraphExplorer enableDecisionEffects decisionEffectsLoading={loading} />;
   const { decisionEffects: effects } = snapshot;
   const actions = {
-    ...(recordings[name] && { onReadHistory: async (id, options) => {
+    ...(recordings[name] && { onReadHistory: async (id, options, { signal }) => {
       window.historyReads.push(options);
+      await window.holdHistory?.(options, signal);
       const key = options.as_of + '/' + options.show_retired;
       const reply = recordings[id][key];
       if (!reply) throw Error('Date unavailable');
