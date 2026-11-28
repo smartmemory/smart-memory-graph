@@ -142,12 +142,15 @@
     },
     "ConflictCheck": {
       "type": "object",
-      "description": "Scope of the one-call conflict check. Omitted counts readable eligible candidates cut from the call. An incomplete check never gives clearance.",
+      "description": "Scope of the conflict check of a draft. Every related rule is judged, in calls of up to `cap` rules, up to the workspace ceiling. checked: every related rule judged. no_related_rule: the lookup proved it finished and found no related rule while rules are in force. nothing_to_check: no other rule in force. partial: more related rules than the ceiling; the closest `ceiling` were judged, `omitted` were not (a lower bound when `omitted_at_least`), and `save_allowed` is the workspace setting decisions.effects.save_on_partial_check. could_not_check: a lookup step or a judge call did not finish; never cleared, try again.",
       "properties": {
-        "state": { "enum": ["checked", "nothing_to_check", "could_not_check"] },
-        "checked": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "state": { "enum": ["checked", "no_related_rule", "nothing_to_check", "partial", "could_not_check"] },
+        "checked": { "type": "integer", "minimum": 0 },
         "cap": { "const": 10 },
-        "omitted": { "type": "integer", "minimum": 0 }
+        "omitted": { "type": "integer", "minimum": 0 },
+        "ceiling": { "type": "integer", "minimum": 10, "maximum": 1000 },
+        "save_allowed": { "type": "boolean" },
+        "omitted_at_least": { "type": "boolean" }
       },
       "required": ["state", "checked", "cap", "omitted"],
       "additionalProperties": false,
@@ -157,8 +160,16 @@
           "then": { "properties": { "checked": { "minimum": 1 }, "omitted": { "const": 0 } } }
         },
         {
-          "if": { "properties": { "state": { "const": "nothing_to_check" } } },
+          "if": { "properties": { "state": { "enum": ["nothing_to_check", "no_related_rule"] } } },
           "then": { "properties": { "checked": { "const": 0 }, "omitted": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "state": { "const": "partial" } } },
+          "then": {
+            "properties": { "checked": { "minimum": 1 }, "omitted": { "minimum": 1 } },
+            "required": ["ceiling", "save_allowed", "omitted_at_least"]
+          },
+          "else": { "not": { "anyOf": [{ "required": ["ceiling"] }, { "required": ["save_allowed"] }, { "required": ["omitted_at_least"] }] } }
         }
       ]
     },
