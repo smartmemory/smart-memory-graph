@@ -507,3 +507,60 @@ test('R1 node list spacing stays inside the node detail', async () => {
   await node('vendor').getByRole('button').click();
   assert.notDeepEqual(await aside().getByRole('list').first().evaluate(spacing), overflow);
 });
+
+const weekly = 'dec_2a14b0292f45';
+const schedule = 'dec_f3af21529846';
+const dose = 'dec_f1c21dfeabdd';
+const amendment = 'db338299-af75-4e54-974f-bdd88e7ac4ce';
+const historyCases = [
+  ['T1', weekly, '2025-12-15', [schedule], [weekly]],
+  ['T2', 'dec_ced77a8a5a71', '2026-04-01', ['dec_44068cc92565'], ['dec_ced77a8a5a71']],
+  ['T3', 'dec_ca6e932d60f9', '2026-04-01', ['dec_dbe5a7046262'], ['dec_ca6e932d60f9']],
+  ['T4', weekly, '2026-02-15', [weekly, dose, amendment], [schedule]],
+];
+
+async function dragTo(page, day) {
+  await page.$eval('input[type=range]', (el, value) => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, Date.parse(value) / 86400000);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, day);
+}
+
+for (const [name, id, day, visible, hidden] of historyCases) {
+  test(name + ' reads the selected date and draws the recorded ripple', async t => {
+    await show(id);
+    if (id === weekly) { await page.waitForFunction(() => Number(document.querySelector('input[type=range]')?.min) === Date.parse('2025-10-01') / 86400000); }
+    await dragTo(page, day);
+    for (const id of visible) await page.waitForSelector('[data-node="' + id + '"]');
+    assert.ok((await page.evaluate(() => window.historyReads)).some(o => o.as_of === day && o.show_retired === false));
+    for (const id of hidden) assert.equal(await page.$('[data-node="' + id + '"]'), null);
+  });
+}
+
+test('T5 and T6 show retired rules and restore the original today view', async t => {
+    const id = weekly;
+    await show(id);
+    await page.waitForFunction(() => Number(document.querySelector('input[type=range]')?.min) === Date.parse('2025-10-01') / 86400000);
+    const ids = () => page.$$eval('[data-node]', nodes => nodes.map(n => n.dataset.node).sort());
+    const initial = await ids();
+    assert.ok(initial.includes(weekly) && !initial.includes(schedule));
+    await page.click('.de-time input[type=checkbox]');
+    await page.waitForSelector('[data-node="' + schedule + '"]');
+    await page.click('.de-time input[type=checkbox]');
+    await page.waitForFunction(() => !document.querySelector('[data-node="dec_f3af21529846"]'));
+    await dragTo(page, '2025-12-15');
+    await page.waitForSelector('[data-node="' + schedule + '"]');
+    await page.click('.de-time button');
+    await page.waitForSelector('[data-node="' + weekly + '"]');
+    assert.deepEqual(await ids(), initial);
+    assert.deepEqual((await page.evaluate(() => window.historyReads)).slice(-4), [
+      { as_of: '2026-11-28', show_retired: true }, { as_of: '2026-11-28', show_retired: false },
+      { as_of: '2025-12-15', show_retired: false }, { as_of: '2026-11-28', show_retired: false },
+    ]);
+    const warnings = [];
+    page.on('console', msg => { if (['warning', 'warn'].includes(msg.type())) warnings.push(msg.text()); });
+    await dragTo(page, '2025-12-16');
+    await page.waitForSelector('[role=alert]');
+    assert.deepEqual(await ids(), initial);
+    assert.equal(warnings.length, 1);
+});

@@ -5,6 +5,8 @@ import { createSDKAdapter } from '../../src/adapters/sdkAdapter';
 import { GraphExplorer } from '../../src';
 import { email, committedEmail, friday, pilots, refunds, standing, crowded, suggestedPilots } from './decisionEffects';
 
+import recordings from './standing-history.json';
+
 function fixture(name) {
   if (name === 'unknown-policy') return { ...email, decisionEffects: { ...email.decisionEffects, policy: undefined } };
   if (name === 'reject') return email;
@@ -29,6 +31,13 @@ function Host({ name, workspaceId, loading, reply, graphTheme }) {
   if (name === 'missing') return <GraphExplorer enableDecisionEffects decisionEffectsLoading={loading} />;
   const { decisionEffects: effects } = snapshot;
   const actions = {
+    ...(recordings[name] && { onReadHistory: async (id, options) => {
+      window.historyReads.push(options);
+      const key = options.as_of + '/' + options.show_retired;
+      const reply = recordings[id][key];
+      if (!reply) throw Error('Date unavailable');
+      return reply;
+    } }),
     onCommit(focus, answers) {
       if (name === 'reject' && !window.lastCommit) {
         window.lastCommit = { focus, answers };
@@ -59,7 +68,8 @@ window.updateHost = render;
 window.loadCase = async (name, graphTheme) => {
   window.lastCommit = null;
   generation++;
-  let reply;
+  window.historyReads = [];
+  let reply = recordings[name]?.['2026-11-28/false'];
   const draftA = 'Move email to the US vendor to cut cost. This replaces the Frankfurt vendor decision.';
   const draftH = 'Pilots get 14 days free instead of 30. This replaces the 30-day free period.';
   const adapter = createSDKAdapter({ decisions: {
