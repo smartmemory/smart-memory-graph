@@ -121,7 +121,7 @@ export function DropCard({ drop, label, chosen, onReplace, onCancel, busy }) {
   return <section className="de-detail de-drop-card" aria-label="Requirement dropped">
     <p><b>Replaces {label}.</b> Drops: {drop.dropped}</p>
     {chosen ? <p>Replacing anyway.</p> : <div className="de-actions">
-      <button className="de-primary" disabled={busy || !onReplace} onClick={() => onReplace(drop.id)}>Replace anyway</button>
+      {onReplace && <button className="de-primary" disabled={busy} onClick={() => onReplace(drop.id)}>Replace anyway</button>}
       <button disabled={busy || !onCancel} onClick={onCancel}>Cancel</button>
     </div>}
   </section>;
@@ -180,8 +180,8 @@ export function CommitBar({ effects, unsettled, review, onConflict, onSave, onCa
     <h3>What would change</h3>
     <strong>{summary} · {effects.replaces.length} replaced · {review.length} to review</strong>
     <p className="de-coverage">{coverageMessage(check, effects.replaces.length > 0)}</p>
-    {canSave && drops.map(d => <DropCard key={d.id} drop={d} label={d.label} chosen={!!dropChoices[d.id]}
-      onReplace={onSave ? onReplaceAnyway : null} onCancel={onCancel} busy={busy} />)}
+    {drops.map(d => <DropCard key={d.id} drop={d} label={d.label} chosen={!!dropChoices[d.id]}
+      onReplace={onSave && canSave ? onReplaceAnyway : null} onCancel={onCancel} busy={busy} />)}
     <p>{nextStep(effects, unsettled, review, onSave, canSave, dropsOpen)}</p>
     <div className="de-actions">
       {conflicts > 0 && <button className="de-primary" disabled={busy}

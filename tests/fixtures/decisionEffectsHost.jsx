@@ -30,6 +30,8 @@ function fixture(name) {
   } };
   if (name === 'drop') return { ...pilots, decisionEffects: { ...pilots.decisionEffects,
     drops: [{ id: 'pilot', dropped: 'stop dosing when ALT is above 5 times ULN' }] } };
+  if (name === 'drop-partial') return { ...pilots, decisionEffects: { ...pilots.decisionEffects,
+    drops: [{ id: 'pilot', dropped: 'stop dosing when ALT is above 5 times ULN' }], conflict_check: checks.partial } };
   if (name === 'propose') return { ...pilots, decisionEffects: { ...pilots.decisionEffects, policy: 'propose' } };
   if (name === 'multi') return { ...email, decisionEffects: { ...email.decisionEffects,
     conflicts: [...email.decisionEffects.conflicts, { ...email.decisionEffects.conflicts[0], id: 'growth' }] } };

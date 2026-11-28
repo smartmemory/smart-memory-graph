@@ -193,6 +193,16 @@ test('Cancel on a dropped requirement changes nothing', async () => {
   for (const kind of ['replaces', 'ripple']) assert.equal(await edge(kind).count(), 0);
 });
 
+test('a known drop on a partial check shows its card; only Replace anyway waits for saving', async () => {
+  await show('drop-partial');
+  const text = await bar().innerText();
+  assert.match(text, /Replaces .+\. Drops: stop dosing when ALT is above 5 times ULN/);
+  assert.match(text, /Partial check: checked the 100 closest related rules, 2 related rules not checked/);
+  assert.equal(await bar().getByRole('button', { name: 'Replace anyway', exact: true }).count(), 0);
+  assert.equal(await bar().getByRole('button', { name: 'Cancel', exact: true }).isEnabled(), true);
+  assert.equal(await button('Save decision').isEnabled(), false);
+});
+
 test('unchecked and partial previews explain their coverage', async () => {
   for (const [name, message, saves] of [
     ['empty', /No rules in force to check against/, true],
