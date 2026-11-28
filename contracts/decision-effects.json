@@ -125,6 +125,16 @@
       "required": ["id", "why", "freshness"],
       "additionalProperties": false
     },
+    "Drop": {
+      "type": "object",
+      "description": "A rule the draft replaces, and the requirement of it the draft drops (the judge's words, plain). Settled at commit by a resolution keyed by `id`: replace (Replace anyway) or cancel.",
+      "properties": {
+        "id": { "$ref": "#/$defs/Id" },
+        "dropped": { "$ref": "#/$defs/Text" }
+      },
+      "required": ["id", "dropped"],
+      "additionalProperties": false
+    },
     "Review": {
       "type": "object",
       "properties": {
@@ -248,6 +258,11 @@
           "items": { "$ref": "#/$defs/Id" },
           "uniqueItems": true
         },
+        "drops": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Drop" },
+          "description": "Draft only. The replaced rules (each also in `replaces`) the draft drops a requirement of. Absent when the workspace setting decisions.effects.replacement_drop_check is off, or on a host without the check."
+        },
         "conflicts": {
           "type": "array",
           "items": { "$ref": "#/$defs/Conflict" }
@@ -328,7 +343,7 @@
       },
       "required": ["text", "resolutions"],
       "additionalProperties": false,
-      "description": "Recompute the authoritative conflict set under the caller scope before writing. Require exactly one entry for each conflict id. For missing entries return 409 naming the missing ids and write nothing. An empty map settles a conflict-free draft. Any cancel aborts the whole write."
+      "description": "Recompute the authoritative conflict set under the caller scope before writing. Require exactly one entry for each conflict id. For missing entries return 409 naming the missing ids and write nothing. An empty map settles a conflict-free draft. Any cancel aborts the whole write. A draft with `drops` also needs one entry per drop, keyed by the replaced rule's id: replace (Replace anyway) or cancel; a missing one is named in the same 409. An entry keyed by a replaced rule with no drop is accepted."
     },
     "UnsettledConflict": {
       "type": "object",
@@ -337,7 +352,8 @@
           "type": "array",
           "items": { "$ref": "#/$defs/Id" },
           "minItems": 1,
-          "uniqueItems": true
+          "uniqueItems": true,
+          "description": "Conflict ids, and the ids of replaced rules whose drop has no resolution."
         }
       },
       "required": ["conflict_ids"],
